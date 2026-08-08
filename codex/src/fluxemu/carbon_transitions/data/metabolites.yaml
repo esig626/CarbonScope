@@ -1,0 +1,320 @@
+schema_version: 1
+# C1..Cn denote the source-map order declared below.  For the frozen benchmark
+# species this is exactly the Table 5 order; it is not silently substituted
+# with a different database numbering system.
+metabolites:
+  - canonical_id: glucose
+    name: D-glucose
+    carbon_count: 6
+    carbon_positions: [C1, C2, C3, C4, C5, C6]
+    synonyms: [glucose_c, glucose_ext, glc__D, SubsGlc]
+    identifiers: {kegg.compound: [C00031], bigg.metabolite: [glc__D]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r1_SubsGlc source-map order"
+    stereochemistry_notes: "D-glucose; canonical order is the explicit source-map sequence."
+    symmetry: false
+  - canonical_id: glucose_6_phosphate
+    name: D-glucose 6-phosphate
+    carbon_count: 6
+    carbon_positions: [C1, C2, C3, C4, C5, C6]
+    synonyms: [G6P, g6p_c]
+    identifiers: {kegg.compound: [C00092], bigg.metabolite: [g6p]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r1/r2"
+    stereochemistry_notes: "D configuration; source-map order retained."
+    symmetry: false
+  - canonical_id: fructose_6_phosphate
+    name: D-fructose 6-phosphate
+    carbon_count: 6
+    carbon_positions: [C1, C2, C3, C4, C5, C6]
+    synonyms: [F6P, f6p_c]
+    identifiers: {kegg.compound: [C00085], bigg.metabolite: [f6p]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r2_pgi"
+    stereochemistry_notes: "D configuration; source-map order retained."
+    symmetry: false
+  - canonical_id: fructose_1_6_bisphosphate
+    name: D-fructose 1,6-bisphosphate
+    carbon_count: 6
+    carbon_positions: [C1, C2, C3, C4, C5, C6]
+    synonyms: [FBP, fbp_c]
+    identifiers: {kegg.compound: [C00354], bigg.metabolite: [fdp]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r4_pfk"
+    stereochemistry_notes: "D configuration; source-map order retained."
+    symmetry: false
+  - canonical_id: dihydroxyacetone_phosphate
+    name: dihydroxyacetone phosphate
+    carbon_count: 3
+    carbon_positions: [C1, C2, C3]
+    synonyms: [DHAP, dhap_c]
+    identifiers: {kegg.compound: [C00111], bigg.metabolite: [dhap]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r5_fba"
+    stereochemistry_notes: "No stereocentre; source-map order retained."
+    symmetry: false
+  - canonical_id: glyceraldehyde_3_phosphate
+    name: glyceraldehyde 3-phosphate
+    carbon_count: 3
+    carbon_positions: [C1, C2, C3]
+    synonyms: [GAP, gap_c]
+    identifiers: {kegg.compound: [C00118], bigg.metabolite: [g3p]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r5_fba"
+    stereochemistry_notes: "D-glyceraldehyde configuration in the biochemical reaction."
+    symmetry: false
+  - canonical_id: bisphosphoglycerate_1_3
+    name: 1,3-bisphosphoglycerate
+    carbon_count: 3
+    carbon_positions: [C1, C2, C3]
+    synonyms: [BPG, bpg_c]
+    identifiers: {kegg.compound: [C00236]}
+    numbering_source: "Frozen synthetic glycolysis map GAPD"
+    stereochemistry_notes: "Source-map order retained."
+    symmetry: false
+  - canonical_id: phosphoglycerate_3
+    name: 3-phospho-D-glycerate
+    carbon_count: 3
+    carbon_positions: [C1, C2, C3]
+    synonyms: [3PG, PGA, 3pg_c]
+    identifiers: {kegg.compound: [C00197], bigg.metabolite: [3pg]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r9_gapdh"
+    stereochemistry_notes: "D-glycerate; source-map order retained."
+    symmetry: false
+  - canonical_id: phosphoglycerate_2
+    name: 2-phospho-D-glycerate
+    carbon_count: 3
+    carbon_positions: [C1, C2, C3]
+    synonyms: [2PG, 2pg_c]
+    identifiers: {kegg.compound: [C00631], bigg.metabolite: [2pg]}
+    numbering_source: "Frozen synthetic glycolysis map PGM"
+    stereochemistry_notes: "D-glycerate; source-map order retained."
+    symmetry: false
+  - canonical_id: phosphoenolpyruvate
+    name: phosphoenolpyruvate
+    carbon_count: 3
+    carbon_positions: [C1, C2, C3]
+    synonyms: [PEP, pep_c]
+    identifiers: {kegg.compound: [C00074], bigg.metabolite: [pep]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r11_peph"
+    stereochemistry_notes: "Source-map order retained."
+    symmetry: false
+  - canonical_id: pyruvate
+    name: pyruvate
+    carbon_count: 3
+    carbon_positions: [C1, C2, C3]
+    synonyms: [Pyr, pyr_c]
+    identifiers: {kegg.compound: [C00022], bigg.metabolite: [pyr]}
+    numbering_source: "Frozen synthetic glycolysis map PDH"
+    stereochemistry_notes: "C1 is the decarboxylated carbon in the frozen PDH map."
+    symmetry: false
+  - canonical_id: lactate
+    name: L-lactate
+    carbon_count: 3
+    carbon_positions: [C1, C2, C3]
+    synonyms: [Lac, lac__L_c, lac__D_c]
+    identifiers: {kegg.compound: [C00186], bigg.metabolite: [lac__D]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r41_ldh"
+    stereochemistry_notes: "Library map is a carbon-skeleton map; model must establish L/D identity separately."
+    symmetry: false
+  - canonical_id: alanine
+    name: L-alanine
+    carbon_count: 3
+    carbon_positions: [C1, C2, C3]
+    synonyms: [Ala, ala__L_c]
+    identifiers: {kegg.compound: [C00041], bigg.metabolite: [ala__L]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r58_gpt_m"
+    stereochemistry_notes: "L configuration; carbon-skeleton map only."
+    symmetry: false
+  - canonical_id: acetyl_coa
+    name: acetyl-CoA carbon skeleton
+    carbon_count: 2
+    carbon_positions: [C1, C2]
+    synonyms: [AcCoA, AcCOA, accoa_c, accoa_m, AcCOAmit, AcCOAcyt]
+    identifiers: {kegg.compound: [C00024], bigg.metabolite: [accoa]}
+    numbering_source: "Frozen Antoniewicz Table 5 v1 and synthetic PDH"
+    stereochemistry_notes: "Only acetyl carbons are tracked; CoA carbons are excluded by design."
+    symmetry: false
+  - canonical_id: carbon_dioxide
+    name: carbon dioxide
+    carbon_count: 1
+    carbon_positions: [C1]
+    synonyms: [CO2, CO2in, CO2ex, co2_c, co2_e, CO2Ex, SubsCO2]
+    identifiers: {kegg.compound: [C00011], bigg.metabolite: [co2]}
+    numbering_source: "Frozen Antoniewicz Table 5 v2/v4"
+    stereochemistry_notes: "Single-carbon species."
+    symmetry: false
+  - canonical_id: oxaloacetate
+    name: oxaloacetate
+    carbon_count: 4
+    carbon_positions: [C1, C2, C3, C4]
+    synonyms: [OAC, Oxa, oaa_c, oaa_m, Oxacyt]
+    identifiers: {kegg.compound: [C00036], bigg.metabolite: [oaa]}
+    numbering_source: "Frozen Antoniewicz Table 5 v1/v6/v8"
+    stereochemistry_notes: "Canonical sequence is the Table 5 OAC order."
+    symmetry: false
+  - canonical_id: citrate
+    name: citrate
+    carbon_count: 6
+    carbon_positions: [C1, C2, C3, C4, C5, C6]
+    synonyms: [Cit, cit_c, cit_m, citrate_c, citrate_m]
+    identifiers: {kegg.compound: [C00158], bigg.metabolite: [cit]}
+    numbering_source: "Frozen Antoniewicz Table 5 v1/v2"
+    stereochemistry_notes: "Canonical sequence is the Table 5 citrate order."
+    symmetry: false
+  - canonical_id: alpha_ketoglutarate
+    name: 2-oxoglutarate
+    carbon_count: 5
+    carbon_positions: [C1, C2, C3, C4, C5]
+    synonyms: [AKG, aKG, akg_c, akg_m, alpha_ketoglutarate]
+    identifiers: {kegg.compound: [C00026], bigg.metabolite: [akg]}
+    numbering_source: "Frozen Antoniewicz Table 5 v2/v4"
+    stereochemistry_notes: "Also called alpha-ketoglutarate."
+    symmetry: false
+  - canonical_id: glutamate
+    name: L-glutamate
+    carbon_count: 5
+    carbon_positions: [C1, C2, C3, C4, C5]
+    synonyms: [Glu, glu__L_c, glutamate_c]
+    identifiers: {kegg.compound: [C00025], bigg.metabolite: [glu__L]}
+    numbering_source: "Frozen Antoniewicz Table 5 v3"
+    stereochemistry_notes: "L configuration; carbon-skeleton map only."
+    symmetry: false
+  - canonical_id: glutamine
+    name: L-glutamine
+    carbon_count: 5
+    carbon_positions: [C1, C2, C3, C4, C5]
+    synonyms: [Gln, gln__L_c]
+    identifiers: {kegg.compound: [C00064], bigg.metabolite: [gln__L]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r47_gls"
+    stereochemistry_notes: "L configuration; carbon-skeleton map only."
+    symmetry: false
+  - canonical_id: succinate
+    name: succinate
+    carbon_count: 4
+    carbon_positions: [C1, C2, C3, C4]
+    synonyms: [Suc, succ_c, succinate_c]
+    identifiers: {kegg.compound: [C00042], bigg.metabolite: [succ]}
+    numbering_source: "Frozen Antoniewicz Table 5 v4/v5"
+    stereochemistry_notes: "Rotationally symmetric; C1/C4 and C2/C3 orientations need equal branches."
+    symmetry: true
+  - canonical_id: fumarate
+    name: fumarate
+    carbon_count: 4
+    carbon_positions: [C1, C2, C3, C4]
+    synonyms: [Fum, fum_c, fumarate_c]
+    identifiers: {kegg.compound: [C00122], bigg.metabolite: [fum]}
+    numbering_source: "Frozen Antoniewicz Table 5 v5/v6/v7"
+    stereochemistry_notes: "Symmetric carbon skeleton; hydration stereochemistry is reaction-specific."
+    symmetry: true
+  - canonical_id: malate
+    name: L-malate
+    carbon_count: 4
+    carbon_positions: [C1, C2, C3, C4]
+    synonyms: [Mal, mal__L_c, mal__L_m, Malcyt, malate_c, malate_m]
+    identifiers: {kegg.compound: [C00149], bigg.metabolite: [mal__L]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r23_fh/r25_mdh"
+    stereochemistry_notes: "L-malate."
+    symmetry: false
+  - canonical_id: aspartate
+    name: L-aspartate
+    carbon_count: 4
+    carbon_positions: [C1, C2, C3, C4]
+    synonyms: [Asp, asp__L_c, aspartate_c]
+    identifiers: {kegg.compound: [C00049], bigg.metabolite: [asp__L]}
+    numbering_source: "Frozen Antoniewicz Table 5 v8"
+    stereochemistry_notes: "L configuration; carbon-skeleton map only."
+    symmetry: false
+  - canonical_id: phosphogluconolactone_6
+    name: 6-phospho-D-glucono-1,5-lactone
+    carbon_count: 6
+    carbon_positions: [C1, C2, C3, C4, C5, C6]
+    synonyms: [6PGL, 6pgl_c]
+    identifiers: {kegg.compound: [C01236], bigg.metabolite: [6pgl]}
+    numbering_source: "Unresolved individual G6PD/lactonase records; reserved global convention"
+    stereochemistry_notes: "No validated individual map is shipped in V1."
+    symmetry: false
+  - canonical_id: phosphogluconate_6
+    name: 6-phospho-D-gluconate
+    carbon_count: 6
+    carbon_positions: [C1, C2, C3, C4, C5, C6]
+    synonyms: [m6PG, 6PG, 6pgc]
+    identifiers: {kegg.compound: [C00345], bigg.metabolite: [6pgc]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r29_g6pdh/r30_pgd"
+    stereochemistry_notes: "D configuration; source-map order retained."
+    symmetry: false
+  - canonical_id: ribulose_5_phosphate
+    name: D-ribulose 5-phosphate
+    carbon_count: 5
+    carbon_positions: [C1, C2, C3, C4, C5]
+    synonyms: [Ru5P, ru5p__D_c]
+    identifiers: {kegg.compound: [C00199], bigg.metabolite: [ru5p__D]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r30_pgd"
+    stereochemistry_notes: "D configuration; source-map order retained."
+    symmetry: false
+  - canonical_id: ribose_5_phosphate
+    name: D-ribose 5-phosphate
+    carbon_count: 5
+    carbon_positions: [C1, C2, C3, C4, C5]
+    synonyms: [R5P, r5p_c]
+    identifiers: {kegg.compound: [C00117], bigg.metabolite: [r5p]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r31_ri"
+    stereochemistry_notes: "D configuration; source-map order retained."
+    symmetry: false
+  - canonical_id: xylulose_5_phosphate
+    name: D-xylulose 5-phosphate
+    carbon_count: 5
+    carbon_positions: [C1, C2, C3, C4, C5]
+    synonyms: [Xu5P, xu5p__D_c]
+    identifiers: {kegg.compound: [C00231], bigg.metabolite: [xu5p__D]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r33_rbe"
+    stereochemistry_notes: "D configuration; source-map order retained."
+    symmetry: false
+  - canonical_id: sedoheptulose_7_phosphate
+    name: sedoheptulose 7-phosphate
+    carbon_count: 7
+    carbon_positions: [C1, C2, C3, C4, C5, C6, C7]
+    synonyms: [S7P, s7p_c]
+    identifiers: {kegg.compound: [C05382], bigg.metabolite: [s7p]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r35_tkt"
+    stereochemistry_notes: "Source-map order retained."
+    symmetry: false
+  - canonical_id: erythrose_4_phosphate
+    name: D-erythrose 4-phosphate
+    carbon_count: 4
+    carbon_positions: [C1, C2, C3, C4]
+    synonyms: [E4P, e4p_c]
+    identifiers: {kegg.compound: [C00279], bigg.metabolite: [e4p]}
+    numbering_source: "mfapy Example_3_MCF7_model.txt, r37_tal"
+    stereochemistry_notes: "D configuration; source-map order retained."
+    symmetry: false
+  - canonical_id: acetate
+    name: acetate
+    carbon_count: 2
+    carbon_positions: [C1, C2]
+    synonyms: [Acetate, ac_c, ac_e]
+    identifiers: {kegg.compound: [C00033], bigg.metabolite: [ac]}
+    numbering_source: "mfapy Example_2_Ecoli_model.txt, r49"
+    stereochemistry_notes: "Acetate carbon skeleton."
+    symmetry: false
+  - canonical_id: serine
+    name: L-serine
+    carbon_count: 3
+    carbon_positions: [C1, C2, C3]
+    synonyms: [Ser, ser__L_c]
+    identifiers: {kegg.compound: [C00065], bigg.metabolite: [ser__L]}
+    numbering_source: "mfapy Example_2_Ecoli_model.txt, r67"
+    stereochemistry_notes: "L configuration."
+    symmetry: false
+  - canonical_id: glycine
+    name: glycine
+    carbon_count: 2
+    carbon_positions: [C1, C2]
+    synonyms: [Gly, gly_c]
+    identifiers: {kegg.compound: [C00037], bigg.metabolite: [gly]}
+    numbering_source: "mfapy Example_2_Ecoli_model.txt, r68"
+    stereochemistry_notes: "Achiral."
+    symmetry: false
+  - canonical_id: methylenetetrahydrofolate
+    name: 5,10-methylenetetrahydrofolate transferred carbon
+    carbon_count: 1
+    carbon_positions: [C1]
+    synonyms: [MEETHF, methylene_thf]
+    identifiers: {}
+    numbering_source: "mfapy Example_2_Ecoli_model.txt, r68"
+    stereochemistry_notes: "Only the transferred one-carbon unit is represented."
+    symmetry: false

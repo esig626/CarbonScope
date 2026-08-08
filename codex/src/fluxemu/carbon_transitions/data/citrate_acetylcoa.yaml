@@ -1,0 +1,52 @@
+schema_version: 1
+entries:
+  - canonical_id: transport.citrate.identity
+    name: citrate transport (carbon identity)
+    pathway: citrate export / ATP-citrate lyase
+    substrates: [citrate]
+    products: [citrate]
+    carbon_counts: {citrate: 6}
+    forward_atom_map:
+      - {from: citrate.C1, to: citrate.C1}
+      - {from: citrate.C2, to: citrate.C2}
+      - {from: citrate.C3, to: citrate.C3}
+      - {from: citrate.C4, to: citrate.C4}
+      - {from: citrate.C5, to: citrate.C5}
+      - {from: citrate.C6, to: citrate.C6}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Compartment transfer preserves every citrate carbon."
+    numbering_convention: "Antoniewicz Table 5 citrate order."
+    aliases: [CITt]
+    ec_numbers: []
+    identifiers: {}
+    provenance: {source_type: "curated transport identity", citation: "FluxEMU V1 transport convention", source_identifier: "transport-identity", source_location: "docs/CARBON_TRANSITION_LIBRARY.md", notes: "No chemical carbon transformation occurs; this is an explicit identity map, not an inferred reaction name match."}
+    validation_status: curated
+    comments: "Only matches exact citrate -> citrate carbon chemistry across compartments."
+  - canonical_id: citrate_acetylcoa.atp_citrate_lyase
+    name: ATP-citrate lyase carbon transition
+    pathway: citrate export / ATP-citrate lyase
+    substrates: [citrate]
+    products: [acetyl_coa, oxaloacetate]
+    carbon_counts: {citrate: 6, acetyl_coa: 2, oxaloacetate: 4}
+    forward_atom_map:
+      - {from: citrate.C1, to: oxaloacetate.C4}
+      - {from: citrate.C2, to: oxaloacetate.C3}
+      - {from: citrate.C3, to: oxaloacetate.C2}
+      - {from: citrate.C4, to: acetyl_coa.C2}
+      - {from: citrate.C5, to: acetyl_coa.C1}
+      - {from: citrate.C6, to: oxaloacetate.C1}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Exact inverse of the source model citrate labels FEDBAC -> AB + CDEF, translated into the frozen Table 5 citrate order."
+    numbering_convention: "Antoniewicz Table 5 citrate order; source model labels translated positionally."
+    aliases: [ACLY, ACL]
+    ec_numbers: [EC:2.3.3.8]
+    identifiers: {kegg.reaction: [R00352], bigg.reaction: [ACLY]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r82_acl", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit FEDBAC -> AB + CDEF map. Translation is documented against the global frozen citrate convention, not guessed from chemistry."}
+    validation_status: curated
+    comments: "CoA and ATP chemistry is non-carbon at the tracked-skeleton level."

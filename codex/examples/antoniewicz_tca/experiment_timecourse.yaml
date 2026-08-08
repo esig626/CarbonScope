@@ -1,0 +1,82 @@
+schema_version: 1
+
+# `build_model.py` validates the standard FluxEMU fields after removing the
+# benchmark-local timecourse block, then passes that documented block to mfapy
+# diffmdv.  This avoids extending FluxEMU's general experiment schema.
+tracers:
+  - metabolite_id: AcCoA
+    isotopomer_fractions:
+      "#00": 0.50
+      "#01": 0.25
+      "#11": 0.25
+    correction: no
+  - metabolite_id: aspartate
+    isotopomer_fractions:
+      "#0000": 1.0
+    correction: no
+
+targets:
+  - fragment_id: OAC
+    metabolite_id: OAC
+    atom_positions: [1, 2, 3, 4]
+    analytical_method: intermediate
+    formula: C4H4O5
+    correction: no
+  - fragment_id: citrate
+    metabolite_id: citrate
+    atom_positions: [1, 2, 3, 4, 5, 6]
+    analytical_method: intermediate
+    formula: C6H8O7
+    correction: no
+  - fragment_id: AKG
+    metabolite_id: AKG
+    atom_positions: [1, 2, 3, 4, 5]
+    analytical_method: intermediate
+    formula: C5H6O5
+    correction: no
+  - fragment_id: succinate
+    metabolite_id: succinate
+    atom_positions: [1, 2, 3, 4]
+    analytical_method: intermediate
+    formula: C4H6O4
+    correction: no
+  - fragment_id: fumarate
+    metabolite_id: fumarate
+    atom_positions: [1, 2, 3, 4]
+    analytical_method: intermediate
+    formula: C4H4O4
+    correction: no
+  - fragment_id: glutamate
+    metabolite_id: glutamate
+    atom_positions: [1, 2, 3, 4, 5]
+    analytical_method: intermediate
+    formula: C5H9NO4
+    correction: no
+
+fraction_of_optimum: 1.0
+sample_count: 1
+sampler: achr
+seed: 0
+
+tolerances:
+  bounds: 1.0e-9
+  mass_balance: 1.0e-9
+  objective_floor: 1.0e-9
+  mid: 1.0e-10
+  tracer_normalization: 1.0e-12
+
+output:
+  overwrite: false
+  float_precision: 15
+
+timecourse:
+  time_points: [0.0, 0.001, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0]
+  initial_internal_mids: unlabelled
+  pool_sizes:
+    OAC: 1.0
+    citrate: 1.0
+    AKG: 1.0
+    glutamate: 1.0
+    succinate: 1.0
+    fumarate: 1.0
+  time_units: artificial_numerical_units_only

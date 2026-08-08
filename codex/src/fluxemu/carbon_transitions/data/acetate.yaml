@@ -1,0 +1,23 @@
+schema_version: 1
+entries:
+  - canonical_id: acetate.acetate_to_acetylcoa
+    name: acetate activation to acetyl-CoA carbon skeleton
+    pathway: acetate -> acetyl-CoA
+    substrates: [acetate]
+    products: [acetyl_coa]
+    carbon_counts: {acetate: 2, acetyl_coa: 2}
+    forward_atom_map:
+      - {from: acetate.C1, to: acetyl_coa.C1}
+      - {from: acetate.C2, to: acetyl_coa.C2}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "The two-carbon acetate skeleton is retained; CoA carbons are not tracked."
+    numbering_convention: "mfapy Example_2 E. coli source-map sequence."
+    aliases: [ACS, ACKr]
+    ec_numbers: [EC:6.2.1.1]
+    identifiers: {kegg.reaction: [R00235], bigg.reaction: [ACS]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_2 E. coli model", source_identifier: "r49", source_location: "vendor/mfapy/sample/Example_2_Ecoli_model.txt", notes: "The source contains the explicit inverse AcCOA -> Acetate ABC -> ABC map."}
+    validation_status: curated
+    comments: "Reaction direction is represented as acetate -> acetyl-CoA; reverse map is derived."

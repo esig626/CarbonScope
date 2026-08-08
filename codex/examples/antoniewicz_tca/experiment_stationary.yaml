@@ -1,0 +1,37 @@
+schema_version: 1
+
+tracers:
+  - metabolite_id: AcCoA
+    isotopomer_fractions:
+      "#00": 0.50
+      "#01": 0.25
+      "#11": 0.25
+    correction: no
+  - metabolite_id: aspartate
+    isotopomer_fractions:
+      "#0000": 1.0
+    correction: no
+
+targets:
+  - fragment_id: glutamate
+    metabolite_id: glutamate
+    atom_positions: [1, 2, 3, 4, 5]
+    analytical_method: intermediate
+    formula: C5H9NO4
+    correction: no
+
+fraction_of_optimum: 1.0
+sample_count: 1
+sampler: achr
+seed: 0
+
+tolerances:
+  bounds: 1.0e-9
+  mass_balance: 1.0e-9
+  objective_floor: 1.0e-9
+  mid: 1.0e-10
+  tracer_normalization: 1.0e-12
+
+output:
+  overwrite: false
+  float_precision: 15

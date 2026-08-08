@@ -1,0 +1,12 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+references/
+standalone-phase1-*.diff
+codex/results/*
+!codex/results/carbon_transition_library/
+codex/results/carbon_transition_library/*
+!codex/results/carbon_transition_library/reaction_inventory.csv

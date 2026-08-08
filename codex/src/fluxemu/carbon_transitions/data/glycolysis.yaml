@@ -1,0 +1,259 @@
+schema_version: 1
+entries:
+  - canonical_id: transport.glucose.identity
+    name: glucose transport (carbon identity)
+    pathway: glycolysis
+    substrates: [glucose]
+    products: [glucose]
+    carbon_counts: {glucose: 6}
+    forward_atom_map: &glucose_identity
+      - {from: glucose.C1, to: glucose.C1}
+      - {from: glucose.C2, to: glucose.C2}
+      - {from: glucose.C3, to: glucose.C3}
+      - {from: glucose.C4, to: glucose.C4}
+      - {from: glucose.C5, to: glucose.C5}
+      - {from: glucose.C6, to: glucose.C6}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Compartment transport preserves every glucose carbon."
+    numbering_convention: "FluxEMU source-map C1..C6 sequence."
+    aliases: [GLC_IN]
+    ec_numbers: []
+    identifiers: {}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "GLC_IN", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Synthetic benchmark mapping; not attributed to Antoniewicz et al."}
+    validation_status: curated
+    comments: "Use for a model-specific glucose compartment transfer only when carbon chemistry is exactly glucose -> glucose."
+  - canonical_id: glycolysis.hexokinase
+    name: hexokinase carbon skeleton transition
+    pathway: glycolysis
+    substrates: [glucose]
+    products: [glucose_6_phosphate]
+    carbon_counts: {glucose: 6, glucose_6_phosphate: 6}
+    forward_atom_map:
+      - {from: glucose.C1, to: glucose_6_phosphate.C1}
+      - {from: glucose.C2, to: glucose_6_phosphate.C2}
+      - {from: glucose.C3, to: glucose_6_phosphate.C3}
+      - {from: glucose.C4, to: glucose_6_phosphate.C4}
+      - {from: glucose.C5, to: glucose_6_phosphate.C5}
+      - {from: glucose.C6, to: glucose_6_phosphate.C6}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Carbon skeleton is retained."
+    numbering_convention: "Frozen synthetic glycolysis C1..C6 sequence."
+    aliases: [HEX]
+    ec_numbers: [EC:2.7.1.1]
+    identifiers: {kegg.reaction: [R02848], bigg.reaction: [HEX1]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "HEX", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Synthetic conventional map; status is deliberately curated, not gold."}
+    validation_status: curated
+    comments: "Non-carbon ATP/ADP chemistry is intentionally not represented."
+  - canonical_id: glycolysis.phosphoglucose_isomerase
+    name: phosphoglucose isomerase
+    pathway: glycolysis
+    substrates: [glucose_6_phosphate]
+    products: [fructose_6_phosphate]
+    carbon_counts: {glucose_6_phosphate: 6, fructose_6_phosphate: 6}
+    forward_atom_map:
+      - {from: glucose_6_phosphate.C1, to: fructose_6_phosphate.C1}
+      - {from: glucose_6_phosphate.C2, to: fructose_6_phosphate.C2}
+      - {from: glucose_6_phosphate.C3, to: fructose_6_phosphate.C3}
+      - {from: glucose_6_phosphate.C4, to: fructose_6_phosphate.C4}
+      - {from: glucose_6_phosphate.C5, to: fructose_6_phosphate.C5}
+      - {from: glucose_6_phosphate.C6, to: fructose_6_phosphate.C6}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "This preserves the frozen benchmark's source-map order; it does not replace it with another database's positional convention."
+    numbering_convention: "Frozen synthetic glycolysis C1..C6 sequence."
+    aliases: [PGI]
+    ec_numbers: [EC:5.3.1.9]
+    identifiers: {kegg.reaction: [R00771], bigg.reaction: [PGI]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "PGI", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Synthetic conventional map; status is deliberately curated, not gold."}
+    validation_status: curated
+    comments: "Reverse map is mechanically derived and validated."
+  - canonical_id: glycolysis.phosphofructokinase
+    name: phosphofructokinase carbon skeleton transition
+    pathway: glycolysis
+    substrates: [fructose_6_phosphate]
+    products: [fructose_1_6_bisphosphate]
+    carbon_counts: {fructose_6_phosphate: 6, fructose_1_6_bisphosphate: 6}
+    forward_atom_map:
+      - {from: fructose_6_phosphate.C1, to: fructose_1_6_bisphosphate.C1}
+      - {from: fructose_6_phosphate.C2, to: fructose_1_6_bisphosphate.C2}
+      - {from: fructose_6_phosphate.C3, to: fructose_1_6_bisphosphate.C3}
+      - {from: fructose_6_phosphate.C4, to: fructose_1_6_bisphosphate.C4}
+      - {from: fructose_6_phosphate.C5, to: fructose_1_6_bisphosphate.C5}
+      - {from: fructose_6_phosphate.C6, to: fructose_1_6_bisphosphate.C6}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Carbon skeleton is retained."
+    numbering_convention: "Frozen synthetic glycolysis C1..C6 sequence."
+    aliases: [PFK]
+    ec_numbers: [EC:2.7.1.11]
+    identifiers: {kegg.reaction: [R00756], bigg.reaction: [PFK]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "PFK", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Synthetic conventional map; status is deliberately curated, not gold."}
+    validation_status: curated
+    comments: "Non-carbon ATP/ADP chemistry is intentionally not represented."
+  - canonical_id: glycolysis.fructose_bisphosphate_aldolase
+    name: fructose-bisphosphate aldolase
+    pathway: glycolysis
+    substrates: [fructose_1_6_bisphosphate]
+    products: [dihydroxyacetone_phosphate, glyceraldehyde_3_phosphate]
+    carbon_counts: {fructose_1_6_bisphosphate: 6, dihydroxyacetone_phosphate: 3, glyceraldehyde_3_phosphate: 3}
+    forward_atom_map:
+      - {from: fructose_1_6_bisphosphate.C1, to: dihydroxyacetone_phosphate.C3}
+      - {from: fructose_1_6_bisphosphate.C2, to: dihydroxyacetone_phosphate.C2}
+      - {from: fructose_1_6_bisphosphate.C3, to: dihydroxyacetone_phosphate.C1}
+      - {from: fructose_1_6_bisphosphate.C4, to: glyceraldehyde_3_phosphate.C1}
+      - {from: fructose_1_6_bisphosphate.C5, to: glyceraldehyde_3_phosphate.C2}
+      - {from: fructose_1_6_bisphosphate.C6, to: glyceraldehyde_3_phosphate.C3}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Cleavage is directional in the frozen benchmark's position convention."
+    numbering_convention: "Frozen synthetic glycolysis C1..C6 sequence."
+    aliases: [FBA]
+    ec_numbers: [EC:4.1.2.13]
+    identifiers: {kegg.reaction: [R01068], bigg.reaction: [FBA]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "FBA", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Exact frozen synthetic map abcdef -> cba + def."}
+    validation_status: curated
+    comments: "Corruption-tested because a reversed DHAP half changes positional labeling."
+  - canonical_id: glycolysis.triose_phosphate_isomerase
+    name: triose-phosphate isomerase
+    pathway: glycolysis
+    substrates: [dihydroxyacetone_phosphate]
+    products: [glyceraldehyde_3_phosphate]
+    carbon_counts: {dihydroxyacetone_phosphate: 3, glyceraldehyde_3_phosphate: 3}
+    forward_atom_map:
+      - {from: dihydroxyacetone_phosphate.C1, to: glyceraldehyde_3_phosphate.C1}
+      - {from: dihydroxyacetone_phosphate.C2, to: glyceraldehyde_3_phosphate.C2}
+      - {from: dihydroxyacetone_phosphate.C3, to: glyceraldehyde_3_phosphate.C3}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Frozen benchmark source-map order."
+    numbering_convention: "Frozen synthetic glycolysis C1..C3 sequence."
+    aliases: [TPI]
+    ec_numbers: [EC:5.3.1.1]
+    identifiers: {kegg.reaction: [R01015], bigg.reaction: [TPI]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "TPI", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Exact frozen synthetic map abc -> abc."}
+    validation_status: curated
+    comments: "Reverse map is derived from the normalized map."
+  - canonical_id: glycolysis.gap_to_bpg
+    name: glyceraldehyde-3-phosphate dehydrogenase carbon skeleton transition
+    pathway: glycolysis
+    substrates: [glyceraldehyde_3_phosphate]
+    products: [bisphosphoglycerate_1_3]
+    carbon_counts: {glyceraldehyde_3_phosphate: 3, bisphosphoglycerate_1_3: 3}
+    forward_atom_map: &gap_bpg_identity
+      - {from: glyceraldehyde_3_phosphate.C1, to: bisphosphoglycerate_1_3.C1}
+      - {from: glyceraldehyde_3_phosphate.C2, to: bisphosphoglycerate_1_3.C2}
+      - {from: glyceraldehyde_3_phosphate.C3, to: bisphosphoglycerate_1_3.C3}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Carbon skeleton is retained."
+    numbering_convention: "Frozen synthetic glycolysis C1..C3 sequence."
+    aliases: [GAPD]
+    ec_numbers: [EC:1.2.1.12]
+    identifiers: {kegg.reaction: [R01061], bigg.reaction: [GAPD]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "GAPD", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Exact frozen synthetic map abc -> abc."}
+    validation_status: curated
+    comments: "Cofactor and phosphate bookkeeping is outside the carbon map."
+  - canonical_id: glycolysis.bpg_to_3pg
+    name: phosphoglycerate kinase carbon skeleton transition
+    pathway: glycolysis
+    substrates: [bisphosphoglycerate_1_3]
+    products: [phosphoglycerate_3]
+    carbon_counts: {bisphosphoglycerate_1_3: 3, phosphoglycerate_3: 3}
+    forward_atom_map:
+      - {from: bisphosphoglycerate_1_3.C1, to: phosphoglycerate_3.C1}
+      - {from: bisphosphoglycerate_1_3.C2, to: phosphoglycerate_3.C2}
+      - {from: bisphosphoglycerate_1_3.C3, to: phosphoglycerate_3.C3}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Carbon skeleton is retained."
+    numbering_convention: "Frozen synthetic glycolysis C1..C3 sequence."
+    aliases: [PGK]
+    ec_numbers: [EC:2.7.2.3]
+    identifiers: {kegg.reaction: [R01512], bigg.reaction: [PGK]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "PGK", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Exact frozen synthetic map abc -> abc."}
+    validation_status: curated
+    comments: "Cofactor and phosphate bookkeeping is outside the carbon map."
+  - canonical_id: glycolysis.3pg_to_2pg
+    name: phosphoglycerate mutase carbon skeleton transition
+    pathway: glycolysis
+    substrates: [phosphoglycerate_3]
+    products: [phosphoglycerate_2]
+    carbon_counts: {phosphoglycerate_3: 3, phosphoglycerate_2: 3}
+    forward_atom_map:
+      - {from: phosphoglycerate_3.C1, to: phosphoglycerate_2.C1}
+      - {from: phosphoglycerate_3.C2, to: phosphoglycerate_2.C2}
+      - {from: phosphoglycerate_3.C3, to: phosphoglycerate_2.C3}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Carbon skeleton is retained."
+    numbering_convention: "Frozen synthetic glycolysis C1..C3 sequence."
+    aliases: [PGM]
+    ec_numbers: [EC:5.4.2.11]
+    identifiers: {kegg.reaction: [R01518], bigg.reaction: [PGM]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "PGM", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Exact frozen synthetic map abc -> abc."}
+    validation_status: curated
+    comments: "Carbon-only transition."
+  - canonical_id: glycolysis.2pg_to_pep
+    name: enolase carbon skeleton transition
+    pathway: glycolysis
+    substrates: [phosphoglycerate_2]
+    products: [phosphoenolpyruvate]
+    carbon_counts: {phosphoglycerate_2: 3, phosphoenolpyruvate: 3}
+    forward_atom_map:
+      - {from: phosphoglycerate_2.C1, to: phosphoenolpyruvate.C1}
+      - {from: phosphoglycerate_2.C2, to: phosphoenolpyruvate.C2}
+      - {from: phosphoglycerate_2.C3, to: phosphoenolpyruvate.C3}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Carbon skeleton is retained."
+    numbering_convention: "Frozen synthetic glycolysis C1..C3 sequence."
+    aliases: [ENO]
+    ec_numbers: [EC:4.2.1.11]
+    identifiers: {kegg.reaction: [R00658], bigg.reaction: [ENO]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "ENO", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Exact frozen synthetic map abc -> abc."}
+    validation_status: curated
+    comments: "Carbon-only transition."
+  - canonical_id: glycolysis.pyruvate_kinase
+    name: pyruvate kinase carbon skeleton transition
+    pathway: glycolysis
+    substrates: [phosphoenolpyruvate]
+    products: [pyruvate]
+    carbon_counts: {phosphoenolpyruvate: 3, pyruvate: 3}
+    forward_atom_map:
+      - {from: phosphoenolpyruvate.C1, to: pyruvate.C1}
+      - {from: phosphoenolpyruvate.C2, to: pyruvate.C2}
+      - {from: phosphoenolpyruvate.C3, to: pyruvate.C3}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Carbon skeleton is retained."
+    numbering_convention: "Frozen synthetic glycolysis C1..C3 sequence."
+    aliases: [PYK]
+    ec_numbers: [EC:2.7.1.40]
+    identifiers: {kegg.reaction: [R00200], bigg.reaction: [PYK]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "PYK", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Exact frozen synthetic map abc -> abc."}
+    validation_status: curated
+    comments: "Non-carbon ATP/ADP chemistry is intentionally not represented."

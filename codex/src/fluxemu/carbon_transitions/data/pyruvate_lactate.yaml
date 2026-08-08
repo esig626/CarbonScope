@@ -1,0 +1,46 @@
+schema_version: 1
+entries:
+  - canonical_id: pyruvate.lactate_dehydrogenase
+    name: lactate dehydrogenase carbon skeleton transition
+    pathway: lactate / pyruvate
+    substrates: [pyruvate]
+    products: [lactate]
+    carbon_counts: {pyruvate: 3, lactate: 3}
+    forward_atom_map:
+      - {from: pyruvate.C1, to: lactate.C1}
+      - {from: pyruvate.C2, to: lactate.C2}
+      - {from: pyruvate.C3, to: lactate.C3}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "The model's lactate enantiomer must be chemically compatible; the carbon skeleton is identity."
+    numbering_convention: "Frozen synthetic glycolysis C1..C3 sequence."
+    aliases: [LDH, LDH_D]
+    ec_numbers: [EC:1.1.1.27]
+    identifiers: {kegg.reaction: [R00703], bigg.reaction: [LDH_D]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "LDH", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Exact frozen synthetic map abc -> abc."}
+    validation_status: curated
+    comments: "NAD(H) is not carbon-bearing and is ignored for matching."
+  - canonical_id: pyruvate.pyruvate_dehydrogenase
+    name: pyruvate dehydrogenase carbon transition
+    pathway: lactate / pyruvate
+    substrates: [pyruvate]
+    products: [acetyl_coa, carbon_dioxide]
+    carbon_counts: {pyruvate: 3, acetyl_coa: 2, carbon_dioxide: 1}
+    forward_atom_map:
+      - {from: pyruvate.C1, to: carbon_dioxide.C1}
+      - {from: pyruvate.C2, to: acetyl_coa.C1}
+      - {from: pyruvate.C3, to: acetyl_coa.C2}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Pyruvate C1 is released as CO2; C2/C3 become acetyl-CoA C1/C2."
+    numbering_convention: "Frozen synthetic glycolysis C1..C3 sequence."
+    aliases: [PDH]
+    ec_numbers: [EC:1.2.4.1]
+    identifiers: {kegg.reaction: [R01196], bigg.reaction: [PDH]}
+    provenance: {source_type: "validated synthetic FluxEMU benchmark", citation: "FluxEMU antoniewicz_tca_glucose frozen synthetic glycolysis", source_identifier: "PDH", source_location: "examples/antoniewicz_tca_glucose/build_model.py: GLYCOLYSIS_REACTIONS", notes: "Exact frozen synthetic map abc -> bc + a; benchmark positional tests cover this fate."}
+    validation_status: curated
+    comments: "CoA carbons are excluded; CO2 is an explicit carbon-containing product."

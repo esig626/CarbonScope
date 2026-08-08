@@ -1,0 +1,50 @@
+schema_version: 1
+entries:
+  - canonical_id: glutaminolysis.glutaminase
+    name: glutaminase carbon skeleton transition
+    pathway: glutamine / glutamate / alpha-ketoglutarate entry
+    substrates: [glutamine]
+    products: [glutamate]
+    carbon_counts: {glutamine: 5, glutamate: 5}
+    forward_atom_map:
+      - {from: glutamine.C1, to: glutamate.C1}
+      - {from: glutamine.C2, to: glutamate.C2}
+      - {from: glutamine.C3, to: glutamate.C3}
+      - {from: glutamine.C4, to: glutamate.C4}
+      - {from: glutamine.C5, to: glutamate.C5}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Amide hydrolysis leaves the five-carbon skeleton unchanged."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [GLS]
+    ec_numbers: [EC:3.5.1.2]
+    identifiers: {kegg.reaction: [R00253], bigg.reaction: [GLS]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r47_gls", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCDE -> ABCDE map; r48 supplies reverse."}
+    validation_status: curated
+    comments: "The biochemical hydrolysis is directionally favoured; reverse here describes an atom-map inverse for model matching."
+  - canonical_id: glutaminolysis.glutamate_dehydrogenase
+    name: glutamate dehydrogenase carbon skeleton transition
+    pathway: glutamine / glutamate / alpha-ketoglutarate entry
+    substrates: [glutamate]
+    products: [alpha_ketoglutarate]
+    carbon_counts: {glutamate: 5, alpha_ketoglutarate: 5}
+    forward_atom_map:
+      - {from: glutamate.C1, to: alpha_ketoglutarate.C1}
+      - {from: glutamate.C2, to: alpha_ketoglutarate.C2}
+      - {from: glutamate.C3, to: alpha_ketoglutarate.C3}
+      - {from: glutamate.C4, to: alpha_ketoglutarate.C4}
+      - {from: glutamate.C5, to: alpha_ketoglutarate.C5}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Oxidative deamination/reductive amination retain the carbon skeleton."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [GLUDy, GLUDH]
+    ec_numbers: [EC:1.4.1.4]
+    identifiers: {kegg.reaction: [R00243], bigg.reaction: [GLUDy]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r49_gludh/r50_gludh", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCDE -> ABCDE maps in both directions."}
+    validation_status: curated
+    comments: "Provides the reversible glutamate <-> alpha-ketoglutarate entry transition."

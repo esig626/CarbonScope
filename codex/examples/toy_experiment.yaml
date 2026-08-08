@@ -1,0 +1,37 @@
+schema_version: 1
+
+tracers:
+  - metabolite_id: AcCoA
+    isotopomer_fractions:
+      "#00": 0.50
+      "#01": 0.25
+      "#11": 0.25
+    correction: no
+  - metabolite_id: Asp
+    isotopomer_fractions:
+      "#0000": 1.0
+    correction: no
+
+targets:
+  - fragment_id: Glue
+    metabolite_id: Glu
+    atom_positions: [1, 2, 3, 4, 5]
+    analytical_method: intermediate
+    formula: C5H10N2O3
+    correction: no
+
+fraction_of_optimum: 0.90
+sample_count: 6
+sampler: achr
+seed: 1729
+
+tolerances:
+  bounds: 1.0e-7
+  mass_balance: 1.0e-7
+  objective_floor: 1.0e-7
+  mid: 1.0e-8
+  tracer_normalization: 1.0e-9
+
+output:
+  overwrite: false
+  float_precision: 12

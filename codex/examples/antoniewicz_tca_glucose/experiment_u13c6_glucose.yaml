@@ -1,0 +1,47 @@
+schema_version: 1
+
+tracers:
+  - metabolite_id: glucose_ext
+    isotopomer_fractions:
+      "#111111": 1.0
+    correction: no
+  - metabolite_id: aspartate
+    isotopomer_fractions:
+      "#0000": 1.0
+    correction: no
+
+targets:
+  - {fragment_id: glucose_c, metabolite_id: glucose_c, atom_positions: [1, 2, 3, 4, 5, 6], analytical_method: intermediate, formula: C6H12O6, correction: no}
+  - {fragment_id: G6P, metabolite_id: G6P, atom_positions: [1, 2, 3, 4, 5, 6], analytical_method: intermediate, formula: C6H13O9P, correction: no}
+  - {fragment_id: F6P, metabolite_id: F6P, atom_positions: [1, 2, 3, 4, 5, 6], analytical_method: intermediate, formula: C6H13O9P, correction: no}
+  - {fragment_id: FBP, metabolite_id: FBP, atom_positions: [1, 2, 3, 4, 5, 6], analytical_method: intermediate, formula: C6H14O12P2, correction: no}
+  - {fragment_id: DHAP, metabolite_id: DHAP, atom_positions: [1, 2, 3], analytical_method: intermediate, formula: C3H7O6P, correction: no}
+  - {fragment_id: GAP, metabolite_id: GAP, atom_positions: [1, 2, 3], analytical_method: intermediate, formula: C3H7O6P, correction: no}
+  - {fragment_id: BPG, metabolite_id: BPG, atom_positions: [1, 2, 3], analytical_method: intermediate, formula: C3H8O10P2, correction: no}
+  - {fragment_id: 3PG, metabolite_id: 3PG, atom_positions: [1, 2, 3], analytical_method: intermediate, formula: C3H7O7P, correction: no}
+  - {fragment_id: 2PG, metabolite_id: 2PG, atom_positions: [1, 2, 3], analytical_method: intermediate, formula: C3H7O7P, correction: no}
+  - {fragment_id: PEP, metabolite_id: PEP, atom_positions: [1, 2, 3], analytical_method: intermediate, formula: C3H5O6P, correction: no}
+  - {fragment_id: pyruvate, metabolite_id: pyruvate, atom_positions: [1, 2, 3], analytical_method: intermediate, formula: C3H3O3, correction: no}
+  - {fragment_id: AcCoA, metabolite_id: AcCoA, atom_positions: [1, 2], analytical_method: intermediate, formula: C23H38N7O17P3S, correction: no}
+  - {fragment_id: citrate, metabolite_id: citrate, atom_positions: [1, 2, 3, 4, 5, 6], analytical_method: intermediate, formula: C6H8O7, correction: no}
+  - {fragment_id: AKG, metabolite_id: AKG, atom_positions: [1, 2, 3, 4, 5], analytical_method: intermediate, formula: C5H6O5, correction: no}
+  - {fragment_id: succinate, metabolite_id: succinate, atom_positions: [1, 2, 3, 4], analytical_method: intermediate, formula: C4H6O4, correction: no}
+  - {fragment_id: fumarate, metabolite_id: fumarate, atom_positions: [1, 2, 3, 4], analytical_method: intermediate, formula: C4H4O4, correction: no}
+  - {fragment_id: OAC, metabolite_id: OAC, atom_positions: [1, 2, 3, 4], analytical_method: intermediate, formula: C4H4O5, correction: no}
+  - {fragment_id: glutamate, metabolite_id: glutamate, atom_positions: [1, 2, 3, 4, 5], analytical_method: intermediate, formula: C5H9NO4, correction: no}
+
+fraction_of_optimum: 1.0
+sample_count: 1
+sampler: achr
+seed: 0
+
+tolerances:
+  bounds: 1.0e-9
+  mass_balance: 1.0e-9
+  objective_floor: 1.0e-9
+  mid: 1.0e-10
+  tracer_normalization: 1.0e-12
+
+output:
+  overwrite: false
+  float_precision: 15

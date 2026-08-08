@@ -1,0 +1,298 @@
+schema_version: 1
+# The eight antoniewicz.table5.* entries are generated/transcribed from the
+# frozen Table5Reaction definitions.  tests/test_carbon_transitions.py compares
+# their normalized maps against those definitions, preventing a second editable
+# interpretation of the published benchmark.
+entries:
+  - canonical_id: antoniewicz.table5.v1.citrate_synthase
+    name: oxaloacetate + acetyl-CoA to citrate (Antoniewicz Table 5 v1)
+    pathway: TCA cycle
+    substrates: [oxaloacetate, acetyl_coa]
+    products: [citrate]
+    carbon_counts: {oxaloacetate: 4, acetyl_coa: 2, citrate: 6}
+    forward_atom_map:
+      - {from: oxaloacetate.C1, to: citrate.C6}
+      - {from: oxaloacetate.C2, to: citrate.C3}
+      - {from: oxaloacetate.C3, to: citrate.C2}
+      - {from: oxaloacetate.C4, to: citrate.C1}
+      - {from: acetyl_coa.C1, to: citrate.C5}
+      - {from: acetyl_coa.C2, to: citrate.C4}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Exact Table 5 order dcbfea, represented as global C positions."
+    numbering_convention: "Antoniewicz Table 5 source-map order, paper p. 37."
+    aliases: [v1, CS]
+    ec_numbers: [EC:2.3.3.1]
+    identifiers: {kegg.reaction: [R00351], bigg.reaction: [CS]}
+    provenance: {source_type: "published EMU model", citation: "Antoniewicz, Kelleher & Stephanopoulos, Metabolic Engineering (2007)", source_identifier: "Table 5 v1", source_location: "nihms16238.pdf, paper p. 37 Table 5; frozen examples/antoniewicz_tca/build_model.py: TABLE5_REACTIONS", notes: "Gold entry generated from frozen validated Table5Reaction definition; no independent remapping."}
+    validation_status: gold
+    comments: "Reverse biochemical map is not declared for the benchmark's irreversible v1."
+  - canonical_id: antoniewicz.table5.v2.citrate_to_akg
+    name: citrate to alpha-ketoglutarate + CO2 (Antoniewicz Table 5 v2)
+    pathway: TCA cycle
+    substrates: [citrate]
+    products: [alpha_ketoglutarate, carbon_dioxide]
+    carbon_counts: {citrate: 6, alpha_ketoglutarate: 5, carbon_dioxide: 1}
+    forward_atom_map:
+      - {from: citrate.C1, to: alpha_ketoglutarate.C1}
+      - {from: citrate.C2, to: alpha_ketoglutarate.C2}
+      - {from: citrate.C3, to: alpha_ketoglutarate.C3}
+      - {from: citrate.C4, to: alpha_ketoglutarate.C4}
+      - {from: citrate.C5, to: alpha_ketoglutarate.C5}
+      - {from: citrate.C6, to: carbon_dioxide.C1}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Exact Table 5 net carbon transition; intermediate isomerization is not expanded."
+    numbering_convention: "Antoniewicz Table 5 source-map order, paper p. 37."
+    aliases: [v2, ICDHyr]
+    ec_numbers: [EC:1.1.1.42]
+    identifiers: {kegg.reaction: [R00709], bigg.reaction: [ICDHyr]}
+    provenance: {source_type: "published EMU model", citation: "Antoniewicz, Kelleher & Stephanopoulos, Metabolic Engineering (2007)", source_identifier: "Table 5 v2", source_location: "nihms16238.pdf, paper p. 37 Table 5; frozen examples/antoniewicz_tca/build_model.py: TABLE5_REACTIONS", notes: "Gold entry generated from frozen validated Table5Reaction definition."}
+    validation_status: gold
+    comments: "CO2 fate is explicit."
+  - canonical_id: antoniewicz.table5.v3.akg_to_glutamate
+    name: alpha-ketoglutarate to glutamate (Antoniewicz Table 5 v3)
+    pathway: TCA cycle
+    substrates: [alpha_ketoglutarate]
+    products: [glutamate]
+    carbon_counts: {alpha_ketoglutarate: 5, glutamate: 5}
+    forward_atom_map:
+      - {from: alpha_ketoglutarate.C1, to: glutamate.C1}
+      - {from: alpha_ketoglutarate.C2, to: glutamate.C2}
+      - {from: alpha_ketoglutarate.C3, to: glutamate.C3}
+      - {from: alpha_ketoglutarate.C4, to: glutamate.C4}
+      - {from: alpha_ketoglutarate.C5, to: glutamate.C5}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Exact Table 5 identity sequence."
+    numbering_convention: "Antoniewicz Table 5 source-map order, paper p. 37."
+    aliases: [v3]
+    ec_numbers: []
+    identifiers: {}
+    provenance: {source_type: "published EMU model", citation: "Antoniewicz, Kelleher & Stephanopoulos, Metabolic Engineering (2007)", source_identifier: "Table 5 v3", source_location: "nihms16238.pdf, paper p. 37 Table 5; frozen examples/antoniewicz_tca/build_model.py: TABLE5_REACTIONS", notes: "Gold entry generated from frozen validated Table5Reaction definition."}
+    validation_status: gold
+    comments: "Benchmark-specific terminal glutamate production."
+  - canonical_id: antoniewicz.table5.v4.akg_to_succinate
+    name: alpha-ketoglutarate to succinate + CO2 (Antoniewicz Table 5 v4)
+    pathway: TCA cycle
+    substrates: [alpha_ketoglutarate]
+    products: [succinate, carbon_dioxide]
+    carbon_counts: {alpha_ketoglutarate: 5, succinate: 4, carbon_dioxide: 1}
+    forward_atom_map:
+      - {from: alpha_ketoglutarate.C1, to: carbon_dioxide.C1}
+      - {from: alpha_ketoglutarate.C2, to: succinate.C1}
+      - {from: alpha_ketoglutarate.C3, to: succinate.C2}
+      - {from: alpha_ketoglutarate.C4, to: succinate.C3}
+      - {from: alpha_ketoglutarate.C5, to: succinate.C4}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: succinate is rotationally symmetric downstream
+    stereochemistry_notes: "Exact Table 5 net map bcde + a."
+    numbering_convention: "Antoniewicz Table 5 source-map order, paper p. 37."
+    aliases: [v4, AKGDH]
+    ec_numbers: [EC:1.2.4.2]
+    identifiers: {kegg.reaction: [R01197], bigg.reaction: [AKGDH]}
+    provenance: {source_type: "published EMU model", citation: "Antoniewicz, Kelleher & Stephanopoulos, Metabolic Engineering (2007)", source_identifier: "Table 5 v4", source_location: "nihms16238.pdf, paper p. 37 Table 5; frozen examples/antoniewicz_tca/build_model.py: TABLE5_REACTIONS", notes: "Gold entry generated from frozen validated Table5Reaction definition."}
+    validation_status: gold
+    comments: "CO2 fate is explicit."
+  - canonical_id: antoniewicz.table5.v5.succinate_to_fumarate
+    name: succinate to fumarate (Antoniewicz Table 5 v5)
+    pathway: TCA cycle
+    substrates: [succinate]
+    products: [fumarate]
+    carbon_counts: {succinate: 4, fumarate: 4}
+    forward_atom_map:
+      - {from: succinate.C1, to: fumarate.C1}
+      - {from: succinate.C2, to: fumarate.C2}
+      - {from: succinate.C3, to: fumarate.C3}
+      - {from: succinate.C4, to: fumarate.C4}
+    reverse_atom_map: not_applicable
+    mapping_branches:
+      - id: canonical_orientation
+        weight: 0.5
+        atom_map:
+          - {from: succinate.C1, to: fumarate.C1}
+          - {from: succinate.C2, to: fumarate.C2}
+          - {from: succinate.C3, to: fumarate.C3}
+          - {from: succinate.C4, to: fumarate.C4}
+      - id: reversed_orientation
+        weight: 0.5
+        atom_map:
+          - {from: succinate.C1, to: fumarate.C4}
+          - {from: succinate.C2, to: fumarate.C3}
+          - {from: succinate.C3, to: fumarate.C2}
+          - {from: succinate.C4, to: fumarate.C1}
+    reversible: false
+    symmetry: "Antoniewicz Table 5 equal 0.5 forward/reverse orientations; both endpoint skeletons symmetric"
+    stereochemistry_notes: "Do not collapse to one orientation."
+    numbering_convention: "Antoniewicz Table 5 source-map order, paper p. 37."
+    aliases: [v5, SUCDi]
+    ec_numbers: [EC:1.3.5.1]
+    identifiers: {kegg.reaction: [R02164], bigg.reaction: [SUCDi]}
+    provenance: {source_type: "published EMU model", citation: "Antoniewicz, Kelleher & Stephanopoulos, Metabolic Engineering (2007)", source_identifier: "Table 5 v5", source_location: "nihms16238.pdf, paper p. 37 Table 5; frozen examples/antoniewicz_tca/build_model.py: TABLE5_REACTIONS", notes: "Gold 0.5 / 0.5 branch treatment derived directly from printed Table 5 transition."}
+    validation_status: gold
+    comments: "mfapy export uses its symmetric-metabolite treatment while retaining explicit branches for audit."
+  - canonical_id: antoniewicz.table5.v6.fumarate_to_oaa
+    name: fumarate to oxaloacetate (Antoniewicz Table 5 v6)
+    pathway: TCA cycle
+    substrates: [fumarate]
+    products: [oxaloacetate]
+    carbon_counts: {fumarate: 4, oxaloacetate: 4}
+    forward_atom_map:
+      - {from: fumarate.C1, to: oxaloacetate.C1}
+      - {from: fumarate.C2, to: oxaloacetate.C2}
+      - {from: fumarate.C3, to: oxaloacetate.C3}
+      - {from: fumarate.C4, to: oxaloacetate.C4}
+    reverse_atom_map: not_applicable
+    mapping_branches:
+      - id: canonical_orientation
+        weight: 0.5
+        atom_map:
+          - {from: fumarate.C1, to: oxaloacetate.C1}
+          - {from: fumarate.C2, to: oxaloacetate.C2}
+          - {from: fumarate.C3, to: oxaloacetate.C3}
+          - {from: fumarate.C4, to: oxaloacetate.C4}
+      - id: reversed_symmetric_fumarate
+        weight: 0.5
+        atom_map:
+          - {from: fumarate.C1, to: oxaloacetate.C4}
+          - {from: fumarate.C2, to: oxaloacetate.C3}
+          - {from: fumarate.C3, to: oxaloacetate.C2}
+          - {from: fumarate.C4, to: oxaloacetate.C1}
+    reversible: false
+    symmetry: "Antoniewicz Table 5 0.5 / 0.5 symmetric fumarate input orientations"
+    stereochemistry_notes: "Benchmark net transition; hydration/oxidation are not split."
+    numbering_convention: "Antoniewicz Table 5 source-map order, paper p. 37."
+    aliases: [v6]
+    ec_numbers: []
+    identifiers: {}
+    provenance: {source_type: "published EMU model", citation: "Antoniewicz, Kelleher & Stephanopoulos, Metabolic Engineering (2007)", source_identifier: "Table 5 v6", source_location: "nihms16238.pdf, paper p. 37 Table 5; frozen examples/antoniewicz_tca/build_model.py: TABLE5_REACTIONS", notes: "Gold 0.5 / 0.5 branch treatment derived directly from printed Table 5 transition."}
+    validation_status: gold
+    comments: "Required to reproduce the frozen MID."
+  - canonical_id: antoniewicz.table5.v7.oaa_to_fumarate
+    name: oxaloacetate to fumarate (Antoniewicz Table 5 v7)
+    pathway: TCA cycle
+    substrates: [oxaloacetate]
+    products: [fumarate]
+    carbon_counts: {oxaloacetate: 4, fumarate: 4}
+    forward_atom_map:
+      - {from: oxaloacetate.C1, to: fumarate.C1}
+      - {from: oxaloacetate.C2, to: fumarate.C2}
+      - {from: oxaloacetate.C3, to: fumarate.C3}
+      - {from: oxaloacetate.C4, to: fumarate.C4}
+    reverse_atom_map: not_applicable
+    mapping_branches:
+      - id: canonical_orientation
+        weight: 0.5
+        atom_map:
+          - {from: oxaloacetate.C1, to: fumarate.C1}
+          - {from: oxaloacetate.C2, to: fumarate.C2}
+          - {from: oxaloacetate.C3, to: fumarate.C3}
+          - {from: oxaloacetate.C4, to: fumarate.C4}
+      - id: reversed_symmetric_fumarate
+        weight: 0.5
+        atom_map:
+          - {from: oxaloacetate.C1, to: fumarate.C4}
+          - {from: oxaloacetate.C2, to: fumarate.C3}
+          - {from: oxaloacetate.C3, to: fumarate.C2}
+          - {from: oxaloacetate.C4, to: fumarate.C1}
+    reversible: false
+    symmetry: "Antoniewicz Table 5 0.5 / 0.5 symmetric fumarate product orientations"
+    stereochemistry_notes: "Do not collapse product orientations."
+    numbering_convention: "Antoniewicz Table 5 source-map order, paper p. 37."
+    aliases: [v7]
+    ec_numbers: []
+    identifiers: {}
+    provenance: {source_type: "published EMU model", citation: "Antoniewicz, Kelleher & Stephanopoulos, Metabolic Engineering (2007)", source_identifier: "Table 5 v7", source_location: "nihms16238.pdf, paper p. 37 Table 5; frozen examples/antoniewicz_tca/build_model.py: TABLE5_REACTIONS", notes: "Gold 0.5 / 0.5 branch treatment derived directly from printed Table 5 transition."}
+    validation_status: gold
+    comments: "Required to reproduce the frozen MID."
+  - canonical_id: antoniewicz.table5.v8.aspartate_to_oaa
+    name: aspartate to oxaloacetate (Antoniewicz Table 5 v8)
+    pathway: TCA cycle
+    substrates: [aspartate]
+    products: [oxaloacetate]
+    carbon_counts: {aspartate: 4, oxaloacetate: 4}
+    forward_atom_map:
+      - {from: aspartate.C1, to: oxaloacetate.C1}
+      - {from: aspartate.C2, to: oxaloacetate.C2}
+      - {from: aspartate.C3, to: oxaloacetate.C3}
+      - {from: aspartate.C4, to: oxaloacetate.C4}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Exact Table 5 identity sequence."
+    numbering_convention: "Antoniewicz Table 5 source-map order, paper p. 37."
+    aliases: [v8]
+    ec_numbers: []
+    identifiers: {}
+    provenance: {source_type: "published EMU model", citation: "Antoniewicz, Kelleher & Stephanopoulos, Metabolic Engineering (2007)", source_identifier: "Table 5 v8", source_location: "nihms16238.pdf, paper p. 37 Table 5; frozen examples/antoniewicz_tca/build_model.py: TABLE5_REACTIONS", notes: "Gold entry generated from frozen validated Table5Reaction definition."}
+    validation_status: gold
+    comments: "Benchmark aspartate entry reaction."
+  - canonical_id: tca.fumarate_hydratase
+    name: fumarate hydratase
+    pathway: TCA cycle
+    substrates: [fumarate]
+    products: [malate]
+    carbon_counts: {fumarate: 4, malate: 4}
+    forward_atom_map:
+      - {from: fumarate.C1, to: malate.C1}
+      - {from: fumarate.C2, to: malate.C2}
+      - {from: fumarate.C3, to: malate.C3}
+      - {from: fumarate.C4, to: malate.C4}
+    reverse_atom_map: derived
+    mapping_branches:
+      - id: canonical_orientation
+        weight: 0.5
+        atom_map:
+          - {from: fumarate.C1, to: malate.C1}
+          - {from: fumarate.C2, to: malate.C2}
+          - {from: fumarate.C3, to: malate.C3}
+          - {from: fumarate.C4, to: malate.C4}
+      - id: reversed_symmetric_fumarate
+        weight: 0.5
+        atom_map:
+          - {from: fumarate.C1, to: malate.C4}
+          - {from: fumarate.C2, to: malate.C3}
+          - {from: fumarate.C3, to: malate.C2}
+          - {from: fumarate.C4, to: malate.C1}
+    reversible: true
+    symmetry: "Fumarate has equal symmetric orientations; mfapy uses the metabolite symmetry flag."
+    stereochemistry_notes: "Hydration gives L-malate; the symmetric fumarate input remains explicit."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [FUM]
+    ec_numbers: [EC:4.2.1.2]
+    identifiers: {kegg.reaction: [R01082], bigg.reaction: [FUM]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model, Fum -> Mal", source_identifier: "r23_fh", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCD -> ABCD map; branch annotation preserves symmetric fumarate treatment."}
+    validation_status: curated
+    comments: "A source-supported full TCA reaction outside the frozen net benchmark."
+  - canonical_id: tca.malate_dehydrogenase
+    name: malate dehydrogenase carbon skeleton transition
+    pathway: TCA cycle
+    substrates: [malate]
+    products: [oxaloacetate]
+    carbon_counts: {malate: 4, oxaloacetate: 4}
+    forward_atom_map:
+      - {from: malate.C1, to: oxaloacetate.C1}
+      - {from: malate.C2, to: oxaloacetate.C2}
+      - {from: malate.C3, to: oxaloacetate.C3}
+      - {from: malate.C4, to: oxaloacetate.C4}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Carbon skeleton is retained."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [MDH]
+    ec_numbers: [EC:1.1.1.37]
+    identifiers: {kegg.reaction: [R00343], bigg.reaction: [MDH]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model, Mal -> Oxa", source_identifier: "r25_mdh", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCD -> ABCD map."}
+    validation_status: curated
+    comments: "NAD(H) is non-carbon for matching."

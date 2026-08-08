@@ -1,0 +1,94 @@
+schema_version: 1
+entries:
+  - canonical_id: anaplerosis.pyruvate_carboxylase
+    name: pyruvate carboxylase
+    pathway: anaplerosis and cataplerosis
+    substrates: [pyruvate, carbon_dioxide]
+    products: [oxaloacetate]
+    carbon_counts: {pyruvate: 3, carbon_dioxide: 1, oxaloacetate: 4}
+    forward_atom_map:
+      - {from: pyruvate.C1, to: oxaloacetate.C1}
+      - {from: pyruvate.C2, to: oxaloacetate.C2}
+      - {from: pyruvate.C3, to: oxaloacetate.C3}
+      - {from: carbon_dioxide.C1, to: oxaloacetate.C4}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Added CO2 becomes source-map OAA C4."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [PC]
+    ec_numbers: [EC:6.4.1.1]
+    identifiers: {kegg.reaction: [R00344], bigg.reaction: [PC]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r27_pc", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABC + D -> ABCD map."}
+    validation_status: curated
+    comments: "ATP/ADP are non-carbon and ignored for matching."
+  - canonical_id: anaplerosis.pep_carboxylase
+    name: phosphoenolpyruvate carboxylase
+    pathway: anaplerosis and cataplerosis
+    substrates: [phosphoenolpyruvate, carbon_dioxide]
+    products: [oxaloacetate]
+    carbon_counts: {phosphoenolpyruvate: 3, carbon_dioxide: 1, oxaloacetate: 4}
+    forward_atom_map:
+      - {from: phosphoenolpyruvate.C1, to: oxaloacetate.C1}
+      - {from: phosphoenolpyruvate.C2, to: oxaloacetate.C2}
+      - {from: phosphoenolpyruvate.C3, to: oxaloacetate.C3}
+      - {from: carbon_dioxide.C1, to: oxaloacetate.C4}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Added CO2 becomes source-map OAA C4."
+    numbering_convention: "mfapy Example_2 E. coli source-map sequence."
+    aliases: [PPC]
+    ec_numbers: [EC:4.1.1.31]
+    identifiers: {bigg.reaction: [PPC]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_2 E. coli model", source_identifier: "r40", source_location: "vendor/mfapy/sample/Example_2_Ecoli_model.txt", notes: "Explicit ABC + D -> ABCD map; source external KEGG tag is not reliable and is not copied."}
+    validation_status: curated
+    comments: "Carbon map only."
+  - canonical_id: anaplerosis.pep_carboxykinase
+    name: phosphoenolpyruvate carboxykinase carbon transition
+    pathway: anaplerosis and cataplerosis
+    substrates: [oxaloacetate]
+    products: [phosphoenolpyruvate, carbon_dioxide]
+    carbon_counts: {oxaloacetate: 4, phosphoenolpyruvate: 3, carbon_dioxide: 1}
+    forward_atom_map:
+      - {from: oxaloacetate.C1, to: phosphoenolpyruvate.C1}
+      - {from: oxaloacetate.C2, to: phosphoenolpyruvate.C2}
+      - {from: oxaloacetate.C3, to: phosphoenolpyruvate.C3}
+      - {from: oxaloacetate.C4, to: carbon_dioxide.C1}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "OAA C4 is released as CO2 in this source-map convention."
+    numbering_convention: "mfapy Example_2 E. coli source-map sequence."
+    aliases: [PPCK]
+    ec_numbers: [EC:4.1.1.49]
+    identifiers: {bigg.reaction: [PPCK]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_2 E. coli model", source_identifier: "r41", source_location: "vendor/mfapy/sample/Example_2_Ecoli_model.txt", notes: "Explicit ABCD -> ABC + D map; source external KEGG tag is not reliable and is not copied."}
+    validation_status: curated
+    comments: "Reverse map is validated by double inversion."
+  - canonical_id: cataplerosis.malic_enzyme
+    name: malic enzyme carbon transition
+    pathway: anaplerosis and cataplerosis
+    substrates: [malate]
+    products: [pyruvate, carbon_dioxide]
+    carbon_counts: {malate: 4, pyruvate: 3, carbon_dioxide: 1}
+    forward_atom_map:
+      - {from: malate.C1, to: pyruvate.C1}
+      - {from: malate.C2, to: pyruvate.C2}
+      - {from: malate.C3, to: pyruvate.C3}
+      - {from: malate.C4, to: carbon_dioxide.C1}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Malate C4 is released as CO2 in the source map."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [ME1, ME2]
+    ec_numbers: [EC:1.1.1.40]
+    identifiers: {kegg.reaction: [R00216], bigg.reaction: [ME1, ME2]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r28_mae", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCD -> ABC + D map."}
+    validation_status: curated
+    comments: "NAD(P)H and cofactor details are non-carbon."

@@ -1,0 +1,186 @@
+schema_version: 1
+entries:
+  - canonical_id: ppp.oxidative_g6p_to_6pg_net
+    name: oxidative pentose-phosphate G6P to 6-phosphogluconate net transition
+    pathway: pentose phosphate pathway
+    substrates: [glucose_6_phosphate]
+    products: [phosphogluconate_6]
+    carbon_counts: {glucose_6_phosphate: 6, phosphogluconate_6: 6}
+    forward_atom_map:
+      - {from: glucose_6_phosphate.C1, to: phosphogluconate_6.C1}
+      - {from: glucose_6_phosphate.C2, to: phosphogluconate_6.C2}
+      - {from: glucose_6_phosphate.C3, to: phosphogluconate_6.C3}
+      - {from: glucose_6_phosphate.C4, to: phosphogluconate_6.C4}
+      - {from: glucose_6_phosphate.C5, to: phosphogluconate_6.C5}
+      - {from: glucose_6_phosphate.C6, to: phosphogluconate_6.C6}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "Net source map preserves the six-carbon skeleton."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: []
+    ec_numbers: []
+    identifiers: {}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r29_g6pdh", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "The source model abbreviates the mapped product as m6PG and does not expose a separate 6-phosphogluconolactone pool."}
+    validation_status: curated
+    comments: "This is intentionally a net G6P -> 6PG record. Separate G6PD and lactonase mappings are unresolved in V1."
+  - canonical_id: ppp.6phosphogluconate_dehydrogenase
+    name: 6-phosphogluconate dehydrogenase
+    pathway: pentose phosphate pathway
+    substrates: [phosphogluconate_6]
+    products: [ribulose_5_phosphate, carbon_dioxide]
+    carbon_counts: {phosphogluconate_6: 6, ribulose_5_phosphate: 5, carbon_dioxide: 1}
+    forward_atom_map:
+      - {from: phosphogluconate_6.C1, to: carbon_dioxide.C1}
+      - {from: phosphogluconate_6.C2, to: ribulose_5_phosphate.C1}
+      - {from: phosphogluconate_6.C3, to: ribulose_5_phosphate.C2}
+      - {from: phosphogluconate_6.C4, to: ribulose_5_phosphate.C3}
+      - {from: phosphogluconate_6.C5, to: ribulose_5_phosphate.C4}
+      - {from: phosphogluconate_6.C6, to: ribulose_5_phosphate.C5}
+    reverse_atom_map: not_applicable
+    mapping_branches: []
+    reversible: false
+    symmetry: none
+    stereochemistry_notes: "C1 is explicitly decarboxylated."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [GND]
+    ec_numbers: [EC:1.1.1.44]
+    identifiers: {kegg.reaction: [R01528], bigg.reaction: [GND]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r30_pgd", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCDEF -> BCDEF + A map."}
+    validation_status: curated
+    comments: "NADPH is non-carbon for matching."
+  - canonical_id: ppp.ribulose5p_isomerase
+    name: ribose-5-phosphate isomerase
+    pathway: pentose phosphate pathway
+    substrates: [ribulose_5_phosphate]
+    products: [ribose_5_phosphate]
+    carbon_counts: {ribulose_5_phosphate: 5, ribose_5_phosphate: 5}
+    forward_atom_map:
+      - {from: ribulose_5_phosphate.C1, to: ribose_5_phosphate.C1}
+      - {from: ribulose_5_phosphate.C2, to: ribose_5_phosphate.C2}
+      - {from: ribulose_5_phosphate.C3, to: ribose_5_phosphate.C3}
+      - {from: ribulose_5_phosphate.C4, to: ribose_5_phosphate.C4}
+      - {from: ribulose_5_phosphate.C5, to: ribose_5_phosphate.C5}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Source-map order identity."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [RPI]
+    ec_numbers: [EC:5.3.1.6]
+    identifiers: {kegg.reaction: [R01056], bigg.reaction: [RPI]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r31_ri", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCDE -> ABCDE map; r32 supplies the reverse source map."}
+    validation_status: curated
+    comments: "Reverse is derived and checked mechanically."
+  - canonical_id: ppp.ribulose5p_epimerase
+    name: ribulose-5-phosphate 3-epimerase
+    pathway: pentose phosphate pathway
+    substrates: [ribulose_5_phosphate]
+    products: [xylulose_5_phosphate]
+    carbon_counts: {ribulose_5_phosphate: 5, xylulose_5_phosphate: 5}
+    forward_atom_map:
+      - {from: ribulose_5_phosphate.C1, to: xylulose_5_phosphate.C1}
+      - {from: ribulose_5_phosphate.C2, to: xylulose_5_phosphate.C2}
+      - {from: ribulose_5_phosphate.C3, to: xylulose_5_phosphate.C3}
+      - {from: ribulose_5_phosphate.C4, to: xylulose_5_phosphate.C4}
+      - {from: ribulose_5_phosphate.C5, to: xylulose_5_phosphate.C5}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "C3 epimerization retains carbon identities."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [RPE]
+    ec_numbers: [EC:5.1.3.1]
+    identifiers: {kegg.reaction: [R01529], bigg.reaction: [RPE]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r33_rbe", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCDE -> ABCDE map; r34 supplies the reverse source map."}
+    validation_status: curated
+    comments: "Reverse is derived and checked mechanically."
+  - canonical_id: ppp.transketolase_r5p_x5p
+    name: "transketolase: ribose-5-phosphate + xylulose-5-phosphate"
+    pathway: pentose phosphate pathway
+    substrates: [ribose_5_phosphate, xylulose_5_phosphate]
+    products: [sedoheptulose_7_phosphate, glyceraldehyde_3_phosphate]
+    carbon_counts: {ribose_5_phosphate: 5, xylulose_5_phosphate: 5, sedoheptulose_7_phosphate: 7, glyceraldehyde_3_phosphate: 3}
+    forward_atom_map:
+      - {from: ribose_5_phosphate.C1, to: sedoheptulose_7_phosphate.C3}
+      - {from: ribose_5_phosphate.C2, to: sedoheptulose_7_phosphate.C4}
+      - {from: ribose_5_phosphate.C3, to: sedoheptulose_7_phosphate.C5}
+      - {from: ribose_5_phosphate.C4, to: sedoheptulose_7_phosphate.C6}
+      - {from: ribose_5_phosphate.C5, to: sedoheptulose_7_phosphate.C7}
+      - {from: xylulose_5_phosphate.C1, to: sedoheptulose_7_phosphate.C1}
+      - {from: xylulose_5_phosphate.C2, to: sedoheptulose_7_phosphate.C2}
+      - {from: xylulose_5_phosphate.C3, to: glyceraldehyde_3_phosphate.C1}
+      - {from: xylulose_5_phosphate.C4, to: glyceraldehyde_3_phosphate.C2}
+      - {from: xylulose_5_phosphate.C5, to: glyceraldehyde_3_phosphate.C3}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Two-carbon transfer follows the explicit source model labels FGABCDE + HIJ."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [TKT1]
+    ec_numbers: [EC:2.2.1.1]
+    identifiers: {kegg.reaction: [R01641], bigg.reaction: [TKT1]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r35_tkt", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCDE + FGHIJ -> FGABCDE + HIJ map; r36 gives reverse."}
+    validation_status: curated
+    comments: "Cleavage/condensation supported by normalized atom references."
+  - canonical_id: ppp.transaldolase_s7p_gap
+    name: "transaldolase: sedoheptulose-7-phosphate + glyceraldehyde-3-phosphate"
+    pathway: pentose phosphate pathway
+    substrates: [glyceraldehyde_3_phosphate, sedoheptulose_7_phosphate]
+    products: [fructose_6_phosphate, erythrose_4_phosphate]
+    carbon_counts: {glyceraldehyde_3_phosphate: 3, sedoheptulose_7_phosphate: 7, fructose_6_phosphate: 6, erythrose_4_phosphate: 4}
+    forward_atom_map:
+      - {from: glyceraldehyde_3_phosphate.C1, to: fructose_6_phosphate.C4}
+      - {from: glyceraldehyde_3_phosphate.C2, to: fructose_6_phosphate.C5}
+      - {from: glyceraldehyde_3_phosphate.C3, to: fructose_6_phosphate.C6}
+      - {from: sedoheptulose_7_phosphate.C1, to: fructose_6_phosphate.C1}
+      - {from: sedoheptulose_7_phosphate.C2, to: fructose_6_phosphate.C2}
+      - {from: sedoheptulose_7_phosphate.C3, to: fructose_6_phosphate.C3}
+      - {from: sedoheptulose_7_phosphate.C4, to: erythrose_4_phosphate.C1}
+      - {from: sedoheptulose_7_phosphate.C5, to: erythrose_4_phosphate.C2}
+      - {from: sedoheptulose_7_phosphate.C6, to: erythrose_4_phosphate.C3}
+      - {from: sedoheptulose_7_phosphate.C7, to: erythrose_4_phosphate.C4}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Three-carbon transfer follows the explicit source model labels DEFABC + GHIJ."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [TALA]
+    ec_numbers: [EC:2.2.1.2]
+    identifiers: {kegg.reaction: [R08575], bigg.reaction: [TALA]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r37_tal", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABC + DEFGHIJ -> DEFABC + GHIJ map; r38 gives reverse."}
+    validation_status: curated
+    comments: "Cleavage/condensation supported by normalized atom references."
+  - canonical_id: ppp.transketolase_e4p_x5p
+    name: "transketolase: erythrose-4-phosphate + xylulose-5-phosphate"
+    pathway: pentose phosphate pathway
+    substrates: [erythrose_4_phosphate, xylulose_5_phosphate]
+    products: [fructose_6_phosphate, glyceraldehyde_3_phosphate]
+    carbon_counts: {erythrose_4_phosphate: 4, xylulose_5_phosphate: 5, fructose_6_phosphate: 6, glyceraldehyde_3_phosphate: 3}
+    forward_atom_map:
+      - {from: erythrose_4_phosphate.C1, to: fructose_6_phosphate.C3}
+      - {from: erythrose_4_phosphate.C2, to: fructose_6_phosphate.C4}
+      - {from: erythrose_4_phosphate.C3, to: fructose_6_phosphate.C5}
+      - {from: erythrose_4_phosphate.C4, to: fructose_6_phosphate.C6}
+      - {from: xylulose_5_phosphate.C1, to: fructose_6_phosphate.C1}
+      - {from: xylulose_5_phosphate.C2, to: fructose_6_phosphate.C2}
+      - {from: xylulose_5_phosphate.C3, to: glyceraldehyde_3_phosphate.C1}
+      - {from: xylulose_5_phosphate.C4, to: glyceraldehyde_3_phosphate.C2}
+      - {from: xylulose_5_phosphate.C5, to: glyceraldehyde_3_phosphate.C3}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Two-carbon transfer follows the explicit source model labels EFABCD + GHI."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [TKT2]
+    ec_numbers: [EC:2.2.1.1]
+    identifiers: {kegg.reaction: [R01067], bigg.reaction: [TKT2]}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r39_tkt", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCD + EFGHI -> EFABCD + GHI map; r40 gives reverse."}
+    validation_status: curated
+    comments: "Cleavage/condensation supported by normalized atom references."

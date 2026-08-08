@@ -1,0 +1,80 @@
+schema_version: 1
+entries:
+  - canonical_id: transport.malate.identity
+    name: malate transport (carbon identity)
+    pathway: malate-aspartate shuttle carbon reactions
+    substrates: [malate]
+    products: [malate]
+    carbon_counts: {malate: 4}
+    forward_atom_map:
+      - {from: malate.C1, to: malate.C1}
+      - {from: malate.C2, to: malate.C2}
+      - {from: malate.C3, to: malate.C3}
+      - {from: malate.C4, to: malate.C4}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "Compartment transfer retains all L-malate carbon positions."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [MALt2_2, MALT]
+    ec_numbers: []
+    identifiers: {}
+    provenance: {source_type: "established isotope-MFA model", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r104_MAL_ex/r105_MAL_ex", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "Explicit ABCD -> ABCD transport maps between mitochondrial and cytosolic malate pools."}
+    validation_status: curated
+    comments: "Only use where the carbon reaction is exactly malate in one compartment to malate in another."
+  - canonical_id: malate_aspartate.aspartate_aminotransferase
+    name: aspartate aminotransferase carbon skeleton transition
+    pathway: malate-aspartate shuttle carbon reactions
+    substrates: [oxaloacetate, glutamate]
+    products: [aspartate, alpha_ketoglutarate]
+    carbon_counts: {oxaloacetate: 4, glutamate: 5, aspartate: 4, alpha_ketoglutarate: 5}
+    forward_atom_map:
+      - {from: oxaloacetate.C1, to: aspartate.C1}
+      - {from: oxaloacetate.C2, to: aspartate.C2}
+      - {from: oxaloacetate.C3, to: aspartate.C3}
+      - {from: oxaloacetate.C4, to: aspartate.C4}
+      - {from: glutamate.C1, to: alpha_ketoglutarate.C1}
+      - {from: glutamate.C2, to: alpha_ketoglutarate.C2}
+      - {from: glutamate.C3, to: alpha_ketoglutarate.C3}
+      - {from: glutamate.C4, to: alpha_ketoglutarate.C4}
+      - {from: glutamate.C5, to: alpha_ketoglutarate.C5}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "No carbon atom crosses between the two carbon skeletons; each co-substrate is transferred as an intact skeleton."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [ASPTA]
+    ec_numbers: [EC:2.6.1.1]
+    identifiers: {kegg.reaction: [R00355], bigg.reaction: [ASPTA]}
+    provenance: {source_type: "curated composite from explicit isotope-MFA maps", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r54_asp plus r49_gludh", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "r54 explicitly maps Oxa -> Asp ABCD -> ABCD and r49 maps Glu -> aKG ABCDE -> ABCDE; the transaminase joins those independently mapped skeleton transfers."}
+    validation_status: curated
+    comments: "Composite provenance is explicit; no automatic mapper was used."
+  - canonical_id: malate_aspartate.alanine_aminotransferase
+    name: alanine aminotransferase carbon skeleton transition
+    pathway: glutamine / glutamate / alpha-ketoglutarate entry
+    substrates: [alanine, alpha_ketoglutarate]
+    products: [pyruvate, glutamate]
+    carbon_counts: {alanine: 3, alpha_ketoglutarate: 5, pyruvate: 3, glutamate: 5}
+    forward_atom_map:
+      - {from: alanine.C1, to: pyruvate.C1}
+      - {from: alanine.C2, to: pyruvate.C2}
+      - {from: alanine.C3, to: pyruvate.C3}
+      - {from: alpha_ketoglutarate.C1, to: glutamate.C1}
+      - {from: alpha_ketoglutarate.C2, to: glutamate.C2}
+      - {from: alpha_ketoglutarate.C3, to: glutamate.C3}
+      - {from: alpha_ketoglutarate.C4, to: glutamate.C4}
+      - {from: alpha_ketoglutarate.C5, to: glutamate.C5}
+    reverse_atom_map: derived
+    mapping_branches: []
+    reversible: true
+    symmetry: none
+    stereochemistry_notes: "No carbon atom crosses between skeletons; alanine maps to pyruvate and alpha-ketoglutarate maps to glutamate."
+    numbering_convention: "mfapy Example_3 MCF7 source-map sequence."
+    aliases: [ALATA_L]
+    ec_numbers: [EC:2.6.1.2]
+    identifiers: {kegg.reaction: [R00258], bigg.reaction: [ALATA_L]}
+    provenance: {source_type: "curated composite from explicit isotope-MFA maps", citation: "mfapy 0.6.3 Example_3 MCF7 model", source_identifier: "r58_gpt_m plus r50_gludh", source_location: "vendor/mfapy/sample/Example_3_MCF7_model.txt", notes: "r58 explicitly maps Pyr -> Ala ABC -> ABC and r50 maps aKG -> Glu ABCDE -> ABCDE; their inverse/component maps define the no-exchange transaminase skeleton transfer."}
+    validation_status: curated
+    comments: "Composite provenance is explicit; no automatic mapper was used."
