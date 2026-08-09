@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import importlib.util
 
 import pytest
 
@@ -10,6 +11,11 @@ import pytest
 @pytest.fixture(autouse=True)
 def collect_closed_figure_cycles(monkeypatch):
     """Bound test-render memory and release closed figures between tests."""
+
+    if importlib.util.find_spec("matplotlib") is None:
+        yield
+        gc.collect()
+        return
 
     from matplotlib.figure import Figure
 
