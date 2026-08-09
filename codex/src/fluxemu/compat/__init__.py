@@ -6,10 +6,12 @@ from .cobra import (
     project_cobra_model,
     resolve_authoritative_transitions,
 )
+from .experiment import project_stationary_experiment
 
 __all__ = [
     "AuthoritativeTransitionAssignment",
     "ProjectionError",
     "project_cobra_model",
+    "project_stationary_experiment",
     "resolve_authoritative_transitions",
 ]
