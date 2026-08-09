@@ -1,0 +1,68 @@
+"""Engine-independent canonical scientific model contract for FluxEMU."""
+
+from .identity import (
+    experiment_fingerprint,
+    fingerprint_experiment,
+    fingerprint_model,
+    model_fingerprint,
+)
+from .schema import (
+    AtomPosition,
+    AtomTransition,
+    CanonicalModel,
+    FluxMetabolite,
+    FluxModel,
+    FluxReaction,
+    IsotopeMetabolite,
+    IsotopeModel,
+    IsotopeParticipant,
+    IsotopeReaction,
+    LinearObjective,
+    MappingBranch,
+    ObjectiveTerm,
+    StationaryExperimentSemantics,
+    StoichiometricTerm,
+    Target,
+    Tracer,
+)
+from .serialisation import deterministic_serialise, serialise
+from .validation import (
+    MIXTURE_ABS_TOLERANCE,
+    CanonicalModelError,
+    validate_canonical_model,
+    validate_flux_model,
+    validate_isotope_model,
+    validate_stationary_experiment,
+)
+
+__all__ = [
+    "AtomPosition",
+    "AtomTransition",
+    "CanonicalModel",
+    "CanonicalModelError",
+    "FluxMetabolite",
+    "FluxModel",
+    "FluxReaction",
+    "IsotopeMetabolite",
+    "IsotopeModel",
+    "IsotopeParticipant",
+    "IsotopeReaction",
+    "LinearObjective",
+    "MIXTURE_ABS_TOLERANCE",
+    "MappingBranch",
+    "ObjectiveTerm",
+    "StationaryExperimentSemantics",
+    "StoichiometricTerm",
+    "Target",
+    "Tracer",
+    "deterministic_serialise",
+    "experiment_fingerprint",
+    "fingerprint_experiment",
+    "fingerprint_model",
+    "model_fingerprint",
+    "serialise",
+    "validate_canonical_model",
+    "validate_flux_model",
+    "validate_isotope_model",
+    "validate_stationary_experiment",
+]
