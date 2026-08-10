@@ -5,11 +5,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from fluxemu.exceptions import ForwardEMUError, MappingError, ValidationError
+from fluxemu.exceptions import ForwardEMUError, MappingError
 from fluxemu.execution import (
     CanonicalFluxState,
     TransientForwardResult,
@@ -28,6 +28,9 @@ from fluxemu.model import (
 from .graph import CompiledEMUPlan, EMU, EMUContribution, compile_emu_plan
 from .stationary import _contribution_mid, _directed_flux, _turnover, _validate_mid
 from .tracers import source_emu_mid
+
+if TYPE_CHECKING:
+    from fluxemu.configuration import TransientExperimentConfig
 
 
 DEFAULT_TRANSIENT_RTOL = 1e-9
@@ -349,6 +352,36 @@ def evaluate_transient(
     )
 
 
+def evaluate_configured_transient(
+    model: CanonicalModel,
+    config: TransientExperimentConfig,
+    fluxes: Mapping[str, float] | Sequence[CanonicalFluxState],
+    *,
+    method: str = DEFAULT_TRANSIENT_METHOD,
+) -> NativeTransientResult:
+    """Execute validated YAML configuration with its declared numerical policy.
+
+    This high-level boundary deliberately has no tolerance overrides: callers that
+    need explicit runtime tolerances use :func:`evaluate_transient` directly.
+    """
+
+    # Local imports preserve the stationary/native EMU import-isolation boundary.
+    from fluxemu.compat import project_transient_experiment
+    from fluxemu.configuration import TransientExperimentConfig
+
+    if not isinstance(config, TransientExperimentConfig):
+        raise TypeError("config must be a validated TransientExperimentConfig")
+    plan = compile_transient_emu_plan(model, project_transient_experiment(config))
+    return evaluate_transient(
+        plan,
+        fluxes,
+        method=method,
+        rtol=config.numerical.rtol,
+        atol=config.numerical.atol,
+        mid_tolerance=config.numerical.mid,
+    )
+
+
 __all__ = [
     "CompiledTransientEMUPlan",
     "DEFAULT_TRANSIENT_ATOL",
@@ -359,5 +392,6 @@ __all__ = [
     "TransientDiagnostics",
     "TransientStateBlock",
     "compile_transient_emu_plan",
+    "evaluate_configured_transient",
     "evaluate_transient",
 ]

@@ -157,3 +157,8 @@ only one spelling for each field; unknown keys are rejected.
 ## Explicit transient experiment YAML
 
 Transient configuration uses `load_transient_experiment` and requires the top-level discriminator `experiment_mode: transient`; the stationary parser does not infer transient behaviour. Its `timecourse` mapping explicitly requires `time_points`, `initial_internal_mids: unlabelled`, and a `pool_quantities` list of `{metabolite_id, quantity}` records. The list form allows duplicate declarations to be rejected. See `PHASE2_NATIVE_TRANSIENT_EMU.md` for the complete V1 scientific semantics.
+
+The transient `timecourse.tolerances` mapping is numerical execution policy.
+`evaluate_configured_transient` forwards its validated `rtol`, `atol`, and `mid`
+values unchanged; these settings are excluded from the scientific transient
+fingerprint.

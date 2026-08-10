@@ -13,6 +13,7 @@ import pytest
 from fluxemu.emu import (
     compile_transient_emu_plan,
     convolve_mids,
+    evaluate_configured_transient,
     evaluate_stationary,
     evaluate_transient,
 )
@@ -37,7 +38,9 @@ from fluxemu.model import (
     Target,
     Tracer,
     TransientExperimentSemantics,
+    transient_experiment_fingerprint,
 )
+from fluxemu.configuration import parse_transient_experiment_config
 
 
 def _flux_reaction(reaction_id, substrates, products):
@@ -116,6 +119,32 @@ def _trajectory(result, target_id):
     )
 
 
+def _configured_value(*, rtol=2.5e-8, atol=3.5e-11, mid=4.5e-7):
+    return {
+        "schema_version": 1,
+        "experiment_mode": "transient",
+        "tracers": [{
+            "metabolite_id": "S",
+            "isotopomer_fractions": {"#1": 1.0},
+            "correction": "no",
+        }],
+        "targets": [{
+            "fragment_id": "A",
+            "metabolite_id": "A",
+            "atom_positions": [1],
+            "analytical_method": "intermediate",
+            "formula": "C1",
+            "correction": "no",
+        }],
+        "timecourse": {
+            "time_points": [0.0, 1.0],
+            "initial_internal_mids": "unlabelled",
+            "pool_quantities": [{"metabolite_id": "A", "quantity": 2.0}],
+            "tolerances": {"rtol": rtol, "atol": atol, "mid": mid},
+        },
+    }
+
+
 def _single_pool(
     source_fractions, *, times=(0.0, 0.2, 1.0, 3.0), q=2.0, v=3.0, run=True
 ):
@@ -146,6 +175,65 @@ def test_stationary_emu_import_isolated_from_transient_optional_backends():
         env=environment,
     )
     assert completed.returncode == 0, completed.stderr
+
+
+def test_configured_execution_forwards_every_declared_numerical_setting(monkeypatch):
+    import fluxemu.emu.transient as transient_module
+
+    model, _, _ = _single_pool((("#1", 1.0),), run=False)
+    config = parse_transient_experiment_config(_configured_value())
+    sentinel_plan = object()
+    sentinel_result = object()
+    observed = {}
+
+    monkeypatch.setattr(transient_module, "compile_transient_emu_plan", lambda model, experiment: sentinel_plan)
+
+    def fake_evaluate(plan, fluxes, **settings):
+        observed.update(settings)
+        assert plan is sentinel_plan
+        assert fluxes == {"IN": 3.0, "OUT": 3.0}
+        return sentinel_result
+
+    monkeypatch.setattr(transient_module, "evaluate_transient", fake_evaluate)
+    result = evaluate_configured_transient(
+        model, config, {"IN": 3.0, "OUT": 3.0}, method="DOP853"
+    )
+    assert result is sentinel_result
+    assert observed == {
+        "method": "DOP853",
+        "rtol": 2.5e-8,
+        "atol": 3.5e-11,
+        "mid_tolerance": 4.5e-7,
+    }
+
+
+def test_numerical_settings_do_not_change_scientific_fingerprint():
+    from fluxemu.compat import project_transient_experiment
+
+    model, _, _ = _single_pool((("#1", 1.0),), run=False)
+    first = parse_transient_experiment_config(_configured_value())
+    second = parse_transient_experiment_config(
+        _configured_value(rtol=8e-7, atol=9e-10, mid=1e-6)
+    )
+    first_science = project_transient_experiment(first)
+    second_science = project_transient_experiment(second)
+    assert first_science == second_science
+    assert transient_experiment_fingerprint(model, first_science) == transient_experiment_fingerprint(
+        model, second_science
+    )
+    assert first.numerical != second.numerical
+
+
+def test_configured_mid_tolerance_is_used_by_real_execution_boundary():
+    model, _, _ = _single_pool((("#1", 1.0),), run=False)
+    value = _configured_value(mid=7.25e-6)
+    value["timecourse"]["time_points"] = [0.0]
+    config = parse_transient_experiment_config(value)
+    result = evaluate_configured_transient(
+        model, config, {"IN": 3.0, "OUT": 3.0}
+    )
+    assert result.forward.mid_tolerance == 7.25e-6
+    assert result.forward.predictions[0].fractions == (1.0, 0.0)
 
 
 def test_t0_fully_labelled_step_matches_single_pool_exponential():

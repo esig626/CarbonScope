@@ -8,6 +8,8 @@ jobs:
         working-directory: codex
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -17,11 +19,11 @@ jobs:
         run: python -m pip install --upgrade pip && python -m pip install -e '.[transient,mfapy]' pytest
       - name: Check patch whitespace
         working-directory: .
-        run: git diff --check HEAD^
+        run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
       - name: Compile production package
         run: python -m compileall -q src
       - name: Canonical and stationary regressions
-        run: python -m pytest -q tests/test_standalone_model_contract.py tests/test_standalone_model_projection.py tests/test_canonical_forward.py tests/test_native_emu_graph.py tests/test_native_emu_tracers.py tests/test_native_stationary_emu.py tests/test_native_stationary_parity.py
+        run: python -m pytest -q tests/test_standalone_model_contract.py tests/test_standalone_model_projection.py tests/test_canonical_forward.py tests/test_canonical_forward_parity.py tests/test_native_emu_graph.py tests/test_native_emu_tracers.py tests/test_native_stationary_emu.py tests/test_native_stationary_parity.py
       - name: Transient contract and exact controls
         run: python -m pytest -q tests/test_transient_experiment_contract.py tests/test_native_transient_emu.py
       - name: Historical transient and stationary-limit gates

@@ -21,6 +21,16 @@ timecourse:
 
 Pool quantities are a list, not a mapping, so duplicate declarations remain detectable. Unknown, duplicate, missing-required, nonfinite, zero, and negative pool quantities fail validation. Tracer, target, time, pool, and initial-state ordering and values participate in the separate transient fingerprint.
 
+Numerical tolerances are execution policy, not scientific experiment semantics,
+and therefore do not participate in that fingerprint. The supported configured
+boundary, `evaluate_configured_transient(model, config, fluxes)`, projects the
+scientific fields, compiles the plan, and forwards the validated YAML `rtol`,
+`atol`, and `mid` values unchanged. Its solver method is deterministic (`RK45` by
+default) and may be selected explicitly. It intentionally offers no tolerance
+overrides, so configured values cannot be silently shadowed. Advanced callers may
+instead use low-level `evaluate_transient`; explicit low-level keyword values take
+precedence over that function's documented defaults.
+
 ## Equations and extraction
 
 The compiled global state concatenates every dynamic EMU MID in deterministic layer, EMU, then mass-isotopologue order. The isotope material balance is `D dX/dt = B(X_lower(t), tracer, v) - A(v) X`.
@@ -32,6 +42,9 @@ An unbalanced terminal target is the **instantaneous production MID** formed fro
 ## Numerics and boundaries
 
 The native engine uses SciPy `solve_ivp` (declared by the `transient` optional extra), with defaults `rtol=1e-9` and `atol=1e-12`. Solver failure, nonfinite output, unacceptable negative components, or normalization error fails explicitly. The engine does not clip, renormalise, or project MIDs onto a simplex. SciPy is imported locally by the transient path so importing the stationary EMU package does not depend on SciPy.
+
+The stationary configuration, scientific fingerprint, and public stationary API
+remain unchanged.
 
 V1 does not support time-varying fluxes or pool sizes, pulse-chase schedules, tracer switches after zero, arbitrary prelabelled internal pools, abundance dynamics, growth dilution not represented by turnover, or non-steady metabolite concentrations. It does not perform inverse MFA.
 

@@ -99,3 +99,14 @@ def test_unknown_initial_state_and_mode_are_rejected() -> None:
 def test_stationary_parser_does_not_infer_or_accept_transient_semantics() -> None:
     with pytest.raises(ConfigurationError, match="unknown field.*experiment_mode"):
         parse_experiment_config(VALID)
+
+
+@pytest.mark.parametrize("name", ["rtol", "atol", "mid"])
+@pytest.mark.parametrize("value", [0.0, -1.0, float("nan"), float("inf")])
+def test_invalid_transient_numerical_setting_fails_explicitly(
+    name: str, value: float
+) -> None:
+    tolerances = {**VALID["timecourse"]["tolerances"], name: value}
+    timecourse = {**VALID["timecourse"], "tolerances": tolerances}
+    with pytest.raises(ConfigurationError, match=name):
+        parse_transient_experiment_config({**VALID, "timecourse": timecourse})

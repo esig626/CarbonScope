@@ -18,6 +18,7 @@ from .transient import (
     TransientDiagnostics,
     TransientStateBlock,
     compile_transient_emu_plan,
+    evaluate_configured_transient,
     evaluate_transient,
 )
 
@@ -29,5 +30,5 @@ __all__ = [
     "CompiledTransientEMUPlan", "DEFAULT_TRANSIENT_ATOL", "DEFAULT_TRANSIENT_METHOD",
     "DEFAULT_TRANSIENT_MID_TOLERANCE", "DEFAULT_TRANSIENT_RTOL", "NativeTransientResult",
     "TransientDiagnostics", "TransientStateBlock", "compile_transient_emu_plan",
-    "evaluate_transient",
+    "evaluate_configured_transient", "evaluate_transient",
 ]
