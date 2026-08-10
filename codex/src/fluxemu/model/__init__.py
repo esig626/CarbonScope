@@ -5,6 +5,7 @@ from .identity import (
     fingerprint_experiment,
     fingerprint_model,
     model_fingerprint,
+    transient_experiment_fingerprint,
 )
 from .schema import (
     AtomPosition,
@@ -20,10 +21,12 @@ from .schema import (
     LinearObjective,
     MappingBranch,
     ObjectiveTerm,
+    PoolQuantity,
     StationaryExperimentSemantics,
     StoichiometricTerm,
     Target,
     Tracer,
+    TransientExperimentSemantics,
 )
 from .serialisation import deterministic_serialise, serialise
 from .validation import (
@@ -33,6 +36,7 @@ from .validation import (
     validate_flux_model,
     validate_isotope_model,
     validate_stationary_experiment,
+    validate_transient_experiment,
 )
 
 __all__ = [
@@ -51,18 +55,22 @@ __all__ = [
     "MIXTURE_ABS_TOLERANCE",
     "MappingBranch",
     "ObjectiveTerm",
+    "PoolQuantity",
     "StationaryExperimentSemantics",
     "StoichiometricTerm",
     "Target",
     "Tracer",
+    "TransientExperimentSemantics",
     "deterministic_serialise",
     "experiment_fingerprint",
     "fingerprint_experiment",
     "fingerprint_model",
     "model_fingerprint",
+    "transient_experiment_fingerprint",
     "serialise",
     "validate_canonical_model",
     "validate_flux_model",
     "validate_isotope_model",
     "validate_stationary_experiment",
+    "validate_transient_experiment",
 ]

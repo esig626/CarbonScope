@@ -15,6 +15,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+transient = [
+  "scipy>=1.13",
+]
 # mfapy imports SciPy at backend module load time.  SciPy 1.13 is the first
 # release line compatible with this project's NumPy 2.x lower bound.
 mfapy = [
