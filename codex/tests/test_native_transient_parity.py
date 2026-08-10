@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import importlib.util
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
@@ -35,6 +37,8 @@ from fluxemu.model import (
 ROOT = Path(__file__).resolve().parents[1]
 ANTON_SHADOW_TOLERANCE = 2.0e-6
 GLUCOSE_SHADOW_TOLERANCE = 1.0e-5
+ANTON_LIVE_FIXTURE_TOLERANCE = 2.0e-6
+GLUCOSE_LIVE_FIXTURE_TOLERANCE = 1.0e-5
 RTOL = 1.0e-9
 ATOL = 1.0e-12
 TCA_REACTIONS = tuple(f"v{index}" for index in range(1, 9))
@@ -117,18 +121,63 @@ def _frozen(path):
     }
 
 
+def _frame_mids(frame):
+    return {
+        (float(time), metabolite): group.sort_values(
+            "mass_isotopologue", key=lambda values: values.str[2:].astype(int)
+        )["fraction"].to_numpy(dtype=float)
+        for (time, metabolite), group in frame.groupby(
+            ["time", "metabolite"], sort=False
+        )
+    }
+
+
+def _target_semantics(model, experiment):
+    balanced = {
+        item.metabolite_id
+        for item in model.flux_model.metabolites
+        if item.steady_state_balanced
+    }
+    sources = {item.metabolite_id for item in experiment.tracers}
+    shared = tuple(
+        target.target_id
+        for target in experiment.targets
+        if target.metabolite_id in balanced or target.metabolite_id in sources
+    )
+    terminal = tuple(
+        target.target_id
+        for target in experiment.targets
+        if target.metabolite_id not in balanced
+        and target.metabolite_id not in sources
+    )
+    assert shared
+    assert set(shared).isdisjoint(terminal)
+    assert set(shared) | set(terminal) == {
+        target.target_id for target in experiment.targets
+    }
+    return shared, terminal
+
+
+def _maximum_difference(first, second, target_ids):
+    return max(
+        float(np.max(np.abs(first[key] - second[key])))
+        for key in first
+        if key[1] in target_ids
+    )
+
+
 def _stationary_predictions(model, experiment, fluxes):
     stationary = StationaryExperimentSemantics(experiment.tracers, experiment.targets)
     result = evaluate_stationary(compile_emu_plan(model, stationary), fluxes)
     return {item.target_id: np.asarray(item.fractions) for item in result.forward.predictions}
 
 
-def _report(benchmark, native, frozen, stationary, threshold):
+def _report(benchmark, model, experiment, native, frozen, stationary, threshold):
     predicted = _predictions(native)
-    shadow_error = max(
-        float(np.max(np.abs(predicted[key] - reference)))
-        for key, reference in frozen.items()
-    )
+    assert predicted.keys() == frozen.keys()
+    shared_targets, terminal_targets = _target_semantics(model, experiment)
+    shared_shadow_error = _maximum_difference(predicted, frozen, shared_targets)
+    terminal_shadow_error = _maximum_difference(predicted, frozen, terminal_targets)
     final_time = max(time for time, _ in predicted)
     stationary_error = max(
         float(np.max(np.abs(predicted[(final_time, target)] - reference)))
@@ -142,22 +191,66 @@ def _report(benchmark, native, frozen, stationary, threshold):
         "target_count": len(stationary),
         "total_mid_components": len(native.forward.values),
         "max_native_vs_analytic_difference": None,
-        "max_native_vs_frozen_mfapy_difference": shadow_error,
+        "max_shared_semantics_native_vs_frozen_mfapy_difference": shared_shadow_error,
+        "max_terminal_native_vs_historical_difference": terminal_shadow_error,
         "max_late_native_vs_native_stationary_difference": stationary_error,
+        "shared_semantics_target_ids": shared_targets,
+        "terminal_target_ids": terminal_targets,
         "maximum_normalization_error": native.forward.max_normalization_error,
         "minimum_component": diagnostic.minimum_mid_component,
         "solver_method": diagnostic.solver_method,
         "rtol": RTOL,
         "atol": ATOL,
         "threshold": threshold,
-        "passed": shadow_error <= threshold and stationary_error <= threshold,
+        "passed": shared_shadow_error <= threshold and stationary_error <= threshold,
     }
     print("FLUXEMU_TRANSIENT_PARITY " + json.dumps(payload, sort_keys=True))
     return payload
 
 
+def _load_historical_builder(directory):
+    path = ROOT / "examples" / directory / "build_model.py"
+    name = f"_transient_fixture_{directory}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    sys.path.insert(0, str(path.parent))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
+    return module
+
+
+def _assert_native_terminal_is_instantaneous(predicted, times):
+    for time in times:
+        np.testing.assert_allclose(
+            _mid(predicted, time, "glutamate"),
+            _mid(predicted, time, "AKG"),
+            rtol=0.0,
+            atol=1.0e-12,
+        )
+
+
 def _mid(predictions, time, target):
     return predictions[(float(time), target)]
+
+
+def test_target_semantics_partition_is_derived_from_canonical_balance_roles():
+    assert ANTON_SHADOW_TOLERANCE == 2.0e-6
+    assert GLUCOSE_SHADOW_TOLERANCE == 1.0e-5
+    model, experiment = _canonical(
+        "antoniewicz_tca", "experiment_timecourse.yaml", TCA_REACTIONS,
+        TCA_TRANSITIONS, (0.0,), 1.0,
+    )
+    renamed_terminal = replace(experiment.targets[-1], target_id="secreted-glu")
+    renamed = replace(
+        experiment, targets=experiment.targets[:-1] + (renamed_terminal,)
+    )
+    shared, terminal = _target_semantics(model, renamed)
+    assert shared == ("OAC", "citrate", "AKG", "succinate", "fumarate")
+    assert terminal == ("secreted-glu",)
 
 
 def test_antoniewicz_native_transient_matches_frozen_shadow_and_stationary_limit():
@@ -176,16 +269,38 @@ def test_antoniewicz_native_transient_matches_frozen_shadow_and_stationary_limit
     predicted = _predictions(native)
     stationary = _stationary_predictions(model, experiment, TCA_FLUXES)
     report = _report(
-        "antoniewicz-table-5-transient", native, frozen, stationary,
+        "antoniewicz-table-5-transient", model, experiment, native, frozen, stationary,
         ANTON_SHADOW_TOLERANCE,
     )
-    assert report["max_native_vs_frozen_mfapy_difference"] <= ANTON_SHADOW_TOLERANCE
+    assert report["shared_semantics_target_ids"] == (
+        "OAC", "citrate", "AKG", "succinate", "fumarate"
+    )
+    assert report["terminal_target_ids"] == ("glutamate",)
+    assert report["max_shared_semantics_native_vs_frozen_mfapy_difference"] <= ANTON_SHADOW_TOLERANCE
+    assert report["max_terminal_native_vs_historical_difference"] > ANTON_SHADOW_TOLERANCE
     assert report["max_late_native_vs_native_stationary_difference"] <= ANTON_SHADOW_TOLERANCE
+    _assert_native_terminal_is_instantaneous(predicted, times)
     assert all(mid[0] == 1.0 and np.count_nonzero(mid[1:]) == 0 for (time, _), mid in predicted.items() if time == 0.0)
     early = _mid(predicted, 0.001, "glutamate")
     assert early[1:3].sum() > 0.0
     assert early[3:].sum() < 1.0e-12
     assert np.all(_mid(predicted, 0.05, "glutamate")[3:] > 0.0)
+
+
+def test_antoniewicz_native_terminal_glutamate_is_instantaneous_akg_production():
+    pytest.importorskip("scipy", reason="native transient execution requires the transient extra")
+    base = ROOT / "examples" / "antoniewicz_tca"
+    frozen = _frozen(base / "timecourse_mids.csv")
+    times = tuple(dict.fromkeys(time for time, _ in frozen))
+    model, experiment = _canonical(
+        "antoniewicz_tca", "experiment_timecourse.yaml", TCA_REACTIONS,
+        TCA_TRANSITIONS, times, 1.0,
+    )
+    native = evaluate_transient(
+        compile_transient_emu_plan(model, experiment), TCA_FLUXES,
+        rtol=RTOL, atol=ATOL,
+    )
+    _assert_native_terminal_is_instantaneous(_predictions(native), times)
 
 
 def test_glucose_tca_native_transient_matches_actual_frozen_grid_and_stationary_limit():
@@ -205,17 +320,42 @@ def test_glucose_tca_native_transient_matches_actual_frozen_grid_and_stationary_
     predicted = _predictions(native)
     stationary = _stationary_predictions(model, experiment, fluxes)
     report = _report(
-        "glucose-to-tca-transient", native, frozen, stationary,
+        "glucose-to-tca-transient", model, experiment, native, frozen, stationary,
         GLUCOSE_SHADOW_TOLERANCE,
     )
-    assert report["max_native_vs_frozen_mfapy_difference"] <= GLUCOSE_SHADOW_TOLERANCE
+    assert report["terminal_target_ids"] == ("glutamate",)
+    assert report["shared_semantics_target_ids"] == (
+        "glucose_c", "G6P", "F6P", "FBP", "DHAP", "GAP", "BPG", "3PG",
+        "2PG", "PEP", "pyruvate", "AcCoA", "citrate", "AKG", "succinate",
+        "fumarate", "OAC",
+    )
+    assert report["max_shared_semantics_native_vs_frozen_mfapy_difference"] <= GLUCOSE_SHADOW_TOLERANCE
+    assert report["max_terminal_native_vs_historical_difference"] > GLUCOSE_SHADOW_TOLERANCE
     assert report["max_late_native_vs_native_stationary_difference"] <= GLUCOSE_SHADOW_TOLERANCE
+    _assert_native_terminal_is_instantaneous(predicted, times)
     assert max(_mid(predicted, time, "pyruvate")[3] for time in times[1:]) > 0.0
     assert max(_mid(predicted, time, "AcCoA")[2] for time in times[1:]) > 0.0
     first = next(time for time in times[1:] if _mid(predicted, time, "citrate")[2] > 1.0e-10)
     assert _mid(predicted, first, "citrate")[2] > _mid(predicted, first, "citrate")[4]
     assert max(_mid(predicted, time, "citrate")[4] for time in times if time > first) > 0.0
     assert _mid(predicted, 10.0, "glutamate")[3:].sum() > 0.0
+
+
+def test_glucose_tca_native_terminal_glutamate_is_instantaneous_akg_production():
+    pytest.importorskip("scipy", reason="native transient execution requires the transient extra")
+    base = ROOT / "examples" / "antoniewicz_tca_glucose"
+    frozen = _frozen(base / "timecourse_mids.csv")
+    times = tuple(dict.fromkeys(time for time, _ in frozen))
+    model, experiment = _canonical(
+        "antoniewicz_tca_glucose", "experiment_u13c6_glucose_timecourse.yaml",
+        UPSTREAM_REACTIONS + TCA_REACTIONS, UPSTREAM_TRANSITIONS + TCA_TRANSITIONS,
+        times, 100.0,
+    )
+    native = evaluate_transient(
+        compile_transient_emu_plan(model, experiment),
+        {**UPSTREAM_FLUXES, **TCA_FLUXES}, rtol=RTOL, atol=ATOL,
+    )
+    _assert_native_terminal_is_instantaneous(_predictions(native), times)
 
 
 def test_transient_shadow_does_not_heal_a_removed_symmetry_orientation():
@@ -242,8 +382,42 @@ def test_transient_shadow_does_not_heal_a_removed_symmetry_orientation():
         compile_transient_emu_plan(corrupted, experiment), TCA_FLUXES,
         rtol=RTOL, atol=ATOL,
     )
-    disagreement = max(
-        float(np.max(np.abs(_predictions(result)[key] - reference)))
-        for key, reference in frozen.items()
-    )
+    shared, _ = _target_semantics(corrupted, experiment)
+    disagreement = _maximum_difference(_predictions(result), frozen, shared)
     assert disagreement > ANTON_SHADOW_TOLERANCE
+
+
+def test_live_antoniewicz_mfapy_reproduces_preserved_historical_fixture():
+    pytest.importorskip("scipy", reason="historical mfapy execution requires SciPy")
+    base = ROOT / "examples" / "antoniewicz_tca"
+    frozen = _frozen(base / "timecourse_mids.csv")
+    live = _frame_mids(_load_historical_builder("antoniewicz_tca").run_timecourse())
+    assert live.keys() == frozen.keys()
+    difference = _maximum_difference(live, frozen, tuple({key[1] for key in frozen}))
+    print("FLUXEMU_HISTORICAL_FIXTURE " + json.dumps({
+        "benchmark": "antoniewicz-table-5-transient",
+        "max_live_mfapy_vs_frozen_difference": difference,
+        "threshold": ANTON_LIVE_FIXTURE_TOLERANCE,
+        "passed": difference <= ANTON_LIVE_FIXTURE_TOLERANCE,
+    }, sort_keys=True))
+    assert difference <= ANTON_LIVE_FIXTURE_TOLERANCE
+
+
+def test_live_glucose_tca_mfapy_reproduces_preserved_historical_fixture():
+    pytest.importorskip("scipy", reason="historical mfapy execution requires SciPy")
+    base = ROOT / "examples" / "antoniewicz_tca_glucose"
+    frozen = _frozen(base / "timecourse_mids.csv")
+    times = tuple(dict.fromkeys(time for time, _ in frozen))
+    builder = _load_historical_builder("antoniewicz_tca_glucose")
+    frame, returned_times, _ = builder.run_timecourse(timepoints=times)
+    assert returned_times == times
+    live = _frame_mids(frame)
+    assert live.keys() == frozen.keys()
+    difference = _maximum_difference(live, frozen, tuple({key[1] for key in frozen}))
+    print("FLUXEMU_HISTORICAL_FIXTURE " + json.dumps({
+        "benchmark": "glucose-to-tca-transient",
+        "max_live_mfapy_vs_frozen_difference": difference,
+        "threshold": GLUCOSE_LIVE_FIXTURE_TOLERANCE,
+        "passed": difference <= GLUCOSE_LIVE_FIXTURE_TOLERANCE,
+    }, sort_keys=True))
+    assert difference <= GLUCOSE_LIVE_FIXTURE_TOLERANCE

@@ -39,6 +39,17 @@ The compiled global state concatenates every dynamic EMU MID in deterministic la
 
 An unbalanced terminal target is the **instantaneous production MID** formed from flux-weighted mapped contributions at that time. It is not accumulated extracellular material or a medium concentration. Such behaviour requires an explicit future dynamic external-pool model.
 
+The checked `timecourse_mids.csv` files predate this native contract and remain
+preserved as historical mfapy provenance. The mfapy compatibility compiler
+temporarily exposed a targeted excreted product as a dynamic intermediate, so its
+historical terminal glutamate trajectory includes a finite mixing-pool lag. Native
+V1 deliberately does not adopt that hidden pool. Strict native-versus-historical
+trajectory parity therefore covers only targets whose source or balanced-dynamic
+semantics match; terminal targets retain a reported diagnostic difference and are
+validated separately against the native instantaneous-production contract. A
+separate CI gate regenerates the historical mfapy trajectories and checks the
+preserved files without changing their semantics.
+
 ## Numerics and boundaries
 
 The native engine uses SciPy `solve_ivp` (declared by the `transient` optional extra), with defaults `rtol=1e-9` and `atol=1e-12`. Solver failure, nonfinite output, unacceptable negative components, or normalization error fails explicitly. The engine does not clip, renormalise, or project MIDs onto a simplex. SciPy is imported locally by the transient path so importing the stationary EMU package does not depend on SciPy.

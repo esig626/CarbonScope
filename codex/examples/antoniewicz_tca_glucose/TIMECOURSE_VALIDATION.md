@@ -40,3 +40,14 @@ Glutamate M+3 through M+5 also emerge later (their time-10 sum is about
 `9.538e-06`). All written probability vectors are finite, nonnegative, and
 normalized; sub-microfraction negative `odeint` roundoff is clipped to zero
 and the vector renormalized before output.
+
+## Historical terminal-target provenance
+
+This file and `timecourse_mids.csv` preserve the historical mfapy calculation.
+The compatibility bridge temporarily compiled terminal glutamate as a dynamic
+intermediate with 100 pool units, so that trajectory contains a finite terminal
+mixing lag. Native FluxEMU V1 has no hidden external pool: an unbalanced terminal
+target is the instantaneous flux-weighted production MID. Strict historical
+trajectory parity is therefore limited to targets with matching transient
+semantics, while native glutamate is validated separately against that native
+contract. The preserved CSV is not rewritten.

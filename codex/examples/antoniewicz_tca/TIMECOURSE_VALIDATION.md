@@ -22,3 +22,14 @@ glutamate.
 The biochemical transitions and tracer mixture are from Section 3.2, Figure
 12, and Table 5 (paper pages 12–14, 29, and 37); the stationary limiting MID
 is Table 6 (paper page 38).
+
+## Historical terminal-target provenance
+
+This file and `timecourse_mids.csv` preserve the historical mfapy `diffmdv`
+calculation. FluxEMU's compatibility bridge temporarily compiled terminal
+glutamate as a dynamic intermediate with its declared pool quantity, producing a
+finite mixing lag. Native FluxEMU V1 instead defines an unbalanced terminal target
+as its instantaneous flux-weighted production MID and does not invent an external
+pool. Strict historical trajectory parity is consequently evaluated only for
+targets with matching transient semantics; native glutamate is checked separately
+against its instantaneous-production contract. The historical CSV is unchanged.
