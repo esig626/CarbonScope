@@ -163,9 +163,20 @@ def test_result_does_not_expose_backend_objects(monkeypatch):
 
 
 def test_backend_missing_target_is_a_fluxemu_validation_failure(monkeypatch):
-    """The real backend test executes only where the mfapy extra is installed."""
+    """A backend response omitting a requested MID must fail FluxEMU validation."""
 
     model, experiment = _science()
+    # The generic fixture has only boundary metabolites, which is intentionally
+    # sufficient for public-contract tests but leaves mfapy with no steady-state
+    # matrix row.  Make the target an internal balanced pool here so this test
+    # isolates the missing-target validation path rather than mfapy's degenerate
+    # zero-row matrix behaviour.
+    metabolites = (
+        model.flux_model.metabolites[0],
+        replace(model.flux_model.metabolites[1], steady_state_balanced=True),
+    )
+    model = replace(model, flux_model=replace(model.flux_model, metabolites=metabolites))
+
     from fluxemu._mfapy import load_mfapy
 
     monkeypatch.setattr(load_mfapy().optimize, "calc_MDV_from_flux", lambda *args: ([], {"X_list": []}))
