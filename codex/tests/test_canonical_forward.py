@@ -165,20 +165,63 @@ def test_result_does_not_expose_backend_objects(monkeypatch):
 def test_backend_missing_target_is_a_fluxemu_validation_failure(monkeypatch):
     """A backend response omitting a requested MID must fail FluxEMU validation."""
 
-    model, experiment = _science()
-    # The generic fixture has only boundary metabolites, which is intentionally
-    # sufficient for public-contract tests but leaves mfapy with no steady-state
-    # matrix row.  Make the target an internal balanced pool here so this test
-    # isolates the missing-target validation path rather than mfapy's degenerate
-    # zero-row matrix behaviour.
-    metabolites = (
-        model.flux_model.metabolites[0],
-        replace(model.flux_model.metabolites[1], steady_state_balanced=True),
+    flux = FluxModel(
+        (
+            FluxMetabolite("source", False),
+            FluxMetabolite("middle", True),
+            FluxMetabolite("product", False),
+        ),
+        (
+            FluxReaction(
+                "R1",
+                (StoichiometricTerm("source", -1), StoichiometricTerm("middle", 1)),
+                0,
+                10,
+            ),
+            FluxReaction(
+                "R2",
+                (StoichiometricTerm("middle", -1), StoichiometricTerm("product", 1)),
+                0,
+                10,
+            ),
+        ),
+        LinearObjective("maximise", ()),
     )
-    model = replace(model, flux_model=replace(model.flux_model, metabolites=metabolites))
+    source_to_middle = AtomTransition(AtomPosition("source", 1), AtomPosition("middle", 1))
+    middle_to_product = AtomTransition(AtomPosition("middle", 1), AtomPosition("product", 1))
+    isotope = IsotopeModel(
+        (
+            IsotopeMetabolite("source", 1, True, False),
+            IsotopeMetabolite("middle", 1, True, False),
+            IsotopeMetabolite("product", 1, True, False),
+        ),
+        (
+            IsotopeReaction(
+                "R1",
+                "forward",
+                True,
+                (IsotopeParticipant("source", (1,)),),
+                (IsotopeParticipant("middle", (1,)),),
+                (MappingBranch("primary", 1.0, (source_to_middle,)),),
+            ),
+            IsotopeReaction(
+                "R2",
+                "forward",
+                True,
+                (IsotopeParticipant("middle", (1,)),),
+                (IsotopeParticipant("product", (1,)),),
+                (MappingBranch("primary", 1.0, (middle_to_product,)),),
+            ),
+        ),
+    )
+    experiment = StationaryExperimentSemantics(
+        (Tracer("source", (("#1", 1.0),), "no"),),
+        (Target("product", "product", (1,), "intermediate", "C", "no"),),
+    )
+    model = CanonicalModel(flux, isotope)
 
     from fluxemu._mfapy import load_mfapy
 
     monkeypatch.setattr(load_mfapy().optimize, "calc_MDV_from_flux", lambda *args: ([], {"X_list": []}))
     with pytest.raises(ValidationError, match="missing requested target"):
-        run_stationary_forward(model, experiment, {"R": 1.0})
+        run_stationary_forward(model, experiment, {"R1": 1.0, "R2": 1.0})
