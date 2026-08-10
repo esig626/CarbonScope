@@ -44,4 +44,3 @@ def test_compiler_traces_explicit_atoms_and_preserves_scientific_order():
 
 def test_emu_identity_retains_requested_atom_order():
     assert EMU("x", (2, 1)) != EMU("x", (1, 2))
-
