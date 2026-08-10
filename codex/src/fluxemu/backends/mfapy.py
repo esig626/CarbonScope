@@ -96,6 +96,26 @@ def compile_stationary_model(
     balanced = {
         item.metabolite_id: item.steady_state_balanced for item in canonical.flux_model.metabolites
     }
+    substrate_ids = {
+        participant.metabolite_id
+        for reaction in canonical.isotope_model.reactions
+        if reaction.isotope_enabled
+        for participant in reaction.substrates
+    }
+    untraced_boundary_substrates = {
+        metabolite_id
+        for metabolite_id in substrate_ids
+        if not balanced.get(metabolite_id, True) and metabolite_id not in tracer_ids
+    }
+    if untraced_boundary_substrates:
+        raise MappingError(
+            "unbalanced isotope substrate(s) must be declared as experiment tracers: "
+            + ", ".join(
+                item.metabolite_id
+                for item in isotope_metabolites
+                if item.metabolite_id in untraced_boundary_substrates
+            )
+        )
 
     metabolites: dict[str, dict[str, Any]] = {}
     for order, item in enumerate(isotope_metabolites):
@@ -106,7 +126,13 @@ def compile_stationary_model(
             # Explicit canonical branches carry symmetry; mfapy must not invent it.
             "symmetry": "no",
             "carbonsource": "carbonsource" if item.metabolite_id in tracer_ids else "no",
-            "excreted": "no" if balanced[item.metabolite_id] else "excreted",
+            # An unbalanced tracer is an input boundary, not an excreted
+            # output.  Only an unbalanced, non-tracer product is excreted.
+            "excreted": (
+                "excreted"
+                if not balanced[item.metabolite_id] and item.metabolite_id not in tracer_ids
+                else "no"
+            ),
             "order": order,
             "externalids": f"fluxemu:{item.metabolite_id}",
             "lb": 0.0,
@@ -185,7 +211,10 @@ def compile_stationary_model(
     except Exception as error:
         raise ForwardEMUError(f"mfapy canonical model construction failed: {error}") from error
     expected = tuple(item.internal_reaction_id for item in compiled)
-    if tuple(backend_model.reaction_ids) != expected:
+    backend_order = tuple(
+        sorted(backend_model.reactions, key=lambda item: backend_model.reactions[item]["order"])
+    )
+    if backend_order != expected:
         raise MappingError("mfapy changed canonical branch ordering")
     return CompiledMfapyModel(backend_model, tuple(compiled), metabolite_ids, target_ids)
 

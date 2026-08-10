@@ -50,7 +50,11 @@ GLYCOLYSIS_TRANSITIONS = (
 
 def _builder(directory: str):
     name = f"_canonical_parity_{directory}"
-    spec = importlib.util.spec_from_file_location(name, ROOT / "examples" / directory / "build_model.py")
+    example_directory = ROOT / "examples" / directory
+    example_path = str(example_directory)
+    if example_path not in sys.path:
+        sys.path.insert(0, example_path)
+    spec = importlib.util.spec_from_file_location(name, example_directory / "build_model.py")
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
