@@ -60,6 +60,6 @@ at roughly `1e-10` scale.
 Accordingly, the frozen CSV remains an immutable historical-provenance fixture and
 is still reproduced by live historical mfapy. Strict shared-semantics scientific
 parity compares native FluxEMU with the same mfapy-generated equations integrated
-independently using LSODA at `rtol=1e-9`, `atol=1e-12`. The original `1e-5`
-scientific threshold is unchanged. The larger native/frozen historical difference
-remains visible as a diagnostic rather than being treated as high-precision truth.
+using LSODA at `rtol=1e-9`, `atol=1e-12`. The original `1e-5` scientific threshold
+is unchanged. The larger native/frozen historical difference remains visible as a
+diagnostic rather than being treated as high-precision truth.
