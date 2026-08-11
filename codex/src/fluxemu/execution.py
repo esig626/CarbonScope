@@ -65,6 +65,37 @@ class StationaryForwardResult:
     max_normalization_error: float
 
 
+@dataclass(frozen=True, slots=True)
+class TransientMID:
+    """One target MID at one requested time for one fixed flux state."""
+
+    sample_id: Any
+    time: float
+    target_id: str
+    fractions: tuple[float, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TransientMIDValue:
+    """One long-form time-resolved isotopologue prediction."""
+
+    sample_id: Any
+    time: float
+    target_id: str
+    isotopologue_index: int
+    predicted_fraction: float
+
+
+@dataclass(frozen=True, slots=True)
+class TransientForwardResult:
+    """Validated ordered trajectories containing no numerical backend objects."""
+
+    predictions: tuple[TransientMID, ...]
+    values: tuple[TransientMIDValue, ...]
+    mid_tolerance: float
+    max_normalization_error: float
+
+
 def _validate_states(
     model: CanonicalModel,
     fluxes: Mapping[str, float] | Sequence[CanonicalFluxState],
@@ -157,5 +188,8 @@ __all__ = [
     "StationaryForwardResult",
     "StationaryMID",
     "StationaryMIDValue",
+    "TransientForwardResult",
+    "TransientMID",
+    "TransientMIDValue",
     "run_stationary_forward",
 ]

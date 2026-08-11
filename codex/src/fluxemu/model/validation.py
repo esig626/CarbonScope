@@ -14,7 +14,9 @@ from .schema import (
     IsotopeParticipant,
     IsotopeReaction,
     MappingBranch,
+    PoolQuantity,
     StationaryExperimentSemantics,
+    TransientExperimentSemantics,
 )
 
 # Mixture weights and tracer fractions are scientific proportions.  This
@@ -303,3 +305,45 @@ def validate_stationary_experiment(
         _nonempty_id(target.formula, "target formula")
         if target.correction not in {"yes", "no"}:
             _fail("target correction must be exactly 'yes' or 'no'")
+
+
+def validate_transient_experiment(
+    model: CanonicalModel,
+    experiment: TransientExperimentSemantics,
+) -> None:
+    """Validate V1 transient inputs without changing stationary semantics."""
+
+    validate_canonical_model(model)
+    if not isinstance(experiment, TransientExperimentSemantics):
+        _fail("experiment must be TransientExperimentSemantics")
+    validate_stationary_experiment(
+        model, StationaryExperimentSemantics(experiment.tracers, experiment.targets)
+    )
+    _tuple(experiment.time_points, "transient time points")
+    if not experiment.time_points:
+        _fail("transient time points must be nonempty")
+    previous: float | None = None
+    for value in experiment.time_points:
+        _finite_number(value, "transient time point")
+        numeric = float(value)
+        if numeric < 0.0:
+            _fail("transient time points must be nonnegative")
+        if previous is not None and numeric <= previous:
+            _fail("transient time points must be strictly increasing and unique")
+        previous = numeric
+
+    _tuple(experiment.pool_quantities, "transient pool quantities")
+    known = {item.metabolite_id for item in model.flux_model.metabolites}
+    seen: set[str] = set()
+    for pool in experiment.pool_quantities:
+        if not isinstance(pool, PoolQuantity):
+            _fail("transient pool quantities must contain PoolQuantity records")
+        _nonempty_id(pool.metabolite_id, "pool-quantity metabolite ID")
+        if pool.metabolite_id in seen:
+            _fail(f"duplicate pool quantity for metabolite {pool.metabolite_id!r}")
+        if pool.metabolite_id not in known:
+            _fail(f"pool quantity references unknown metabolite {pool.metabolite_id!r}")
+        _finite_number(pool.quantity, f"pool quantity for {pool.metabolite_id!r}", positive=True)
+        seen.add(pool.metabolite_id)
+    if experiment.initial_internal_mids != "unlabelled":
+        _fail("initial_internal_mids must be explicitly 'unlabelled' in transient V1")

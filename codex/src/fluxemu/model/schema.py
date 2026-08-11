@@ -123,6 +123,25 @@ class StationaryExperimentSemantics:
 
 
 @dataclass(frozen=True, slots=True)
+class PoolQuantity:
+    """A fixed amount for one balanced dynamic metabolite pool."""
+
+    metabolite_id: str
+    quantity: Number
+
+
+@dataclass(frozen=True, slots=True)
+class TransientExperimentSemantics:
+    """V1 tracer-step experiment state, separate from stationary semantics."""
+
+    tracers: tuple[Tracer, ...]
+    targets: tuple[Target, ...]
+    time_points: tuple[Number, ...]
+    pool_quantities: tuple[PoolQuantity, ...]
+    initial_internal_mids: str
+
+
+@dataclass(frozen=True, slots=True)
 class CanonicalModel:
     flux_model: FluxModel
     isotope_model: IsotopeModel

@@ -15,6 +15,7 @@ from .exceptions import ConfigurationError
 
 SamplerName = Literal["achr", "optgp"]
 CorrectionMode = Literal["yes", "no"]
+InitialInternalMIDs = Literal["unlabelled"]
 DEFAULT_TRACER_NORMALIZATION_TOLERANCE = 1e-9
 
 
@@ -399,6 +400,105 @@ class ExperimentConfig:
         }
 
 
+@dataclass(frozen=True)
+class PoolQuantitySettings:
+    """One explicitly declared, fixed transient metabolite amount."""
+
+    metabolite_id: str
+    quantity: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "metabolite_id", _nonempty_text(
+            self.metabolite_id, "pool_quantity.metabolite_id"
+        ))
+        object.__setattr__(self, "quantity", _positive_float(
+            self.quantity, f"pool quantity for {self.metabolite_id!r}"
+        ))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"metabolite_id": self.metabolite_id, "quantity": self.quantity}
+
+
+@dataclass(frozen=True)
+class TransientNumericalSettings:
+    """Declared solve and requested-output acceptance tolerances."""
+
+    rtol: float = 1e-9
+    atol: float = 1e-12
+    mid: float = 1e-8
+
+    def __post_init__(self) -> None:
+        for name in ("rtol", "atol", "mid"):
+            object.__setattr__(self, name, _positive_float(
+                getattr(self, name), f"timecourse.tolerances.{name}"
+            ))
+
+    def to_dict(self) -> dict[str, float]:
+        return {"rtol": self.rtol, "atol": self.atol, "mid": self.mid}
+
+
+@dataclass(frozen=True)
+class TransientExperimentConfig:
+    """Validated V1 transient configuration, separate from sampling config."""
+
+    tracers: tuple[TracerMixture, ...]
+    targets: tuple[TargetFragment, ...]
+    time_points: tuple[float, ...]
+    pool_quantities: tuple[PoolQuantitySettings, ...]
+    initial_internal_mids: InitialInternalMIDs
+    numerical: TransientNumericalSettings = field(default_factory=TransientNumericalSettings)
+    schema_version: int = 1
+    experiment_mode: Literal["transient"] = "transient"
+
+    def __post_init__(self) -> None:
+        tracers, targets = tuple(self.tracers), tuple(self.targets)
+        if not tracers or not all(isinstance(x, TracerMixture) for x in tracers):
+            raise ConfigurationError("tracers must contain at least one valid tracer")
+        if not targets or not all(isinstance(x, TargetFragment) for x in targets):
+            raise ConfigurationError("targets must contain at least one valid target fragment")
+        if len({x.metabolite_id for x in tracers}) != len(tracers):
+            raise ConfigurationError("tracer metabolite IDs must be unique")
+        if len({x.fragment_id for x in targets}) != len(targets):
+            raise ConfigurationError("target fragment IDs must be unique")
+        points = tuple(_finite_float(x, "timecourse time point") for x in self.time_points)
+        if not points:
+            raise ConfigurationError("timecourse.time_points must not be empty")
+        if any(x < 0 for x in points):
+            raise ConfigurationError("timecourse.time_points must be nonnegative")
+        if any(right <= left for left, right in zip(points, points[1:])):
+            raise ConfigurationError("timecourse.time_points must be strictly increasing and unique")
+        pools = tuple(self.pool_quantities)
+        if not pools or not all(isinstance(x, PoolQuantitySettings) for x in pools):
+            raise ConfigurationError("timecourse.pool_quantities must contain records")
+        ids = [x.metabolite_id for x in pools]
+        if len(set(ids)) != len(ids):
+            raise ConfigurationError("timecourse.pool_quantities contains duplicate metabolites")
+        if self.initial_internal_mids != "unlabelled":
+            raise ConfigurationError("timecourse.initial_internal_mids must be explicitly 'unlabelled'")
+        if self.experiment_mode != "transient":
+            raise ConfigurationError("experiment_mode must be exactly 'transient'")
+        if self.schema_version != 1:
+            raise ConfigurationError(f"unsupported experiment schema_version {self.schema_version}")
+        object.__setattr__(self, "tracers", tracers)
+        object.__setattr__(self, "targets", targets)
+        object.__setattr__(self, "time_points", points)
+        object.__setattr__(self, "pool_quantities", pools)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "experiment_mode": self.experiment_mode,
+            "tracers": [x.to_dict() for x in self.tracers],
+            "targets": [x.to_dict() for x in self.targets],
+            "timecourse": {
+                "time_points": list(self.time_points),
+                "initial_internal_mids": self.initial_internal_mids,
+                "pool_quantities": [x.to_dict() for x in self.pool_quantities],
+                "tolerances": self.numerical.to_dict(),
+            },
+        }
+
+
 def _parse_tolerances(value: Any) -> NumericalTolerances:
     if value is None:
         return NumericalTolerances()
@@ -584,6 +684,66 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     if value is None:
         raise ConfigurationError(f"experiment YAML '{source}' is empty")
     return parse_experiment_config(value)
+
+
+def parse_transient_experiment_config(value: Any) -> TransientExperimentConfig:
+    """Validate the explicit transient YAML path without mode inference."""
+
+    data = _mapping(value, "experiment")
+    _check_keys(
+        data,
+        allowed={"schema_version", "experiment_mode", "tracers", "targets", "timecourse"},
+        required={"experiment_mode", "tracers", "targets", "timecourse"},
+        context="experiment",
+    )
+    if data["experiment_mode"] != "transient":
+        raise ConfigurationError("experiment_mode must be exactly 'transient'")
+    course = _mapping(data["timecourse"], "timecourse")
+    _check_keys(
+        course,
+        allowed={"time_points", "initial_internal_mids", "pool_quantities", "tolerances"},
+        required={"time_points", "initial_internal_mids", "pool_quantities"},
+        context="timecourse",
+    )
+    tolerance_data = _mapping(course.get("tolerances", {}), "timecourse.tolerances")
+    _check_keys(tolerance_data, allowed={"rtol", "atol", "mid"}, context="timecourse.tolerances")
+    numerical = TransientNumericalSettings(**tolerance_data)
+    tracer_values = _sequence(data["tracers"], "tracers")
+    target_values = _sequence(data["targets"], "targets")
+    pool_values = _sequence(course["pool_quantities"], "timecourse.pool_quantities")
+    pools: list[PoolQuantitySettings] = []
+    for index, value in enumerate(pool_values):
+        context = f"timecourse.pool_quantities[{index}]"
+        record = _mapping(value, context)
+        _check_keys(record, allowed={"metabolite_id", "quantity"},
+                    required={"metabolite_id", "quantity"}, context=context)
+        pools.append(PoolQuantitySettings(record["metabolite_id"], record["quantity"]))
+    return TransientExperimentConfig(
+        tracers=tuple(_parse_tracer(x, i, DEFAULT_TRACER_NORMALIZATION_TOLERANCE)
+                      for i, x in enumerate(tracer_values)),
+        targets=tuple(_parse_target(x, i) for i, x in enumerate(target_values)),
+        time_points=tuple(_sequence(course["time_points"], "timecourse.time_points")),
+        pool_quantities=tuple(pools),
+        initial_internal_mids=course["initial_internal_mids"],
+        numerical=numerical,
+        schema_version=data.get("schema_version", 1),
+        experiment_mode=data["experiment_mode"],
+    )
+
+
+def load_transient_experiment(path: str | Path) -> TransientExperimentConfig:
+    """Load an explicitly transient experiment YAML file."""
+
+    source = Path(path)
+    try:
+        value = yaml.safe_load(source.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ConfigurationError(f"could not read experiment YAML '{source}': {error}") from error
+    except yaml.YAMLError as error:
+        raise ConfigurationError(f"invalid YAML in experiment file '{source}': {error}") from error
+    if value is None:
+        raise ConfigurationError(f"experiment YAML '{source}' is empty")
+    return parse_transient_experiment_config(value)
 
 
 # Short public spelling used by the pipeline and CLI.

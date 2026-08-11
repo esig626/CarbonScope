@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from hashlib import sha256
 
-from .schema import CanonicalModel, StationaryExperimentSemantics
+from .schema import CanonicalModel, StationaryExperimentSemantics, TransientExperimentSemantics
 from .serialisation import deterministic_serialise
-from .validation import validate_canonical_model, validate_stationary_experiment
+from .validation import (
+    validate_canonical_model,
+    validate_stationary_experiment,
+    validate_transient_experiment,
+)
 
 
 def _fingerprint(value: object) -> str:
@@ -27,6 +31,16 @@ def experiment_fingerprint(
     """Validate against ``model`` then fingerprint only experiment semantics."""
 
     validate_stationary_experiment(model, experiment)
+    return _fingerprint(experiment)
+
+
+def transient_experiment_fingerprint(
+    model: CanonicalModel,
+    experiment: TransientExperimentSemantics,
+) -> str:
+    """Fingerprint the complete, explicitly dynamic experiment contract."""
+
+    validate_transient_experiment(model, experiment)
     return _fingerprint(experiment)
 
 
