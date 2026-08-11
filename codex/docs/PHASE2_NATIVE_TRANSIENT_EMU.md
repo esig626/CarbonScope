@@ -39,16 +39,23 @@ The compiled global state concatenates every dynamic EMU MID in deterministic la
 
 An unbalanced terminal target is the **instantaneous production MID** formed from flux-weighted mapped contributions at that time. It is not accumulated extracellular material or a medium concentration. Such behaviour requires an explicit future dynamic external-pool model.
 
-The checked `timecourse_mids.csv` files predate this native contract and remain
-preserved as historical mfapy provenance. The mfapy compatibility compiler
-temporarily exposed a targeted excreted product as a dynamic intermediate, so its
-historical terminal glutamate trajectory includes a finite mixing-pool lag. Native
-V1 deliberately does not adopt that hidden pool. Strict native-versus-historical
-trajectory parity therefore covers only targets whose source or balanced-dynamic
-semantics match; terminal targets retain a reported diagnostic difference and are
-validated separately against the native instantaneous-production contract. A
-separate CI gate regenerates the historical mfapy trajectories and checks the
-preserved files without changing their semantics.
+## Historical mfapy validation and numerical reference
+
+The checked `timecourse_mids.csv` files predate the native contract and remain preserved as historical mfapy provenance. Two distinct historical effects must not be confused with native scientific error.
+
+First, the mfapy compatibility compiler temporarily exposed a targeted excreted product as a dynamic intermediate. Historical terminal glutamate therefore has a finite mixing-pool lag. Native V1 deliberately has no hidden terminal pool. Terminal targets are excluded from the shared-semantics trajectory metric and are instead checked directly against the native instantaneous-production contract.
+
+Second, mfapy's generated transient function historically integrates with SciPy `odeint` at `rtol=1e-3`, `atol=1e-3`. GitHub convergence diagnostics showed that the residual shared-target differences against those frozen coarse trajectories are numerical integration error, not a different shared-state transient model. For the Antoniewicz benchmark the native/frozen maximum was about `4.80e-4`; tightening the same generated mfapy equation system reduced the maximum to about `4.62e-8` at `rtol=1e-6`, `atol=1e-9`, and to order `1e-10` at `rtol=1e-9`, `atol=1e-12`. For the glucose-to-TCA benchmark the corresponding sequence was about `1.283e-3`, `7.93e-8`, and `1.14e-10`. High-accuracy `odeint`, LSODA, RK45, and DOP853 solutions agreed at roughly `1e-10` to `1e-9` scale.
+
+Validation therefore has three separate roles:
+
+1. **Historical provenance:** live historical mfapy, using its historical coarse integration policy, must reproduce the preserved CSV fixture.
+2. **Scientific shared-semantics parity:** native FluxEMU is compared with the exact mfapy-generated ODE system integrated independently with high-accuracy LSODA (`rtol=1e-9`, `atol=1e-12`). The original strict tolerances remain `2e-6` for Antoniewicz and `1e-5` for glucose-to-TCA; they were not relaxed.
+3. **Native-only contracts:** terminal targets, long-time stationary convergence, exact controls T0-T10, normalization, nonnegativity, and solver diagnostics are checked independently of the historical coarse fixture.
+
+The frozen CSVs are not rewritten to make them agree with native output. Their larger shared-target discrepancy remains a diagnostic measurement of the historical integration accuracy.
+
+A pure atom-orientation reversal of a symmetric metabolite is not a valid negative control for a mass-isotopomer distribution when the altered positional information is aggregated out by the MID. Validation therefore does not demand a mass-MID change from such an observationally invariant orientation perturbation.
 
 ## Numerics and boundaries
 
@@ -59,4 +66,4 @@ remain unchanged.
 
 V1 does not support time-varying fluxes or pool sizes, pulse-chase schedules, tracer switches after zero, arbitrary prelabelled internal pools, abundance dynamics, growth dilution not represented by turnover, or non-steady metabolite concentrations. It does not perform inverse MFA.
 
-mfapy remains only a temporary historical shadow for differential validation. It performs no native ODE construction, graph construction, source evaluation, atom propagation, condensation, integration, or target extraction.
+mfapy remains only a temporary historical and differential-validation shadow. It performs no native ODE construction, graph construction, source evaluation, atom propagation, condensation, integration, or target extraction.
