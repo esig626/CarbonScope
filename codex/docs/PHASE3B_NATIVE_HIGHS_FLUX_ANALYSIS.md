@@ -8,6 +8,13 @@ bounds are copied unchanged. Duplicate terms are summed without creating a dense
 matrix. A SHA-256 fingerprint covers ordering, sparse values, bounds, objective,
 and direction.
 
+COBRA flux balance and isotope source/terminal roles are separate concepts.
+`project_cobra_flux_model` faithfully preserves every COBRA metabolite balance row;
+isotope metadata can never silently alter native FBA feasibility. In contrast,
+`project_cobra_model` retains the established isotope-forward policy in which
+reviewed tracer-source and excreted pools may be unbalanced. The implementations
+select these policies explicitly rather than conflating them.
+
 The public `run_highs_fba` and `run_highs_fva_reference` APIs import highspy only
 when execution begins. Install `fluxemu[highs]` (`highspy>=1.11,<1.13`). CI prints
 the exact installed version. Solver output is disabled, one thread and simplex are

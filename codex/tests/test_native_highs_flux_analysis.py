@@ -7,6 +7,7 @@ import math
 import sys
 
 import pytest
+import fluxemu.flux_analysis.highs as highs_module
 
 from fluxemu.exceptions import AnalysisError
 from fluxemu.flux_analysis import compile_flux_lp, run_highs_fba, run_highs_fva_reference
@@ -40,7 +41,7 @@ def test_compile_is_sparse_ordered_balanced_and_deterministic():
     assert compiled.fingerprint == compile_flux_lp(model()).fingerprint
 
 
-def test_unique_fba_boundary_semantics_and_diagnostics():
+def test_unique_fba_and_diagnostics():
     result = run_highs_fba(model())
     assert result.objective_value == pytest.approx(10, abs=1e-9)
     assert result.fluxes.to_dict() == pytest.approx({"in": 10, "out": 10, "blocked": 0})
@@ -48,9 +49,17 @@ def test_unique_fba_boundary_semantics_and_diagnostics():
                result.diagnostics.max_upper_bound_violation,
                result.diagnostics.max_mass_balance_residual,
                result.diagnostics.objective_recalculation_error) <= 1e-9
-    boundary = run_highs_fba(model(balanced=False))
-    assert boundary.objective_value == pytest.approx(10)
-    assert boundary.fluxes["in"] == pytest.approx(0)  # no false balance equality
+
+
+def test_alternate_optimum_uses_objective_and_fva_invariants_not_incidental_primal():
+    alternate = model(balanced=False)
+    result = run_highs_fba(alternate)
+    assert result.objective_value == pytest.approx(10)
+    assert result.diagnostics.max_lower_bound_violation <= 1e-9
+    assert result.diagnostics.max_upper_bound_violation <= 1e-9
+    assert result.diagnostics.max_mass_balance_residual <= 1e-9
+    ranges = run_highs_fva_reference(alternate, 1.0).ranges
+    assert ranges.loc["in"].tolist() == pytest.approx([0, 10])
 
 
 def test_reference_fva_full_and_fractional_ranges_are_repeatable_and_nonmutating():
@@ -62,6 +71,30 @@ def test_reference_fva_full_and_fractional_ranges_are_repeatable_and_nonmutating
     assert fractional.ranges.loc["out"].tolist() == pytest.approx([5, 10])
     assert fractional.ranges.equals(run_highs_fva_reference(original, 0.5).ranges)
     assert repr(original) == before
+
+
+def test_reference_fva_has_fresh_single_reaction_objectives_and_retention(monkeypatch):
+    calls = []
+    original_solve = highs_module._solve
+
+    def recording_solve(lp, costs, direction, operation, retention=None):
+        calls.append((tuple(costs), direction, retention))
+        return original_solve(lp, costs, direction, operation, retention)
+
+    monkeypatch.setattr(highs_module, "_solve", recording_solve)
+    run_highs_fva_reference(model(), 0.5)
+
+    # The first call is biological FBA. Every later cold endpoint contains
+    # exactly one fresh cost and the biological objective only as a row.
+    assert calls[0] == ((0.0, 1.0, 0.0), "max", None)
+    endpoint_calls = calls[1:]
+    assert [direction for _, direction, _ in endpoint_calls] == ["min", "max"] * 3
+    assert [costs for costs, _, _ in endpoint_calls] == [
+        (1.0, 0.0, 0.0), (1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0), (0.0, 1.0, 0.0),
+        (0.0, 0.0, 1.0), (0.0, 0.0, 1.0),
+    ]
+    assert all(retention == (">=", 5.0) for _, _, retention in endpoint_calls)
 
 
 def test_reversible_multiobjective_and_minimise_controls():

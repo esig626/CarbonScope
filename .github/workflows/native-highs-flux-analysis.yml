@@ -5,13 +5,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
       - run: python -m pip install './codex[highs]' pytest
       - run: python -c "import highspy; print(highspy.HIGHS_VERSION_MAJOR, highspy.HIGHS_VERSION_MINOR, highspy.HIGHS_VERSION_PATCH)"
-      - run: git diff --check
+      - name: Check patch whitespace
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+          elif [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            git diff --check "${{ github.event.before }}..${{ github.sha }}"
+          else
+            git diff --check "${{ github.sha }}^..${{ github.sha }}"
+          fi
       - run: python -m compileall -q codex/src codex/tests
       - run: pytest -q codex/tests/test_native_highs_flux_analysis.py
       - run: pytest -q codex/tests/test_native_highs_cobra_parity.py
-      - run: pytest -q codex/tests/test_cobra_analysis.py codex/tests/test_standalone_model_projection.py
+      - run: pytest -q codex/tests/test_cobra_analysis.py codex/tests/test_cobra_flux_projection.py codex/tests/test_standalone_model_projection.py
       - run: pytest -q codex/tests/test_native_highs_import_isolation.py

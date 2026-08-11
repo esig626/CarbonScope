@@ -273,7 +273,10 @@ def project_cobra_model(
     resolved = resolve_authoritative_transitions(
         cobra_model, assignments, library=transition_library, require_complete=require_complete
     )
-    flux_model = project_cobra_flux_model(cobra_model)
+    # Isotope-forward models deliberately retain their reviewed tracer-source
+    # and terminal-pool boundary roles.  This is distinct from projecting the
+    # COBRA LP, where every metabolite remains a steady-state constraint row.
+    flux_model = _project_cobra_flux_model(cobra_model, isotope_boundary_roles=True)
 
     authoritative_metabolites = {}
     for match in resolved.values():
@@ -328,14 +331,21 @@ def project_cobra_model(
 
 
 def project_cobra_flux_model(cobra_model) -> FluxModel:
-    """Project only the engine-neutral constraint system, without isotope mapping."""
+    """Faithfully project the COBRA LP, independent of isotope annotations."""
 
-    metadata = collect_isotope_metadata(cobra_model)
+    return _project_cobra_flux_model(cobra_model, isotope_boundary_roles=False)
+
+
+def _project_cobra_flux_model(cobra_model, *, isotope_boundary_roles: bool) -> FluxModel:
+    """Project constraints under an explicit, non-conflated balance policy."""
+
+    metadata = collect_isotope_metadata(cobra_model) if isotope_boundary_roles else None
     flux_metabolites = tuple(
         FluxMetabolite(
             item.id,
             not (
-                item.id in metadata.metabolites
+                isotope_boundary_roles
+                and item.id in metadata.metabolites
                 and (metadata.metabolites[item.id].is_carbon_source or metadata.metabolites[item.id].is_excreted)
             ),
         )
