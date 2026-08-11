@@ -20,46 +20,10 @@ from cobra.util.solver import fix_objective_as_constraint, linear_reaction_coeff
 from optlang.interface import OPTIMAL
 
 from fluxemu.exceptions import AnalysisError as FluxAnalysisError
+from fluxemu.flux_analysis.results import FBAResult, FVAResult
 
 
 OBJECTIVE_FLOOR_CONSTRAINT = "fluxemu_objective_floor"
-
-
-@dataclass(frozen=True)
-class FBAResult:
-    """An optimal FBA solution in the model's exact reaction order."""
-
-    objective_value: float
-    status: str
-    objective_direction: str
-    fluxes: pd.Series
-
-    def to_frame(self) -> pd.DataFrame:
-        """Return an output-oriented FBA table."""
-
-        frame = self.fluxes.rename("flux").to_frame()
-        frame.index.name = "reaction_id"
-        frame["objective_value"] = self.objective_value
-        frame["solver_status"] = self.status
-        return frame
-
-
-@dataclass(frozen=True)
-class FVAResult:
-    """Flux-variability ranges calculated at an objective fraction."""
-
-    ranges: pd.DataFrame
-    fraction_of_optimum: float
-    objective_value: float
-    objective_direction: str
-
-    def to_frame(self) -> pd.DataFrame:
-        """Return an output-oriented FVA table."""
-
-        frame = self.ranges.copy()
-        frame.index.name = "reaction_id"
-        frame["fraction_of_optimum"] = self.fraction_of_optimum
-        return frame
 
 
 @dataclass(frozen=True)

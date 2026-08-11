@@ -38,6 +38,7 @@ from fluxemu.model import (
     ObjectiveTerm,
     StoichiometricTerm,
     validate_canonical_model,
+    validate_flux_model,
 )
 
 
@@ -272,30 +273,11 @@ def project_cobra_model(
     resolved = resolve_authoritative_transitions(
         cobra_model, assignments, library=transition_library, require_complete=require_complete
     )
-    flux_metabolites = tuple(
-        FluxMetabolite(
-            item.id,
-            not (
-                item.id in metadata.metabolites
-                and (metadata.metabolites[item.id].is_carbon_source or metadata.metabolites[item.id].is_excreted)
-            ),
-        )
-        for item in cobra_model.metabolites
-    )
-    flux_reactions = tuple(
-        FluxReaction(
-            reaction.id,
-            tuple(StoichiometricTerm(item.id, coefficient) for item, coefficient in reaction.metabolites.items()),
-            reaction.lower_bound,
-            reaction.upper_bound,
-        )
-        for reaction in cobra_model.reactions
-    )
-    coefficients = linear_reaction_coefficients(cobra_model)
-    objective = LinearObjective(
-        "maximise" if cobra_model.objective.direction == "max" else "minimise",
-        tuple(ObjectiveTerm(reaction.id, coefficients[reaction]) for reaction in cobra_model.reactions if reaction in coefficients),
-    )
+    # Isotope-forward models deliberately retain their reviewed tracer-source
+    # and terminal-pool boundary roles.  This is distinct from projecting the
+    # COBRA LP, where every metabolite remains a steady-state constraint row.
+    flux_model = _project_cobra_flux_model(cobra_model, isotope_boundary_roles=True)
+
     authoritative_metabolites = {}
     for match in resolved.values():
         source_names = match.transition.substrates if match.direction == "forward" else match.transition.products
@@ -341,8 +323,48 @@ def project_cobra_model(
                 )
             isotope_reactions.append(IsotopeReaction(reaction.id, "forward", False, (), (), ()))
     model = CanonicalModel(
-        FluxModel(flux_metabolites, flux_reactions, objective),
+        flux_model,
         IsotopeModel(isotope_metabolites, tuple(isotope_reactions)),
     )
     validate_canonical_model(model)
+    return model
+
+
+def project_cobra_flux_model(cobra_model) -> FluxModel:
+    """Faithfully project the COBRA LP, independent of isotope annotations."""
+
+    return _project_cobra_flux_model(cobra_model, isotope_boundary_roles=False)
+
+
+def _project_cobra_flux_model(cobra_model, *, isotope_boundary_roles: bool) -> FluxModel:
+    """Project constraints under an explicit, non-conflated balance policy."""
+
+    metadata = collect_isotope_metadata(cobra_model) if isotope_boundary_roles else None
+    flux_metabolites = tuple(
+        FluxMetabolite(
+            item.id,
+            not (
+                isotope_boundary_roles
+                and item.id in metadata.metabolites
+                and (metadata.metabolites[item.id].is_carbon_source or metadata.metabolites[item.id].is_excreted)
+            ),
+        )
+        for item in cobra_model.metabolites
+    )
+    flux_reactions = tuple(
+        FluxReaction(
+            reaction.id,
+            tuple(StoichiometricTerm(item.id, coefficient) for item, coefficient in reaction.metabolites.items()),
+            reaction.lower_bound,
+            reaction.upper_bound,
+        )
+        for reaction in cobra_model.reactions
+    )
+    coefficients = linear_reaction_coefficients(cobra_model)
+    objective = LinearObjective(
+        "maximise" if cobra_model.objective.direction == "max" else "minimise",
+        tuple(ObjectiveTerm(reaction.id, coefficients[reaction]) for reaction in cobra_model.reactions if reaction in coefficients),
+    )
+    model = FluxModel(flux_metabolites, flux_reactions, objective)
+    validate_flux_model(model)
     return model
