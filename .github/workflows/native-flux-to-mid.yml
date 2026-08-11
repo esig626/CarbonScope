@@ -1,0 +1,51 @@
+name: Native one-model flux to MID
+
+on: [push, pull_request]
+
+jobs:
+  native-flux-to-mid:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: codex/pyproject.toml
+
+      - name: Install native dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e './codex[highs]' pytest
+
+      - name: Print exact HiGHS version
+        run: python -c "import highspy; print(highspy.HIGHS_VERSION_MAJOR, highspy.HIGHS_VERSION_MINOR, highspy.HIGHS_VERSION_PATCH)"
+
+      - name: Check base-to-head whitespace
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+          elif [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            git diff --check "${{ github.event.before }}..${{ github.sha }}"
+          else
+            git diff --check "${{ github.sha }}^..${{ github.sha }}"
+          fi
+
+      - name: Compile production sources and tests
+        run: python -m compileall -q codex/src codex/tests
+
+      - name: Run native end-to-end and import-firewall tests
+        run: pytest -q codex/tests/test_native_stationary_analysis.py codex/tests/test_native_highs_import_isolation.py
+
+      - name: Run existing native HiGHS tests
+        run: pytest -q codex/tests/test_native_highs_flux_analysis.py codex/tests/test_native_highs_cobra_parity.py
+
+      - name: Run existing native stationary EMU tests
+        run: pytest -q codex/tests/test_native_emu_graph.py codex/tests/test_native_emu_tracers.py codex/tests/test_native_stationary_emu.py codex/tests/test_native_stationary_parity.py
+
+      - name: Run canonical model and projection tests
+        run: pytest -q codex/tests/test_standalone_model_contract.py codex/tests/test_standalone_model_projection.py
