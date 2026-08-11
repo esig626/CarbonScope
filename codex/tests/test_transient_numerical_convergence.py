@@ -1,9 +1,9 @@
-"""GitHub-only diagnostic for residual native/mfapy transient differences.
+"""GitHub numerical diagnostic for residual native/mfapy transient differences.
 
-This module deliberately does not change the production solver or the existing
-historical parity gates.  It reuses mfapy's generated ODE system, replacing only
-its numerical integrator so that GitHub CI can determine whether the residual
-native/frozen difference is integration error or a structural equation mismatch.
+This module deliberately does not change the production solver or the scientific
+parity thresholds. It reuses mfapy's generated ODE system, replacing only its
+numerical integrator so CI can distinguish historical integration error from a
+structural shared-state equation mismatch.
 """
 
 from __future__ import annotations
@@ -213,7 +213,7 @@ def _run_case(directory: str, yaml_name: str, reactions, transitions, fluxes, po
     print("FLUXEMU_TRANSIENT_CONVERGENCE " + json.dumps(payload, sort_keys=True))
 
     # Diagnostic-only assertions: execution, shape/key integrity and finite output.
-    # The existing parity tests remain the scientific pass/fail gates.
+    # The parity test module holds the scientific pass/fail thresholds.
     assert all(np.isfinite(row["max_abs_difference"]) for row in rows)
     assert all(np.isfinite(value) for value in agreements.values())
 
