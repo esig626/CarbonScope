@@ -38,13 +38,13 @@ the exact same generated mfapy equations without changing their state ordering,
 fluxes, pools, tracer, or requested times. The maximum shared-semantics native/reference
 difference decreased from about `4.80e-4` with the historical settings to about
 `4.62e-8` at `rtol=1e-6`, `atol=1e-9`, and to order `1e-10` at high accuracy.
-Independent high-accuracy `odeint`, LSODA, RK45, and DOP853 integrations agreed at
-roughly `1e-10` to `1e-9` scale.
+High-accuracy `odeint`, LSODA, RK45, and DOP853 integrations agreed at roughly
+`1e-10` to `1e-9` scale.
 
 Accordingly, `timecourse_mids.csv` remains an immutable **historical provenance
 fixture**, and live historical mfapy must continue to reproduce it. The strict
 shared-semantics scientific parity gate instead compares native FluxEMU with the
-same mfapy-generated ODE system integrated accurately with LSODA at `rtol=1e-9`,
+same mfapy-generated ODE system integrated with LSODA at `rtol=1e-9`,
 `atol=1e-12`. The original `2e-6` parity threshold is unchanged. The historical
 native/frozen discrepancy remains reported diagnostically rather than being hidden
 or used as a high-precision reference.
