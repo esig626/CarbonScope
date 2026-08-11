@@ -24,5 +24,5 @@ jobs:
         run: python -m pytest -q codex/tests/test_transient_experiment_contract.py codex/tests/test_native_transient_emu.py
       - name: Transient numerical convergence diagnostic
         run: python -m pytest -q -s codex/tests/test_transient_numerical_convergence.py
-      - name: Historical transient and stationary-limit gates
+      - name: Historical provenance, high-accuracy parity, and stationary-limit gates
         run: python -m pytest -q codex/tests/test_native_transient_parity.py codex/tests/test_antoniewicz_tca.py codex/tests/test_antoniewicz_tca_glucose.py
