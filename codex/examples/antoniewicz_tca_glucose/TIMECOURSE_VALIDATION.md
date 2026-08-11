@@ -2,18 +2,18 @@
 
 The existing mfapy `diffmdv` route is used through the model's generated
 function. All non-source/non-excreted intracellular pools (including the
-terminal glutamate EMUs) start at M+0 and use 100 arbitrary pool units. Flux
+historical terminal glutamate state) start at M+0 and use 100 arbitrary pool units. Flux
 units and pool units are arbitrary, so time is numerical rather than
 biological. The fixed flux vector is never altered to accelerate convergence.
 
 The requested initial time grid was `0, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10`.
-The final point was not converged, so the script automatically extended it to
+The final point was not converged, so the historical script automatically extended it to
 `20, 40, 80, 160`. At time 160 the largest absolute difference from the
 stationary `calmdv` result across every target and MID component was
 `2.81454249e-7`, below the declared `1e-5` convergence criterion.
 
 Vectors in the table are respectively citrate M+0..M+6; OAC M+0..M+4; and
-glutamate M+0..M+5. They are the values saved in `timecourse_mids.csv`.
+glutamate M+0..M+5. They are the historical values saved in `timecourse_mids.csv`.
 
 | Time | citrate; OAC; glutamate |
 | ---: | --- |
@@ -37,17 +37,29 @@ enters initially unlabelled OAC as M+2. Citrate M+4 is then strictly positive
 at time 5 (`4.3845765e-10`) and plainly visible by time 10
 (`9.58443e-05`), when returned labelled OAC combines with labelled AcCoA.
 Glutamate M+3 through M+5 also emerge later (their time-10 sum is about
-`9.538e-06`). All written probability vectors are finite, nonnegative, and
-normalized; sub-microfraction negative `odeint` roundoff is clipped to zero
-and the vector renormalized before output.
+`9.538e-06`). The preserved historical writer clips sub-microfraction negative
+`odeint` roundoff and renormalizes its output; native FluxEMU does neither.
 
-## Historical terminal-target provenance
+## Historical fixture, terminal semantics, and numerical accuracy
 
 This file and `timecourse_mids.csv` preserve the historical mfapy calculation.
 The compatibility bridge temporarily compiled terminal glutamate as a dynamic
 intermediate with 100 pool units, so that trajectory contains a finite terminal
 mixing lag. Native FluxEMU V1 has no hidden external pool: an unbalanced terminal
-target is the instantaneous flux-weighted production MID. Strict historical
-trajectory parity is therefore limited to targets with matching transient
-semantics, while native glutamate is validated separately against that native
-contract. The preserved CSV is not rewritten.
+target is the instantaneous flux-weighted production MID. Native glutamate is
+therefore validated separately against that native contract.
+
+The historical shared-target trajectory was generated with mfapy's `odeint` policy
+at `rtol=1e-3`, `atol=1e-3`. A GitHub convergence diagnostic reintegrated the exact
+same generated mfapy ODE system on the same requested grid. The maximum shared-target
+native/reference discrepancy fell from about `1.283e-3` with the historical settings
+to about `7.93e-8` at `rtol=1e-6`, `atol=1e-9`, and to about `1.14e-10` at
+`rtol=1e-9`, `atol=1e-12`. High-accuracy `odeint`, LSODA, RK45, and DOP853 agreed
+at roughly `1e-10` scale.
+
+Accordingly, the frozen CSV remains an immutable historical-provenance fixture and
+is still reproduced by live historical mfapy. Strict shared-semantics scientific
+parity compares native FluxEMU with the same mfapy-generated equations integrated
+independently using LSODA at `rtol=1e-9`, `atol=1e-12`. The original `1e-5`
+scientific threshold is unchanged. The larger native/frozen historical difference
+remains visible as a diagnostic rather than being treated as high-precision truth.
