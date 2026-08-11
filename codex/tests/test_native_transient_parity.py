@@ -41,6 +41,9 @@ ANTON_LIVE_FIXTURE_TOLERANCE = 2.0e-6
 GLUCOSE_LIVE_FIXTURE_TOLERANCE = 1.0e-5
 RTOL = 1.0e-9
 ATOL = 1.0e-12
+REFERENCE_SOLVER = "LSODA"
+REFERENCE_RTOL = 1.0e-9
+REFERENCE_ATOL = 1.0e-12
 TCA_REACTIONS = tuple(f"v{index}" for index in range(1, 9))
 TCA_TRANSITIONS = (
     "antoniewicz.table5.v1.citrate_synthase",
@@ -172,11 +175,24 @@ def _stationary_predictions(model, experiment, fluxes):
     return {item.target_id: np.asarray(item.fractions) for item in result.forward.predictions}
 
 
-def _report(benchmark, model, experiment, native, frozen, stationary, threshold):
+def _report(
+    benchmark,
+    model,
+    experiment,
+    native,
+    frozen,
+    high_accuracy_reference,
+    stationary,
+    threshold,
+):
     predicted = _predictions(native)
     assert predicted.keys() == frozen.keys()
+    assert predicted.keys() == high_accuracy_reference.keys()
     shared_targets, terminal_targets = _target_semantics(model, experiment)
-    shared_shadow_error = _maximum_difference(predicted, frozen, shared_targets)
+    shared_reference_error = _maximum_difference(
+        predicted, high_accuracy_reference, shared_targets
+    )
+    shared_historical_error = _maximum_difference(predicted, frozen, shared_targets)
     terminal_shadow_error = _maximum_difference(predicted, frozen, terminal_targets)
     final_time = max(time for time, _ in predicted)
     stationary_error = max(
@@ -191,7 +207,8 @@ def _report(benchmark, model, experiment, native, frozen, stationary, threshold)
         "target_count": len(stationary),
         "total_mid_components": len(native.forward.values),
         "max_native_vs_analytic_difference": None,
-        "max_shared_semantics_native_vs_frozen_mfapy_difference": shared_shadow_error,
+        "max_shared_semantics_native_vs_high_accuracy_mfapy_equations_difference": shared_reference_error,
+        "max_shared_semantics_native_vs_frozen_mfapy_difference": shared_historical_error,
         "max_terminal_native_vs_historical_difference": terminal_shadow_error,
         "max_late_native_vs_native_stationary_difference": stationary_error,
         "shared_semantics_target_ids": shared_targets,
@@ -201,8 +218,11 @@ def _report(benchmark, model, experiment, native, frozen, stationary, threshold)
         "solver_method": diagnostic.solver_method,
         "rtol": RTOL,
         "atol": ATOL,
+        "reference_solver_method": REFERENCE_SOLVER,
+        "reference_rtol": REFERENCE_RTOL,
+        "reference_atol": REFERENCE_ATOL,
         "threshold": threshold,
-        "passed": shared_shadow_error <= threshold and stationary_error <= threshold,
+        "passed": shared_reference_error <= threshold and stationary_error <= threshold,
     }
     print("FLUXEMU_TRANSIENT_PARITY " + json.dumps(payload, sort_keys=True))
     return payload
@@ -221,6 +241,51 @@ def _load_historical_builder(directory):
     finally:
         sys.path.pop(0)
     return module
+
+
+def _high_accuracy_mfapy_reference(directory, times):
+    """Integrate mfapy's generated equations accurately without changing mfapy."""
+
+    scipy = pytest.importorskip("scipy", reason="high-accuracy mfapy reference requires SciPy")
+    builder = _load_historical_builder(directory)
+    historical_odeint = scipy.integrate.odeint
+
+    def accurate_odeint_adapter(func, y0, timepoints, args=(), **kwargs):
+        del kwargs
+        requested = np.asarray(timepoints, dtype=float)
+        initial = np.asarray(y0, dtype=float)
+
+        def rhs(time, state):
+            return np.asarray(func(state, time, *args), dtype=float)
+
+        solution = scipy.integrate.solve_ivp(
+            rhs,
+            (float(requested[0]), float(requested[-1])),
+            initial,
+            t_eval=requested,
+            method=REFERENCE_SOLVER,
+            rtol=REFERENCE_RTOL,
+            atol=REFERENCE_ATOL,
+        )
+        assert solution.success, solution.message
+        assert solution.y.shape == (initial.size, requested.size)
+        assert np.isfinite(solution.y).all()
+        return np.asarray(solution.y.T, dtype=float)
+
+    scipy.integrate.odeint = accurate_odeint_adapter
+    try:
+        if directory == "antoniewicz_tca":
+            frame = builder.run_timecourse()
+        else:
+            frame, returned_times, _ = builder.run_timecourse(timepoints=times)
+            assert tuple(returned_times) == tuple(times)
+    finally:
+        scipy.integrate.odeint = historical_odeint
+
+    result = _frame_mids(frame)
+    assert result
+    assert all(np.isfinite(value).all() for value in result.values())
+    return result
 
 
 def _assert_native_terminal_is_instantaneous(predicted, times):
@@ -267,16 +332,20 @@ def test_antoniewicz_native_transient_matches_frozen_shadow_and_stationary_limit
         rtol=RTOL, atol=ATOL,
     )
     predicted = _predictions(native)
+    high_accuracy_reference = _high_accuracy_mfapy_reference("antoniewicz_tca", times)
     stationary = _stationary_predictions(model, experiment, TCA_FLUXES)
     report = _report(
-        "antoniewicz-table-5-transient", model, experiment, native, frozen, stationary,
-        ANTON_SHADOW_TOLERANCE,
+        "antoniewicz-table-5-transient", model, experiment, native, frozen,
+        high_accuracy_reference, stationary, ANTON_SHADOW_TOLERANCE,
     )
     assert report["shared_semantics_target_ids"] == (
         "OAC", "citrate", "AKG", "succinate", "fumarate"
     )
     assert report["terminal_target_ids"] == ("glutamate",)
-    assert report["max_shared_semantics_native_vs_frozen_mfapy_difference"] <= ANTON_SHADOW_TOLERANCE
+    assert report[
+        "max_shared_semantics_native_vs_high_accuracy_mfapy_equations_difference"
+    ] <= ANTON_SHADOW_TOLERANCE
+    assert report["max_shared_semantics_native_vs_frozen_mfapy_difference"] > ANTON_SHADOW_TOLERANCE
     assert report["max_terminal_native_vs_historical_difference"] > ANTON_SHADOW_TOLERANCE
     assert report["max_late_native_vs_native_stationary_difference"] <= ANTON_SHADOW_TOLERANCE
     _assert_native_terminal_is_instantaneous(predicted, times)
@@ -318,10 +387,13 @@ def test_glucose_tca_native_transient_matches_actual_frozen_grid_and_stationary_
         compile_transient_emu_plan(model, experiment), fluxes, rtol=RTOL, atol=ATOL,
     )
     predicted = _predictions(native)
+    high_accuracy_reference = _high_accuracy_mfapy_reference(
+        "antoniewicz_tca_glucose", times
+    )
     stationary = _stationary_predictions(model, experiment, fluxes)
     report = _report(
-        "glucose-to-tca-transient", model, experiment, native, frozen, stationary,
-        GLUCOSE_SHADOW_TOLERANCE,
+        "glucose-to-tca-transient", model, experiment, native, frozen,
+        high_accuracy_reference, stationary, GLUCOSE_SHADOW_TOLERANCE,
     )
     assert report["terminal_target_ids"] == ("glutamate",)
     assert report["shared_semantics_target_ids"] == (
@@ -329,7 +401,10 @@ def test_glucose_tca_native_transient_matches_actual_frozen_grid_and_stationary_
         "2PG", "PEP", "pyruvate", "AcCoA", "citrate", "AKG", "succinate",
         "fumarate", "OAC",
     )
-    assert report["max_shared_semantics_native_vs_frozen_mfapy_difference"] <= GLUCOSE_SHADOW_TOLERANCE
+    assert report[
+        "max_shared_semantics_native_vs_high_accuracy_mfapy_equations_difference"
+    ] <= GLUCOSE_SHADOW_TOLERANCE
+    assert report["max_shared_semantics_native_vs_frozen_mfapy_difference"] > GLUCOSE_SHADOW_TOLERANCE
     assert report["max_terminal_native_vs_historical_difference"] > GLUCOSE_SHADOW_TOLERANCE
     assert report["max_late_native_vs_native_stationary_difference"] <= GLUCOSE_SHADOW_TOLERANCE
     _assert_native_terminal_is_instantaneous(predicted, times)
@@ -383,7 +458,10 @@ def test_transient_shadow_does_not_heal_a_removed_symmetry_orientation():
         rtol=RTOL, atol=ATOL,
     )
     shared, _ = _target_semantics(corrupted, experiment)
-    disagreement = _maximum_difference(_predictions(result), frozen, shared)
+    high_accuracy_reference = _high_accuracy_mfapy_reference("antoniewicz_tca", times)
+    disagreement = _maximum_difference(
+        _predictions(result), high_accuracy_reference, shared
+    )
     assert disagreement > ANTON_SHADOW_TOLERANCE
 
 
