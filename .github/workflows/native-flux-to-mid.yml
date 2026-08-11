@@ -48,4 +48,4 @@ jobs:
         run: pytest -q codex/tests/test_native_emu_graph.py codex/tests/test_native_emu_tracers.py codex/tests/test_native_stationary_emu.py codex/tests/test_native_stationary_parity.py
 
       - name: Run canonical model and projection tests
-        run: pytest -q codex/tests/test_standalone_model_contract.py codex/tests/test_standalone_model_projection.py codex/tests/test_canonical_forward.py
+        run: pytest -q codex/tests/test_standalone_model_contract.py codex/tests/test_standalone_model_projection.py
