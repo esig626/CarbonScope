@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from fluxemu.exceptions import MappingError
 from fluxemu.model import (
     CanonicalModel,
+    FluxProjectionRule,
     StationaryExperimentSemantics,
     experiment_fingerprint,
     model_fingerprint,
@@ -40,6 +41,7 @@ class EMUContribution:
     branch_weight: float
     product: EMU
     precursors: tuple[EMU, ...]
+    flux_projection: FluxProjectionRule | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +61,7 @@ class CompiledEMUPlan:
     contributions: tuple[EMUContribution, ...]
     layers: tuple[EMULayer, ...]
     source_emus: tuple[EMU, ...]
+    observations: tuple[tuple[str, tuple[EMU, ...]], ...] = ()
 
 
 def _physical_direction(reaction) -> int:
@@ -92,6 +95,10 @@ def compile_emu_plan(
         (target.target_id, EMU(target.metabolite_id, target.atom_positions))
         for target in experiment.targets
     )
+    observations = tuple(
+        (item.target_id, tuple(EMU(p.metabolite_id, p.atom_positions) for p in item.precursors))
+        for item in experiment.observation_targets
+    )
 
     ordered_emus: list[EMU] = []
     contributions: list[EMUContribution] = []
@@ -116,15 +123,16 @@ def compile_emu_plan(
             product = next((p for p in reaction.products if p.metabolite_id == emu.metabolite_id), None)
             if product is None:
                 continue
-            physical = flux_by_id.get(reaction.reaction_id)
-            if physical is None:
-                raise MappingError(f"isotope reaction {reaction.reaction_id!r} has no flux reaction")
-            direction = _physical_direction(physical)
-            expected = 1 if reaction.direction == "forward" else -1
-            if direction != expected:
-                raise MappingError(
-                    f"isotope direction for {reaction.reaction_id!r} conflicts with canonical bounds"
-                )
+            if reaction.flux_projection is None:
+                physical = flux_by_id.get(reaction.reaction_id)
+                if physical is None:
+                    raise MappingError(f"isotope reaction {reaction.reaction_id!r} has no flux reaction")
+                direction = _physical_direction(physical)
+                expected = 1 if reaction.direction == "forward" else -1
+                if direction != expected:
+                    raise MappingError(
+                        f"isotope direction for {reaction.reaction_id!r} conflicts with canonical bounds"
+                    )
             for branch in reaction.mapping_branches:
                 selected = []
                 for destination_position in emu.atom_positions:
@@ -157,6 +165,7 @@ def compile_emu_plan(
                     float(branch.weight),
                     emu,
                     tuple(precursor_list),
+                    reaction.flux_projection,
                 )
                 contributions.append(contribution)
                 found = True
@@ -167,27 +176,53 @@ def compile_emu_plan(
 
     for _, target_emu in targets:
         trace(target_emu)
+    for _, precursor_emus in observations:
+        for precursor_emu in precursor_emus:
+            trace(precursor_emu)
 
     # Any physical producer of a required non-source pool needs an explicit map.
-    planned_metabolites = {item.metabolite_id for item in ordered_emus if item.metabolite_id not in sources}
+    planned_metabolites = tuple(dict.fromkeys(
+        item.metabolite_id for item in ordered_emus if item.metabolite_id not in sources
+    ))
     for metabolite_id in planned_metabolites:
-        mapped = {
-            item.reaction_id
+        covered = {
+            (reference.reaction_id, reference.direction)
             for item in model.isotope_model.reactions
             if item.isotope_enabled and any(p.metabolite_id == metabolite_id for p in item.products)
+            for reference in (
+                item.flux_projection.covered_physical_directions
+                if item.flux_projection is not None
+                else ()
+            )
         }
         for reaction in model.flux_model.reactions:
-            direction = _physical_direction(reaction)
             coefficient = sum(
                 float(term.coefficient)
                 for term in reaction.stoichiometric_terms
                 if term.metabolite_id == metabolite_id
-            ) * direction
-            if coefficient > 0.0 and reaction.reaction_id not in mapped:
-                raise MappingError(
-                    f"flux reaction {reaction.reaction_id!r} produces required pool "
-                    f"{metabolite_id!r} without an explicit isotope mapping"
+            )
+            activity = None
+            certificate = model.isotope_model.direction_activity_certificate
+            if certificate is not None:
+                activity = next(item for item in certificate.activities if item.reaction_id == reaction.reaction_id)
+            forward_possible = activity.forward_active if activity is not None else float(reaction.upper_bound) > 0
+            reverse_possible = activity.reverse_active if activity is not None else float(reaction.lower_bound) < 0
+            possible = []
+            if forward_possible and coefficient > 0:
+                possible.append("forward")
+            if reverse_possible and coefficient < 0:
+                possible.append("reverse")
+            for direction in possible:
+                legacy_mapped = any(
+                    item.flux_projection is None and item.reaction_id == reaction.reaction_id
+                    and any(p.metabolite_id == metabolite_id for p in item.products)
+                    for item in model.isotope_model.reactions
                 )
+                if not legacy_mapped and (reaction.reaction_id, direction) not in covered:
+                    raise MappingError(
+                        f"flux reaction {reaction.reaction_id!r} {direction} produces required pool "
+                        f"{metabolite_id!r} without an explicit isotope mapping or directional coverage"
+                    )
 
     unknowns = tuple(
         item for item in ordered_emus if item.metabolite_id in balanced and item.metabolite_id not in sources
@@ -204,6 +239,7 @@ def compile_emu_plan(
         tuple(contributions),
         layers,
         tuple(item for item in ordered_emus if item.metabolite_id in sources),
+        observations,
     )
 
 

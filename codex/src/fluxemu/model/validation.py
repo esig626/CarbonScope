@@ -9,12 +9,18 @@ from .schema import (
     AtomPosition,
     AtomTransition,
     CanonicalModel,
+    DirectionActivity,
+    DirectionActivityCertificate,
     FluxModel,
+    FluxProjectionExpression,
+    FluxProjectionRule,
+    FluxProjectionTerm,
     IsotopeModel,
     IsotopeParticipant,
     IsotopeReaction,
     MappingBranch,
     PoolQuantity,
+    PhysicalDirectionRef,
     StationaryExperimentSemantics,
     TransientExperimentSemantics,
 )
@@ -208,6 +214,31 @@ def validate_isotope_model(model: IsotopeModel) -> None:
             _fail("isotope direction must be exactly 'forward' or 'reverse'")
         if reaction.directional_id is not None:
             _nonempty_id(reaction.directional_id, "directional isotope reaction ID")
+        projection = reaction.flux_projection
+        if projection is not None:
+            if not isinstance(projection, FluxProjectionRule):
+                _fail("flux projection must be a FluxProjectionRule")
+            _nonempty_id(projection.projection_id, "flux projection ID")
+            if projection.transform != "positive_part":
+                _fail("flux projection transform must be exactly 'positive_part'")
+            _finite_number(projection.zero_tolerance, "flux projection zero tolerance")
+            if projection.zero_tolerance < 0:
+                _fail("flux projection zero tolerance must be nonnegative")
+            expressions = (projection.expression,) + projection.equivalent_expressions
+            for expression in expressions:
+                if not isinstance(expression, FluxProjectionExpression) or not expression.terms:
+                    _fail("flux projection expressions must be nonempty")
+                for term in expression.terms:
+                    if not isinstance(term, FluxProjectionTerm):
+                        _fail("flux projection expression contains a malformed term")
+                    _nonempty_id(term.reaction_id, "projected physical reaction ID")
+                    _finite_number(term.coefficient, "flux projection coefficient")
+            for reference in projection.covered_physical_directions:
+                if not isinstance(reference, PhysicalDirectionRef):
+                    _fail("covered physical direction is malformed")
+                _nonempty_id(reference.reaction_id, "covered physical reaction ID")
+                if reference.direction not in {"forward", "reverse"}:
+                    _fail("covered physical direction must be 'forward' or 'reverse'")
         for participant in reaction.substrates + reaction.products:
             _validate_participant(participant, metabolites, reaction.reaction_id)
         if reaction.mapping_branches:
@@ -220,6 +251,20 @@ def validate_isotope_model(model: IsotopeModel) -> None:
             weight = sum(branch.weight for branch in reaction.mapping_branches)
             if not math.isclose(weight, 1.0, rel_tol=0.0, abs_tol=MIXTURE_ABS_TOLERANCE):
                 _fail(f"mapping branch weights for {reaction.reaction_id!r} must sum to one")
+    certificate = model.direction_activity_certificate
+    if certificate is not None:
+        if not isinstance(certificate, DirectionActivityCertificate):
+            _fail("direction activity certificate is malformed")
+        _nonempty_id(certificate.certificate_id, "direction activity certificate ID")
+        _finite_number(certificate.zero_tolerance, "direction activity tolerance")
+        _unique_ids(certificate.activities, "reaction_id", "direction activity reaction ID")
+        for activity in certificate.activities:
+            if not isinstance(activity, DirectionActivity):
+                _fail("direction activity record is malformed")
+            _literal_bool(activity.forward_active, "forward_active")
+            _literal_bool(activity.reverse_active, "reverse_active")
+            _finite_number(activity.forward_maximum, "forward maximum")
+            _finite_number(activity.reverse_minimum, "reverse minimum")
 
 
 def validate_canonical_model(model: CanonicalModel) -> None:
@@ -229,6 +274,26 @@ def validate_canonical_model(model: CanonicalModel) -> None:
         _fail("canonical model must be a CanonicalModel")
     validate_flux_model(model.flux_model)
     validate_isotope_model(model.isotope_model)
+    physical_ids = {item.reaction_id for item in model.flux_model.reactions}
+    certificate = model.isotope_model.direction_activity_certificate
+    if certificate is not None:
+        certificate_ids = {item.reaction_id for item in certificate.activities}
+        if certificate_ids != physical_ids:
+            _fail("direction activity certificate must cover every physical reaction exactly once")
+    for reaction in model.isotope_model.reactions:
+        rule = reaction.flux_projection
+        if rule is None:
+            if reaction.isotope_enabled and reaction.reaction_id not in physical_ids:
+                _fail(f"legacy isotope reaction {reaction.reaction_id!r} has no physical reaction")
+            continue
+        referenced = {
+            term.reaction_id
+            for expression in (rule.expression,) + rule.equivalent_expressions
+            for term in expression.terms
+        } | {item.reaction_id for item in rule.covered_physical_directions}
+        unknown = sorted(referenced - physical_ids)
+        if unknown:
+            _fail("flux projection references unknown physical reaction(s): " + ", ".join(unknown))
 
 
 def _isotope_index(model: CanonicalModel) -> dict[str, object]:
@@ -246,6 +311,7 @@ def validate_stationary_experiment(
         _fail("experiment must be StationaryExperimentSemantics")
     _tuple(experiment.tracers, "experiment tracers")
     _tuple(experiment.targets, "experiment targets")
+    _tuple(experiment.observation_targets, "observation targets")
     metabolites = _isotope_index(model)
     for tracer in experiment.tracers:
         _tuple(tracer.isotopomers, "tracer isotopomers")
@@ -305,6 +371,22 @@ def validate_stationary_experiment(
         _nonempty_id(target.formula, "target formula")
         if target.correction not in {"yes", "no"}:
             _fail("target correction must be exactly 'yes' or 'no'")
+    for observation in experiment.observation_targets:
+        _nonempty_id(observation.target_id, "observation target ID")
+        if observation.target_id in target_ids:
+            _fail(f"duplicate target ID: {observation.target_id!r}")
+        target_ids.add(observation.target_id)
+        if not isinstance(observation.carbon_count, int) or observation.carbon_count < 1:
+            _fail("observation carbon count must be a positive integer")
+        _tuple(observation.precursors, "observation precursors")
+        if sum(len(item.atom_positions) for item in observation.precursors) != observation.carbon_count:
+            _fail("observation precursor atoms must equal its carbon count")
+        for precursor in observation.precursors:
+            metabolite = metabolites.get(precursor.metabolite_id)
+            if metabolite is None or not metabolite.isotope_visible:
+                _fail(f"observation references unknown isotope metabolite {precursor.metabolite_id!r}")
+            if any(not isinstance(p, int) or not 1 <= p <= metabolite.carbon_count for p in precursor.atom_positions):
+                _fail("observation precursor position is out of range")
 
 
 def validate_transient_experiment(

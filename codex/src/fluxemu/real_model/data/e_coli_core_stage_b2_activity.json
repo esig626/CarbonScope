@@ -1,0 +1,675 @@
+{
+  "certificate_id": "r1_stage_b2_class_restricted_fva_union",
+  "zero_tolerance": 1e-09,
+  "provenance": {
+    "source": "class_restricted_fva.csv",
+    "domain": "union of frozen theta0 and theta1 accepted classes"
+  },
+  "activities": [
+    {
+      "reaction_id": "ACALD",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -0.5084740740740759,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "ACALDt",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -0.5084740740740642,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "ACKr",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -12.03062238580378,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "ACONTa",
+      "forward_maximum": 7.907366332404379,
+      "reverse_minimum": 0.5657243483209716,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "ACONTb",
+      "forward_maximum": 7.907366332404377,
+      "reverse_minimum": 0.5657243483209716,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "ACt2r",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -12.030622385803781,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "ADK1",
+      "forward_maximum": 13.702222117579382,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "AKGDH",
+      "forward_maximum": 6.9833498968135075,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "AKGt2r",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -0.28601666666666187,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "ALCD2x",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -0.4428645161290292,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "ATPM",
+      "forward_maximum": 22.09222211757936,
+      "reverse_minimum": 8.39,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "ATPS4r",
+      "forward_maximum": 49.3030495790271,
+      "reverse_minimum": 12.680411886882872,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "BIOMASS_Ecoli_core_w_GAM",
+      "forward_maximum": 0.8739215069684303,
+      "reverse_minimum": 0.524352904181085,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "CO2t",
+      "forward_maximum": -4.971065364893525,
+      "reverse_minimum": -23.553636644000854,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "CS",
+      "forward_maximum": 7.907366332404374,
+      "reverse_minimum": 0.5657243483209714,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "CYTBD",
+      "forward_maximum": 45.12700560575756,
+      "reverse_minimum": 17.86453668979245,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "D_LACt2",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -0.4290249999999974,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "ENO",
+      "forward_maximum": 17.82168073016052,
+      "reverse_minimum": 12.156056777367965,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "ETOHt2r",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -0.4428645161290212,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "EX_ac_e",
+      "forward_maximum": 12.030622385803781,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_acald_e",
+      "forward_maximum": 0.5084740740740709,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_akg_e",
+      "forward_maximum": 0.2860166666666616,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_co2_e",
+      "forward_maximum": 23.553636644000857,
+      "reverse_minimum": 4.971065364893544,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_etoh_e",
+      "forward_maximum": 0.4428645161290283,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_for_e",
+      "forward_maximum": 9.134814745052898,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_fru_e",
+      "forward_maximum": 0.0,
+      "reverse_minimum": 0.0,
+      "forward_active": false,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_fum_e",
+      "forward_maximum": 0.0,
+      "reverse_minimum": 0.0,
+      "forward_active": false,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_glc__D_e",
+      "forward_maximum": -10.0,
+      "reverse_minimum": -10.0,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "EX_gln__L_e",
+      "forward_maximum": 0.0,
+      "reverse_minimum": 0.0,
+      "forward_active": false,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_glu__L_e",
+      "forward_maximum": 0.2542370370370338,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_h_e",
+      "forward_maximum": 31.443343941013193,
+      "reverse_minimum": 17.180248121191017,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_h2o_e",
+      "forward_maximum": 29.792310592854477,
+      "reverse_minimum": 8.790661660110201,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_lac__D_e",
+      "forward_maximum": 0.42902499999999605,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_mal__L_e",
+      "forward_maximum": 0.0,
+      "reverse_minimum": 0.0,
+      "forward_active": false,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_nh4_e",
+      "forward_maximum": -2.8591915159186194,
+      "reverse_minimum": -4.924249846370541,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "EX_o2_e",
+      "forward_maximum": -8.932268344896222,
+      "reverse_minimum": -22.563502802878784,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "EX_pi_e",
+      "forward_maximum": -1.9289370286109688,
+      "reverse_minimum": -3.2148950476847684,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "EX_pyr_e",
+      "forward_maximum": 0.5084740740740707,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "EX_succ_e",
+      "forward_maximum": 0.334848780487817,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "FBA",
+      "forward_maximum": 9.478426166211076,
+      "reverse_minimum": 4.862074322917025,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "FBP",
+      "forward_maximum": 13.702222117579323,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "FORt2",
+      "forward_maximum": 54.80888847031742,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "FORt",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -54.80888847031738,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "FRD7",
+      "forward_maximum": 1000.0,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "FRUpts2",
+      "forward_maximum": 0.0,
+      "reverse_minimum": 0.0,
+      "forward_active": false,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "FUM",
+      "forward_maximum": 6.983349896813405,
+      "reverse_minimum": -0.24061244771607224,
+      "forward_active": true,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "FUMt2_2",
+      "forward_maximum": 0.0,
+      "reverse_minimum": 0.0,
+      "forward_active": false,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "G6PDH2r",
+      "forward_maximum": 12.858065245686207,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "GAPD",
+      "forward_maximum": 18.60611267481542,
+      "reverse_minimum": 13.437295620304281,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "GLCpts",
+      "forward_maximum": 10.000000000000002,
+      "reverse_minimum": 10.000000000000002,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "GLNS",
+      "forward_maximum": 13.836299155178025,
+      "reverse_minimum": 0.13407703759910344,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "GLNabc",
+      "forward_maximum": 0.0,
+      "reverse_minimum": 0.0,
+      "forward_active": false,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "GLUDy",
+      "forward_maximum": 10.977107639259764,
+      "reverse_minimum": -4.705257351625351,
+      "forward_active": true,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "GLUN",
+      "forward_maximum": 13.702222117579398,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "GLUSy",
+      "forward_maximum": 13.702222117579279,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "GLUt2r",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -0.2542370370370325,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "GND",
+      "forward_maximum": 12.858065245687177,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "H2Ot",
+      "forward_maximum": -8.790661660110196,
+      "reverse_minimum": -29.792310592854484,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "ICDHyr",
+      "forward_maximum": 7.907366332404394,
+      "reverse_minimum": 0.5657243483209716,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "ICL",
+      "forward_maximum": 5.094743033687063,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "LDH_D",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -0.4290249999999957,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "MALS",
+      "forward_maximum": 5.094743033687851,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "MALt2_2",
+      "forward_maximum": 0.0,
+      "reverse_minimum": 0.0,
+      "forward_active": false,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "MDH",
+      "forward_maximum": 9.624080626987931,
+      "reverse_minimum": -11.671066279606274,
+      "forward_active": true,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "ME1",
+      "forward_maximum": 9.784333118585932,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "ME2",
+      "forward_maximum": 12.0319849511807,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "NADH16",
+      "forward_maximum": 42.42967745750613,
+      "reverse_minimum": 17.8244346151731,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "NADTRHD",
+      "forward_maximum": 27.40444423515875,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "NH4t",
+      "forward_maximum": 4.9242498463704765,
+      "reverse_minimum": 2.859191515918619,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "O2t",
+      "forward_maximum": 22.56350280287937,
+      "reverse_minimum": 8.93226834489622,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PDH",
+      "forward_maximum": 14.802128996130868,
+      "reverse_minimum": 5.186089355645644,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PFK",
+      "forward_maximum": 22.940035836075126,
+      "reverse_minimum": 4.862074322917166,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PFL",
+      "forward_maximum": 9.134814745052894,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PGI",
+      "forward_maximum": 9.892507654642879,
+      "reverse_minimum": -3.0336360764329195,
+      "forward_active": true,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "PGK",
+      "forward_maximum": -13.437295620304525,
+      "reverse_minimum": -18.606112674815424,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "PGL",
+      "forward_maximum": 12.858065245681004,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PGM",
+      "forward_maximum": -12.156056777368695,
+      "reverse_minimum": -17.82168073016052,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "PIt2r",
+      "forward_maximum": 3.2148950476847515,
+      "reverse_minimum": 1.9289370286109648,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PPC",
+      "forward_maximum": 18.107953303632055,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PPCK",
+      "forward_maximum": 13.70222211757934,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PPS",
+      "forward_maximum": 13.702222117579394,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PTAr",
+      "forward_maximum": 12.030622385803786,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PYK",
+      "forward_maximum": 19.56866623717113,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "PYRt2",
+      "forward_maximum": 0.0,
+      "reverse_minimum": -0.5084740740740694,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "RPE",
+      "forward_maximum": 7.956432213498401,
+      "reverse_minimum": -0.6209090068715414,
+      "forward_active": true,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "RPI",
+      "forward_maximum": -0.376904867525364,
+      "reverse_minimum": -4.901633032185802,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "SUCCt2_2",
+      "forward_maximum": 18.269629490106887,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "SUCCt3",
+      "forward_maximum": 18.269629490108503,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "SUCDi",
+      "forward_maximum": 1000.0,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "SUCOAS",
+      "forward_maximum": 3.5128599559471796e-16,
+      "reverse_minimum": -6.983349896813501,
+      "forward_active": false,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "TALA",
+      "forward_maximum": 4.132804082117457,
+      "reverse_minimum": -0.15453620107026586,
+      "forward_active": true,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "THD2",
+      "forward_maximum": 35.55290799853514,
+      "reverse_minimum": 0.0,
+      "forward_active": true,
+      "reverse_active": false
+    },
+    {
+      "reaction_id": "TKT1",
+      "forward_maximum": 4.132804082117253,
+      "reverse_minimum": -0.15453620107026733,
+      "forward_active": true,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "TKT2",
+      "forward_maximum": 3.8236281313816085,
+      "reverse_minimum": -0.4663728058012102,
+      "forward_active": true,
+      "reverse_active": true
+    },
+    {
+      "reaction_id": "TPI",
+      "forward_maximum": 9.478426166211076,
+      "reverse_minimum": 4.862074322917062,
+      "forward_active": true,
+      "reverse_active": false
+    }
+  ]
+}

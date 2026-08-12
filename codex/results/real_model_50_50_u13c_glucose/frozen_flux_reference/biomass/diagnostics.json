@@ -1,0 +1,59 @@
+{
+  "source": "frozen Stage A2 flux vector",
+  "purpose": "isotope-engine reference oracle; NOT final native-HiGHS acceptance",
+  "deterministic_repeat": true,
+  "mid_tolerance": 1e-10,
+  "max_normalization_error": 6.217248937900877e-15,
+  "layers": [
+    {
+      "sample_id": "biomass",
+      "emu_size": 1,
+      "matrix_dimension": 59,
+      "rank": 59,
+      "condition_number": 47.945958206027115,
+      "max_absolute_residual": 8.881784197001252e-16,
+      "minimum_component": 0.4999999999999981,
+      "max_normalization_error": 3.774758283725532e-15
+    },
+    {
+      "sample_id": "biomass",
+      "emu_size": 2,
+      "matrix_dimension": 75,
+      "rank": 75,
+      "condition_number": 41.343468119636384,
+      "max_absolute_residual": 8.881784197001252e-16,
+      "minimum_component": 0.0,
+      "max_normalization_error": 4.884981308350689e-15
+    },
+    {
+      "sample_id": "biomass",
+      "emu_size": 3,
+      "matrix_dimension": 30,
+      "rank": 30,
+      "condition_number": 41.11927726951832,
+      "max_absolute_residual": 8.881784197001252e-16,
+      "minimum_component": 0.0,
+      "max_normalization_error": 5.995204332975845e-15
+    },
+    {
+      "sample_id": "biomass",
+      "emu_size": 4,
+      "matrix_dimension": 12,
+      "rank": 12,
+      "condition_number": 10.19232653556404,
+      "max_absolute_residual": 3.3073291685031203e-16,
+      "minimum_component": 0.11131498971846196,
+      "max_normalization_error": 5.995204332975845e-15
+    },
+    {
+      "sample_id": "biomass",
+      "emu_size": 5,
+      "matrix_dimension": 4,
+      "rank": 4,
+      "condition_number": 59.8151283534746,
+      "max_absolute_residual": 7.434163248475809e-16,
+      "minimum_component": 0.06964888835615801,
+      "max_normalization_error": 6.217248937900877e-15
+    }
+  ]
+}

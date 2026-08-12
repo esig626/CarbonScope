@@ -35,6 +35,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "fluxemu.carbon_transitions" = ["data/*.yaml", "docs/*.md"]
+"fluxemu.real_model" = ["data/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

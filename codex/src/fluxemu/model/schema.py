@@ -81,6 +81,55 @@ class IsotopeParticipant:
 
 
 @dataclass(frozen=True, slots=True)
+class FluxProjectionTerm:
+    """One coefficient in an explicit physical-net-flux expression."""
+
+    reaction_id: str
+    coefficient: Number
+
+
+@dataclass(frozen=True, slots=True)
+class PhysicalDirectionRef:
+    reaction_id: str
+    direction: str
+
+
+@dataclass(frozen=True, slots=True)
+class FluxProjectionExpression:
+    terms: tuple[FluxProjectionTerm, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FluxProjectionRule:
+    """Serializable map from a complete physical flux vector to one component rate."""
+
+    projection_id: str
+    expression: FluxProjectionExpression
+    transform: str
+    zero_tolerance: Number
+    equivalent_expressions: tuple[FluxProjectionExpression, ...] = ()
+    covered_physical_directions: tuple[PhysicalDirectionRef, ...] = ()
+    provenance: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class DirectionActivity:
+    reaction_id: str
+    forward_active: bool
+    reverse_active: bool
+    forward_maximum: Number
+    reverse_minimum: Number
+
+
+@dataclass(frozen=True, slots=True)
+class DirectionActivityCertificate:
+    certificate_id: str
+    zero_tolerance: Number
+    activities: tuple[DirectionActivity, ...]
+    provenance: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class IsotopeReaction:
     reaction_id: str
     direction: str
@@ -91,12 +140,14 @@ class IsotopeReaction:
     directional_id: str | None = None
     symmetry_semantics: str | None = None
     provenance: tuple[tuple[str, str], ...] = ()
+    flux_projection: FluxProjectionRule | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class IsotopeModel:
     metabolites: tuple[IsotopeMetabolite, ...]
     reactions: tuple[IsotopeReaction, ...]
+    direction_activity_certificate: DirectionActivityCertificate | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,9 +168,24 @@ class Target:
 
 
 @dataclass(frozen=True, slots=True)
+class ObservationPrecursor:
+    metabolite_id: str
+    atom_positions: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ObservationTarget:
+    target_id: str
+    carbon_count: int
+    precursors: tuple[ObservationPrecursor, ...]
+    provenance: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class StationaryExperimentSemantics:
     tracers: tuple[Tracer, ...]
     targets: tuple[Target, ...]
+    observation_targets: tuple[ObservationTarget, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
