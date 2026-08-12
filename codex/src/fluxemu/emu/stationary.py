@@ -19,6 +19,7 @@ from fluxemu.execution import (
 )
 
 from .graph import CompiledEMUPlan, EMU, EMUContribution
+from .projection import evaluate_flux_projection
 from .tracers import convolve_mids, source_emu_mid
 
 
@@ -58,17 +59,23 @@ def _directed_flux(plan: CompiledEMUPlan, reaction_id: str, flux: dict[str, floa
     return max(directed, 0.0)
 
 
+def _contribution_rate(plan: CompiledEMUPlan, contribution: EMUContribution, flux: dict[str, float]) -> float:
+    if contribution.flux_projection is not None:
+        return evaluate_flux_projection(contribution.flux_projection, flux)
+    return _directed_flux(plan, contribution.reaction_id, flux)
+
+
 def _turnover(plan: CompiledEMUPlan, emu: EMU, flux: dict[str, float]) -> float:
     total = 0.0
     for reaction in plan.model.flux_model.reactions:
-        direction = 1 if float(reaction.lower_bound) >= 0.0 else -1
         coefficient = sum(
             float(term.coefficient)
             for term in reaction.stoichiometric_terms
             if term.metabolite_id == emu.metabolite_id
-        ) * direction
-        if coefficient < 0.0:
-            total += -coefficient * _directed_flux(plan, reaction.reaction_id, flux)
+        )
+        consumption = -coefficient * float(flux[reaction.reaction_id])
+        if consumption > 1e-12:
+            total += consumption
     return total
 
 
@@ -112,18 +119,43 @@ def _evaluate_state(
     for contribution in plan.contributions:
         by_product.setdefault(contribution.product, []).append(contribution)
 
+    # A compiled plan is flux-independent and therefore contains every
+    # admissible producer.  For a particular complete state, trace only
+    # components whose projected rate is nonzero.  This prevents inactive
+    # certified pathways from introducing mathematically undefined zero-flow
+    # pools into an otherwise well-posed stationary system.
+    active: set[EMU] = set(plan.source_emus)
+    def activate(emu: EMU) -> None:
+        if emu in active:
+            return
+        active.add(emu)
+        for contribution in by_product.get(emu, ()):
+            if _contribution_rate(plan, contribution, flux) * contribution.branch_weight > 1e-12:
+                for precursor in contribution.precursors:
+                    activate(precursor)
+    for _, emu in plan.targets:
+        activate(emu)
+    for _, precursors in plan.observations:
+        for emu in precursors:
+            activate(emu)
+
     diagnostics: list[LayerDiagnostics] = []
     normalization_errors: list[float] = []
     for layer in plan.layers:
-        index = {emu: position for position, emu in enumerate(layer.unknowns)}
-        dimension = len(layer.unknowns)
+        unknowns = tuple(emu for emu in layer.unknowns if emu in active)
+        index = {emu: position for position, emu in enumerate(unknowns)}
+        dimension = len(unknowns)
+        if dimension == 0:
+            continue
         matrix = np.zeros((dimension, dimension), dtype=float)
         rhs = np.zeros((dimension, layer.size + 1), dtype=float)
-        for row, emu in enumerate(layer.unknowns):
+        for row, emu in enumerate(unknowns):
             turnover = _turnover(plan, emu, flux)
             matrix[row, row] = turnover
             for contribution in by_product.get(emu, ()):
-                effective = _directed_flux(plan, contribution.reaction_id, flux) * contribution.branch_weight
+                effective = _contribution_rate(plan, contribution, flux) * contribution.branch_weight
+                if effective <= 1e-12:
+                    continue
                 if (
                     len(contribution.precursors) == 1
                     and contribution.precursors[0].size == layer.size
@@ -137,12 +169,12 @@ def _evaluate_state(
         if rank < dimension or not math.isfinite(condition):
             raise ForwardEMUError(
                 f"stationary EMU layer {layer.size} is singular: dimension={dimension}, "
-                f"rank={rank}, condition_number={condition}"
+                f"rank={rank}, condition_number={condition}, unknowns={unknowns!r}"
             )
         solution = np.linalg.solve(matrix, rhs)
         residual = float(np.max(np.abs(matrix @ solution - rhs), initial=0.0))
         layer_errors = []
-        for emu, vector in zip(layer.unknowns, solution):
+        for emu, vector in zip(unknowns, solution):
             error = _validate_mid(vector, emu, tolerance)
             layer_errors.append(error)
             normalization_errors.append(error)
@@ -165,13 +197,19 @@ def _evaluate_state(
             numerator = np.zeros(emu.size + 1, dtype=float)
             denominator = 0.0
             for contribution in by_product.get(emu, ()):
-                effective = _directed_flux(plan, contribution.reaction_id, flux) * contribution.branch_weight
+                effective = _contribution_rate(plan, contribution, flux) * contribution.branch_weight
                 numerator += effective * _contribution_mid(contribution, mids)
                 denominator += effective
             if denominator <= 1e-15:
                 raise ForwardEMUError(f"terminal target {target_id!r} has zero productive flux")
             vector = numerator / denominator
         error = _validate_mid(vector, emu, tolerance)
+        normalization_errors.append(error)
+        predictions.append(StationaryMID(state.sample_id, target_id, tuple(float(x) for x in vector)))
+    for target_id, precursors in plan.observations:
+        vector = convolve_mids(tuple(mids[item] for item in precursors))
+        synthetic = EMU(target_id, tuple(range(1, sum(item.size for item in precursors) + 1)))
+        error = _validate_mid(vector, synthetic, tolerance)
         normalization_errors.append(error)
         predictions.append(StationaryMID(state.sample_id, target_id, tuple(float(x) for x in vector)))
     return tuple(predictions), tuple(diagnostics), max(normalization_errors, default=0.0)

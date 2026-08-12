@@ -1,0 +1,3754 @@
+{
+  "schema_version": 1,
+  "projection_count": 48,
+  "isotope_component_count": 49,
+  "metabolites": {
+    "glc__D_e": 6,
+    "g6p_c": 6,
+    "f6p_c": 6,
+    "fdp_c": 6,
+    "dhap_c": 3,
+    "g3p_c": 3,
+    "3pg_c": 3,
+    "pep_c": 3,
+    "pyr_c": 3,
+    "accoa_c": 2,
+    "co2_c": 1,
+    "co2_e": 1,
+    "icit_c": 6,
+    "akg_c": 5,
+    "succ_c": 4,
+    "succ_e": 4,
+    "fum_c": 4,
+    "mal__L_c": 4,
+    "oaa_c": 4,
+    "6pgc_c": 6,
+    "ru5p__D_c": 5,
+    "r5p_c": 5,
+    "xu5p__D_c": 5,
+    "s7p_c": 7,
+    "e4p_c": 4,
+    "ac_c": 2,
+    "ac_e": 2,
+    "for_c": 1,
+    "for_e": 1,
+    "gln__L_c": 5,
+    "glu__L_c": 5
+  },
+  "components": [
+    {
+      "component_id": "pts_glucose_component",
+      "projection_id": "pts_glucose_component",
+      "substrates": [
+        "glc__D_e"
+      ],
+      "products": [
+        "g6p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "glc__D_e",
+              1,
+              "g6p_c",
+              1
+            ],
+            [
+              "glc__D_e",
+              2,
+              "g6p_c",
+              2
+            ],
+            [
+              "glc__D_e",
+              3,
+              "g6p_c",
+              3
+            ],
+            [
+              "glc__D_e",
+              4,
+              "g6p_c",
+              4
+            ],
+            [
+              "glc__D_e",
+              5,
+              "g6p_c",
+              5
+            ],
+            [
+              "glc__D_e",
+              6,
+              "g6p_c",
+              6
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "GLCpts",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "GLCpts",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r1",
+        "atom_map": "ABCDEF -> ABCDEF",
+        "relationship": "decomposed",
+        "notes": "First of two components tied to the same physical PTS flux"
+      }
+    },
+    {
+      "component_id": "pts_pep_component",
+      "projection_id": "pts_pep_component",
+      "substrates": [
+        "pep_c"
+      ],
+      "products": [
+        "pyr_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "pep_c",
+              1,
+              "pyr_c",
+              1
+            ],
+            [
+              "pep_c",
+              2,
+              "pyr_c",
+              2
+            ],
+            [
+              "pep_c",
+              3,
+              "pyr_c",
+              3
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "GLCpts",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "GLCpts",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r14",
+        "atom_map": "ABC -> ABC",
+        "relationship": "decomposed",
+        "notes": "Second PTS carbon skeleton; together the two components account for all 9 input and 9 output carbons"
+      }
+    },
+    {
+      "component_id": "pgi_forward",
+      "projection_id": "pgi_forward",
+      "substrates": [
+        "g6p_c"
+      ],
+      "products": [
+        "f6p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "g6p_c",
+              1,
+              "f6p_c",
+              1
+            ],
+            [
+              "g6p_c",
+              2,
+              "f6p_c",
+              2
+            ],
+            [
+              "g6p_c",
+              3,
+              "f6p_c",
+              3
+            ],
+            [
+              "g6p_c",
+              4,
+              "f6p_c",
+              4
+            ],
+            [
+              "g6p_c",
+              5,
+              "f6p_c",
+              5
+            ],
+            [
+              "g6p_c",
+              6,
+              "f6p_c",
+              6
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PGI",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "PGI",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r2",
+        "atom_map": "ABCDEF -> ABCDEF",
+        "relationship": "one_to_one",
+        "notes": "Direct source direction"
+      }
+    },
+    {
+      "component_id": "pgi_reverse",
+      "projection_id": "pgi_reverse",
+      "substrates": [
+        "f6p_c"
+      ],
+      "products": [
+        "g6p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "f6p_c",
+              1,
+              "g6p_c",
+              1
+            ],
+            [
+              "f6p_c",
+              2,
+              "g6p_c",
+              2
+            ],
+            [
+              "f6p_c",
+              3,
+              "g6p_c",
+              3
+            ],
+            [
+              "f6p_c",
+              4,
+              "g6p_c",
+              4
+            ],
+            [
+              "f6p_c",
+              5,
+              "g6p_c",
+              5
+            ],
+            [
+              "f6p_c",
+              6,
+              "g6p_c",
+              6
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PGI",
+          -1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "PGI",
+          "reverse"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r3",
+        "atom_map": "ABCDEF -> ABCDEF",
+        "relationship": "one_to_one",
+        "notes": "Direct source direction"
+      }
+    },
+    {
+      "component_id": "pfk_forward",
+      "projection_id": "pfk_forward",
+      "substrates": [
+        "f6p_c"
+      ],
+      "products": [
+        "fdp_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "f6p_c",
+              1,
+              "fdp_c",
+              1
+            ],
+            [
+              "f6p_c",
+              2,
+              "fdp_c",
+              2
+            ],
+            [
+              "f6p_c",
+              3,
+              "fdp_c",
+              3
+            ],
+            [
+              "f6p_c",
+              4,
+              "fdp_c",
+              4
+            ],
+            [
+              "f6p_c",
+              5,
+              "fdp_c",
+              5
+            ],
+            [
+              "f6p_c",
+              6,
+              "fdp_c",
+              6
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PFK",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "PFK",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r4",
+        "atom_map": "ABCDEF -> ABCDEF",
+        "relationship": "one_to_one",
+        "notes": "Non-carbon cofactors suppressed by source"
+      }
+    },
+    {
+      "component_id": "fbp_forward",
+      "projection_id": "fbp_forward",
+      "substrates": [
+        "fdp_c"
+      ],
+      "products": [
+        "f6p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "fdp_c",
+              1,
+              "f6p_c",
+              1
+            ],
+            [
+              "fdp_c",
+              2,
+              "f6p_c",
+              2
+            ],
+            [
+              "fdp_c",
+              3,
+              "f6p_c",
+              3
+            ],
+            [
+              "fdp_c",
+              4,
+              "f6p_c",
+              4
+            ],
+            [
+              "fdp_c",
+              5,
+              "f6p_c",
+              5
+            ],
+            [
+              "fdp_c",
+              6,
+              "f6p_c",
+              6
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "FBP",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "FBP",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r5",
+        "atom_map": "ABCDEF -> ABCDEF",
+        "relationship": "one_to_one",
+        "notes": "Direct source direction"
+      }
+    },
+    {
+      "component_id": "fba_forward",
+      "projection_id": "fba_forward",
+      "substrates": [
+        "fdp_c"
+      ],
+      "products": [
+        "dhap_c",
+        "g3p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "fdp_c",
+              3,
+              "dhap_c",
+              1
+            ],
+            [
+              "fdp_c",
+              2,
+              "dhap_c",
+              2
+            ],
+            [
+              "fdp_c",
+              1,
+              "dhap_c",
+              3
+            ],
+            [
+              "fdp_c",
+              4,
+              "g3p_c",
+              1
+            ],
+            [
+              "fdp_c",
+              5,
+              "g3p_c",
+              2
+            ],
+            [
+              "fdp_c",
+              6,
+              "g3p_c",
+              3
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "FBA",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "FBA",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r6",
+        "atom_map": "ABCDEF -> CBA + DEF",
+        "relationship": "one_to_one",
+        "notes": "Exact DHAP reversal preserved"
+      }
+    },
+    {
+      "component_id": "tpi_forward",
+      "projection_id": "tpi_forward",
+      "substrates": [
+        "dhap_c"
+      ],
+      "products": [
+        "g3p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "dhap_c",
+              1,
+              "g3p_c",
+              1
+            ],
+            [
+              "dhap_c",
+              2,
+              "g3p_c",
+              2
+            ],
+            [
+              "dhap_c",
+              3,
+              "g3p_c",
+              3
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "TPI",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "TPI",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r8",
+        "atom_map": "ABC -> ABC",
+        "relationship": "one_to_one",
+        "notes": "Direct E. coli map; do not use the conflicting old smoke-fixture CBA product"
+      }
+    },
+    {
+      "component_id": "lower_glycolysis_gap_to_pga",
+      "projection_id": "lower_glycolysis_gap_to_pga",
+      "substrates": [
+        "g3p_c"
+      ],
+      "products": [
+        "3pg_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "g3p_c",
+              1,
+              "3pg_c",
+              1
+            ],
+            [
+              "g3p_c",
+              2,
+              "3pg_c",
+              2
+            ],
+            [
+              "g3p_c",
+              3,
+              "3pg_c",
+              3
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "GAPD",
+          1
+        ]
+      ],
+      "equivalent_expressions": [
+        [
+          [
+            "PGK",
+            -1
+          ]
+        ]
+      ],
+      "covered": [
+        [
+          "GAPD",
+          "forward"
+        ],
+        [
+          "PGK",
+          "reverse"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r10",
+        "atom_map": "ABC -> ABC",
+        "relationship": "lumped",
+        "notes": "13dpg_c is an unbranched intermediate; frozen-class lump equality independently verified"
+      }
+    },
+    {
+      "component_id": "lower_glycolysis_pga_to_pep",
+      "projection_id": "lower_glycolysis_pga_to_pep",
+      "substrates": [
+        "3pg_c"
+      ],
+      "products": [
+        "pep_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "3pg_c",
+              1,
+              "pep_c",
+              1
+            ],
+            [
+              "3pg_c",
+              2,
+              "pep_c",
+              2
+            ],
+            [
+              "3pg_c",
+              3,
+              "pep_c",
+              3
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PGM",
+          -1
+        ]
+      ],
+      "equivalent_expressions": [
+        [
+          [
+            "ENO",
+            1
+          ]
+        ]
+      ],
+      "covered": [
+        [
+          "PGM",
+          "reverse"
+        ],
+        [
+          "ENO",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r12",
+        "atom_map": "ABC -> ABC",
+        "relationship": "lumped",
+        "notes": "2pg_c is an unbranched intermediate; frozen-class lump equality independently verified"
+      }
+    },
+    {
+      "component_id": "pyk_forward",
+      "projection_id": "pyk_forward",
+      "substrates": [
+        "pep_c"
+      ],
+      "products": [
+        "pyr_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "pep_c",
+              1,
+              "pyr_c",
+              1
+            ],
+            [
+              "pep_c",
+              2,
+              "pyr_c",
+              2
+            ],
+            [
+              "pep_c",
+              3,
+              "pyr_c",
+              3
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PYK",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "PYK",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r14",
+        "atom_map": "ABC -> ABC",
+        "relationship": "one_to_one",
+        "notes": "Separate physical PYK flux from PTS component"
+      }
+    },
+    {
+      "component_id": "pps_forward",
+      "projection_id": "pps_forward",
+      "substrates": [
+        "pyr_c"
+      ],
+      "products": [
+        "pep_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "pyr_c",
+              1,
+              "pep_c",
+              1
+            ],
+            [
+              "pyr_c",
+              2,
+              "pep_c",
+              2
+            ],
+            [
+              "pyr_c",
+              3,
+              "pep_c",
+              3
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PPS",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "PPS",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r15",
+        "atom_map": "ABC -> ABC",
+        "relationship": "one_to_one",
+        "notes": "Direct source direction"
+      }
+    },
+    {
+      "component_id": "pdh_forward",
+      "projection_id": "pdh_forward",
+      "substrates": [
+        "pyr_c"
+      ],
+      "products": [
+        "accoa_c",
+        "co2_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "pyr_c",
+              2,
+              "accoa_c",
+              1
+            ],
+            [
+              "pyr_c",
+              3,
+              "accoa_c",
+              2
+            ],
+            [
+              "pyr_c",
+              1,
+              "co2_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PDH",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "PDH",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r16",
+        "atom_map": "ABC -> BC + A",
+        "relationship": "one_to_one",
+        "notes": "Explicit decarboxylation"
+      }
+    },
+    {
+      "component_id": "tca_citrate_isocitrate",
+      "projection_id": "tca_citrate_isocitrate",
+      "substrates": [
+        "oaa_c",
+        "accoa_c"
+      ],
+      "products": [
+        "icit_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "oaa_c",
+              4,
+              "icit_c",
+              1
+            ],
+            [
+              "oaa_c",
+              3,
+              "icit_c",
+              2
+            ],
+            [
+              "oaa_c",
+              2,
+              "icit_c",
+              3
+            ],
+            [
+              "accoa_c",
+              2,
+              "icit_c",
+              4
+            ],
+            [
+              "accoa_c",
+              1,
+              "icit_c",
+              5
+            ],
+            [
+              "oaa_c",
+              1,
+              "icit_c",
+              6
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "CS",
+          1
+        ]
+      ],
+      "equivalent_expressions": [
+        [
+          [
+            "ACONTa",
+            1
+          ]
+        ],
+        [
+          [
+            "ACONTb",
+            1
+          ]
+        ]
+      ],
+      "covered": [
+        [
+          "CS",
+          "forward"
+        ],
+        [
+          "ACONTa",
+          "forward"
+        ],
+        [
+          "ACONTb",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r17",
+        "atom_map": "AB + CDEF -> FEDBAC",
+        "relationship": "lumped",
+        "notes": "Authoritative permuted condensation; do not assign identity maps to citrate/aconitate; frozen-class lump equality independently verified"
+      }
+    },
+    {
+      "component_id": "icdh_forward",
+      "projection_id": "icdh_forward",
+      "substrates": [
+        "icit_c"
+      ],
+      "products": [
+        "akg_c",
+        "co2_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "icit_c",
+              1,
+              "akg_c",
+              1
+            ],
+            [
+              "icit_c",
+              2,
+              "akg_c",
+              2
+            ],
+            [
+              "icit_c",
+              3,
+              "akg_c",
+              3
+            ],
+            [
+              "icit_c",
+              4,
+              "akg_c",
+              4
+            ],
+            [
+              "icit_c",
+              5,
+              "akg_c",
+              5
+            ],
+            [
+              "icit_c",
+              6,
+              "co2_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "ICDHyr",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "ICDHyr",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r18",
+        "atom_map": "ABCDEF -> ABCDE + F",
+        "relationship": "one_to_one",
+        "notes": "Class-summary FVA indicates no required reverse direction"
+      }
+    },
+    {
+      "component_id": "akg_to_succinate",
+      "projection_id": "akg_to_succinate",
+      "substrates": [
+        "akg_c"
+      ],
+      "products": [
+        "succ_c",
+        "co2_c"
+      ],
+      "branches": [
+        {
+          "id": "canonical_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "akg_c",
+              2,
+              "succ_c",
+              1
+            ],
+            [
+              "akg_c",
+              3,
+              "succ_c",
+              2
+            ],
+            [
+              "akg_c",
+              4,
+              "succ_c",
+              3
+            ],
+            [
+              "akg_c",
+              5,
+              "succ_c",
+              4
+            ],
+            [
+              "akg_c",
+              1,
+              "co2_c",
+              1
+            ]
+          ]
+        },
+        {
+          "id": "reversed_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "akg_c",
+              2,
+              "succ_c",
+              4
+            ],
+            [
+              "akg_c",
+              3,
+              "succ_c",
+              3
+            ],
+            [
+              "akg_c",
+              4,
+              "succ_c",
+              2
+            ],
+            [
+              "akg_c",
+              5,
+              "succ_c",
+              1
+            ],
+            [
+              "akg_c",
+              1,
+              "co2_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "AKGDH",
+          1
+        ]
+      ],
+      "equivalent_expressions": [
+        [
+          [
+            "SUCOAS",
+            -1
+          ]
+        ]
+      ],
+      "covered": [
+        [
+          "AKGDH",
+          "forward"
+        ],
+        [
+          "SUCOAS",
+          "reverse"
+        ]
+      ],
+      "symmetry": "checked mfapy Suc/Fum symmetric-pool declaration",
+      "provenance": {
+        "source_ids": "r19",
+        "atom_map": "ABCDE -> BCDE + A",
+        "relationship": "lumped",
+        "notes": "Succinyl-CoA is an unbranched intermediate in this core; frozen-class lump equality independently verified"
+      }
+    },
+    {
+      "component_id": "succinate_to_fumarate",
+      "projection_id": "succinate_to_fumarate",
+      "substrates": [
+        "succ_c"
+      ],
+      "products": [
+        "fum_c"
+      ],
+      "branches": [
+        {
+          "id": "canonical_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "succ_c",
+              1,
+              "fum_c",
+              1
+            ],
+            [
+              "succ_c",
+              2,
+              "fum_c",
+              2
+            ],
+            [
+              "succ_c",
+              3,
+              "fum_c",
+              3
+            ],
+            [
+              "succ_c",
+              4,
+              "fum_c",
+              4
+            ]
+          ]
+        },
+        {
+          "id": "reversed_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "succ_c",
+              4,
+              "fum_c",
+              1
+            ],
+            [
+              "succ_c",
+              3,
+              "fum_c",
+              2
+            ],
+            [
+              "succ_c",
+              2,
+              "fum_c",
+              3
+            ],
+            [
+              "succ_c",
+              1,
+              "fum_c",
+              4
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "SUCDi",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "SUCDi",
+          "forward"
+        ]
+      ],
+      "symmetry": "checked mfapy symmetric-pool declaration plus normalized 0.5/0.5 branch audit",
+      "provenance": {
+        "source_ids": "r20",
+        "atom_map": "ABCD -> ABCD",
+        "relationship": "one_to_one",
+        "notes": "Checked library supplies explicit equal 0.5/0.5 orientations"
+      }
+    },
+    {
+      "component_id": "fumarate_to_succinate",
+      "projection_id": "fumarate_to_succinate",
+      "substrates": [
+        "fum_c"
+      ],
+      "products": [
+        "succ_c"
+      ],
+      "branches": [
+        {
+          "id": "canonical_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "fum_c",
+              1,
+              "succ_c",
+              1
+            ],
+            [
+              "fum_c",
+              2,
+              "succ_c",
+              2
+            ],
+            [
+              "fum_c",
+              3,
+              "succ_c",
+              3
+            ],
+            [
+              "fum_c",
+              4,
+              "succ_c",
+              4
+            ]
+          ]
+        },
+        {
+          "id": "reversed_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "fum_c",
+              4,
+              "succ_c",
+              4
+            ],
+            [
+              "fum_c",
+              3,
+              "succ_c",
+              3
+            ],
+            [
+              "fum_c",
+              2,
+              "succ_c",
+              2
+            ],
+            [
+              "fum_c",
+              1,
+              "succ_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "FRD7",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "FRD7",
+          "forward"
+        ]
+      ],
+      "symmetry": "checked mfapy Suc/Fum symmetric-pool declaration",
+      "provenance": {
+        "source_ids": "r21",
+        "atom_map": "ABCD -> ABCD",
+        "relationship": "one_to_one",
+        "notes": "Independent explicit source direction; checked symmetry treatment must be retained"
+      }
+    },
+    {
+      "component_id": "fumarate_to_malate",
+      "projection_id": "fumarate_to_malate",
+      "substrates": [
+        "fum_c"
+      ],
+      "products": [
+        "mal__L_c"
+      ],
+      "branches": [
+        {
+          "id": "canonical_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "fum_c",
+              1,
+              "mal__L_c",
+              1
+            ],
+            [
+              "fum_c",
+              2,
+              "mal__L_c",
+              2
+            ],
+            [
+              "fum_c",
+              3,
+              "mal__L_c",
+              3
+            ],
+            [
+              "fum_c",
+              4,
+              "mal__L_c",
+              4
+            ]
+          ]
+        },
+        {
+          "id": "reversed_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "fum_c",
+              4,
+              "mal__L_c",
+              1
+            ],
+            [
+              "fum_c",
+              3,
+              "mal__L_c",
+              2
+            ],
+            [
+              "fum_c",
+              2,
+              "mal__L_c",
+              3
+            ],
+            [
+              "fum_c",
+              1,
+              "mal__L_c",
+              4
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "FUM",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "FUM",
+          "forward"
+        ]
+      ],
+      "symmetry": "checked mfapy symmetric-pool declaration plus normalized 0.5/0.5 branch audit",
+      "provenance": {
+        "source_ids": "r22",
+        "atom_map": "ABCD -> ABCD",
+        "relationship": "one_to_one",
+        "notes": "Source marks fumarate symmetric; preserve equal branches"
+      }
+    },
+    {
+      "component_id": "malate_to_fumarate",
+      "projection_id": "malate_to_fumarate",
+      "substrates": [
+        "mal__L_c"
+      ],
+      "products": [
+        "fum_c"
+      ],
+      "branches": [
+        {
+          "id": "canonical_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "mal__L_c",
+              1,
+              "fum_c",
+              1
+            ],
+            [
+              "mal__L_c",
+              2,
+              "fum_c",
+              2
+            ],
+            [
+              "mal__L_c",
+              3,
+              "fum_c",
+              3
+            ],
+            [
+              "mal__L_c",
+              4,
+              "fum_c",
+              4
+            ]
+          ]
+        },
+        {
+          "id": "reversed_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "mal__L_c",
+              1,
+              "fum_c",
+              4
+            ],
+            [
+              "mal__L_c",
+              2,
+              "fum_c",
+              3
+            ],
+            [
+              "mal__L_c",
+              3,
+              "fum_c",
+              2
+            ],
+            [
+              "mal__L_c",
+              4,
+              "fum_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "FUM",
+          -1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "FUM",
+          "reverse"
+        ]
+      ],
+      "symmetry": "checked mfapy symmetric-pool declaration plus normalized 0.5/0.5 branch audit",
+      "provenance": {
+        "source_ids": "r23",
+        "atom_map": "ABCD -> ABCD",
+        "relationship": "one_to_one",
+        "notes": "Explicit source reverse direction"
+      }
+    },
+    {
+      "component_id": "malate_to_oaa",
+      "projection_id": "malate_to_oaa",
+      "substrates": [
+        "mal__L_c"
+      ],
+      "products": [
+        "oaa_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "mal__L_c",
+              1,
+              "oaa_c",
+              1
+            ],
+            [
+              "mal__L_c",
+              2,
+              "oaa_c",
+              2
+            ],
+            [
+              "mal__L_c",
+              3,
+              "oaa_c",
+              3
+            ],
+            [
+              "mal__L_c",
+              4,
+              "oaa_c",
+              4
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "MDH",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "MDH",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r24",
+        "atom_map": "ABCD -> ABCD",
+        "relationship": "one_to_one",
+        "notes": "Explicit source direction"
+      }
+    },
+    {
+      "component_id": "oaa_to_malate",
+      "projection_id": "oaa_to_malate",
+      "substrates": [
+        "oaa_c"
+      ],
+      "products": [
+        "mal__L_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "oaa_c",
+              1,
+              "mal__L_c",
+              1
+            ],
+            [
+              "oaa_c",
+              2,
+              "mal__L_c",
+              2
+            ],
+            [
+              "oaa_c",
+              3,
+              "mal__L_c",
+              3
+            ],
+            [
+              "oaa_c",
+              4,
+              "mal__L_c",
+              4
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "MDH",
+          -1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "MDH",
+          "reverse"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r25",
+        "atom_map": "ABCD -> ABCD",
+        "relationship": "one_to_one",
+        "notes": "Explicit source direction required by Theta_1 FVA"
+      }
+    },
+    {
+      "component_id": "glyoxylate_bypass",
+      "projection_id": "glyoxylate_bypass",
+      "substrates": [
+        "icit_c",
+        "accoa_c"
+      ],
+      "products": [
+        "mal__L_c",
+        "succ_c"
+      ],
+      "branches": [
+        {
+          "id": "canonical_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "icit_c",
+              1,
+              "mal__L_c",
+              1
+            ],
+            [
+              "icit_c",
+              2,
+              "mal__L_c",
+              2
+            ],
+            [
+              "accoa_c",
+              2,
+              "mal__L_c",
+              3
+            ],
+            [
+              "accoa_c",
+              1,
+              "mal__L_c",
+              4
+            ],
+            [
+              "icit_c",
+              6,
+              "succ_c",
+              1
+            ],
+            [
+              "icit_c",
+              3,
+              "succ_c",
+              2
+            ],
+            [
+              "icit_c",
+              4,
+              "succ_c",
+              3
+            ],
+            [
+              "icit_c",
+              5,
+              "succ_c",
+              4
+            ]
+          ]
+        },
+        {
+          "id": "reversed_orientation",
+          "weight": 0.5,
+          "transitions": [
+            [
+              "icit_c",
+              1,
+              "mal__L_c",
+              1
+            ],
+            [
+              "icit_c",
+              2,
+              "mal__L_c",
+              2
+            ],
+            [
+              "accoa_c",
+              2,
+              "mal__L_c",
+              3
+            ],
+            [
+              "accoa_c",
+              1,
+              "mal__L_c",
+              4
+            ],
+            [
+              "icit_c",
+              6,
+              "succ_c",
+              4
+            ],
+            [
+              "icit_c",
+              3,
+              "succ_c",
+              3
+            ],
+            [
+              "icit_c",
+              4,
+              "succ_c",
+              2
+            ],
+            [
+              "icit_c",
+              5,
+              "succ_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "ICL",
+          1
+        ]
+      ],
+      "equivalent_expressions": [
+        [
+          [
+            "MALS",
+            1
+          ]
+        ]
+      ],
+      "covered": [
+        [
+          "ICL",
+          "forward"
+        ],
+        [
+          "MALS",
+          "forward"
+        ]
+      ],
+      "symmetry": "checked mfapy Suc/Fum symmetric-pool declaration",
+      "provenance": {
+        "source_ids": "r26",
+        "atom_map": "ABCDEF + GH -> ABHG + FCDE",
+        "relationship": "lumped",
+        "notes": "Glyoxylate is an unbranched suppressed intermediate; condensation and split both explicit; frozen-class lump equality independently verified"
+      }
+    },
+    {
+      "component_id": "oxidative_ppp_net",
+      "projection_id": "oxidative_ppp_net",
+      "substrates": [
+        "g6p_c"
+      ],
+      "products": [
+        "6pgc_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "g6p_c",
+              1,
+              "6pgc_c",
+              1
+            ],
+            [
+              "g6p_c",
+              2,
+              "6pgc_c",
+              2
+            ],
+            [
+              "g6p_c",
+              3,
+              "6pgc_c",
+              3
+            ],
+            [
+              "g6p_c",
+              4,
+              "6pgc_c",
+              4
+            ],
+            [
+              "g6p_c",
+              5,
+              "6pgc_c",
+              5
+            ],
+            [
+              "g6p_c",
+              6,
+              "6pgc_c",
+              6
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "G6PDH2r",
+          1
+        ]
+      ],
+      "equivalent_expressions": [
+        [
+          [
+            "PGL",
+            1
+          ]
+        ]
+      ],
+      "covered": [
+        [
+          "G6PDH2r",
+          "forward"
+        ],
+        [
+          "PGL",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r27",
+        "atom_map": "ABCDEF -> ABCDEF",
+        "relationship": "lumped",
+        "notes": "Checked library explicitly declares the individual 6PGL maps unresolved; only this source-backed net is allowed; frozen-class lump equality independently verified"
+      }
+    },
+    {
+      "component_id": "gnd_forward",
+      "projection_id": "gnd_forward",
+      "substrates": [
+        "6pgc_c"
+      ],
+      "products": [
+        "ru5p__D_c",
+        "co2_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "6pgc_c",
+              2,
+              "ru5p__D_c",
+              1
+            ],
+            [
+              "6pgc_c",
+              3,
+              "ru5p__D_c",
+              2
+            ],
+            [
+              "6pgc_c",
+              4,
+              "ru5p__D_c",
+              3
+            ],
+            [
+              "6pgc_c",
+              5,
+              "ru5p__D_c",
+              4
+            ],
+            [
+              "6pgc_c",
+              6,
+              "ru5p__D_c",
+              5
+            ],
+            [
+              "6pgc_c",
+              1,
+              "co2_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "GND",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "GND",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r28",
+        "atom_map": "ABCDEF -> BCDEF + A",
+        "relationship": "one_to_one",
+        "notes": "Explicit decarboxylation"
+      }
+    },
+    {
+      "component_id": "rpi_ru5p_to_r5p",
+      "projection_id": "rpi_ru5p_to_r5p",
+      "substrates": [
+        "ru5p__D_c"
+      ],
+      "products": [
+        "r5p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "ru5p__D_c",
+              1,
+              "r5p_c",
+              1
+            ],
+            [
+              "ru5p__D_c",
+              2,
+              "r5p_c",
+              2
+            ],
+            [
+              "ru5p__D_c",
+              3,
+              "r5p_c",
+              3
+            ],
+            [
+              "ru5p__D_c",
+              4,
+              "r5p_c",
+              4
+            ],
+            [
+              "ru5p__D_c",
+              5,
+              "r5p_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "RPI",
+          -1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "RPI",
+          "reverse"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r29",
+        "atom_map": "ABCDE -> ABCDE",
+        "relationship": "one_to_one",
+        "notes": "Only reverse COBRA orientation is required by both class summaries"
+      }
+    },
+    {
+      "component_id": "rpe_forward",
+      "projection_id": "rpe_forward",
+      "substrates": [
+        "ru5p__D_c"
+      ],
+      "products": [
+        "xu5p__D_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "ru5p__D_c",
+              1,
+              "xu5p__D_c",
+              1
+            ],
+            [
+              "ru5p__D_c",
+              2,
+              "xu5p__D_c",
+              2
+            ],
+            [
+              "ru5p__D_c",
+              3,
+              "xu5p__D_c",
+              3
+            ],
+            [
+              "ru5p__D_c",
+              4,
+              "xu5p__D_c",
+              4
+            ],
+            [
+              "ru5p__D_c",
+              5,
+              "xu5p__D_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "RPE",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "RPE",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r31",
+        "atom_map": "ABCDE -> ABCDE",
+        "relationship": "one_to_one",
+        "notes": "Explicit direction"
+      }
+    },
+    {
+      "component_id": "rpe_reverse",
+      "projection_id": "rpe_reverse",
+      "substrates": [
+        "xu5p__D_c"
+      ],
+      "products": [
+        "ru5p__D_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "xu5p__D_c",
+              1,
+              "ru5p__D_c",
+              1
+            ],
+            [
+              "xu5p__D_c",
+              2,
+              "ru5p__D_c",
+              2
+            ],
+            [
+              "xu5p__D_c",
+              3,
+              "ru5p__D_c",
+              3
+            ],
+            [
+              "xu5p__D_c",
+              4,
+              "ru5p__D_c",
+              4
+            ],
+            [
+              "xu5p__D_c",
+              5,
+              "ru5p__D_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "RPE",
+          -1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "RPE",
+          "reverse"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r32",
+        "atom_map": "ABCDE -> ABCDE",
+        "relationship": "one_to_one",
+        "notes": "Explicit direction"
+      }
+    },
+    {
+      "component_id": "tkt1_forward",
+      "projection_id": "tkt1_forward",
+      "substrates": [
+        "xu5p__D_c",
+        "r5p_c"
+      ],
+      "products": [
+        "s7p_c",
+        "g3p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "xu5p__D_c",
+              1,
+              "s7p_c",
+              1
+            ],
+            [
+              "xu5p__D_c",
+              2,
+              "s7p_c",
+              2
+            ],
+            [
+              "r5p_c",
+              1,
+              "s7p_c",
+              3
+            ],
+            [
+              "r5p_c",
+              2,
+              "s7p_c",
+              4
+            ],
+            [
+              "r5p_c",
+              3,
+              "s7p_c",
+              5
+            ],
+            [
+              "r5p_c",
+              4,
+              "s7p_c",
+              6
+            ],
+            [
+              "r5p_c",
+              5,
+              "s7p_c",
+              7
+            ],
+            [
+              "xu5p__D_c",
+              3,
+              "g3p_c",
+              1
+            ],
+            [
+              "xu5p__D_c",
+              4,
+              "g3p_c",
+              2
+            ],
+            [
+              "xu5p__D_c",
+              5,
+              "g3p_c",
+              3
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "TKT1",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "TKT1",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r33",
+        "atom_map": "ABCDE + FGHIJ -> FGABCDE + HIJ",
+        "relationship": "one_to_one",
+        "notes": "Explicit condensation/cleavage map"
+      }
+    },
+    {
+      "component_id": "tkt1_reverse",
+      "projection_id": "tkt1_reverse",
+      "substrates": [
+        "s7p_c",
+        "g3p_c"
+      ],
+      "products": [
+        "xu5p__D_c",
+        "r5p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "s7p_c",
+              1,
+              "xu5p__D_c",
+              1
+            ],
+            [
+              "s7p_c",
+              2,
+              "xu5p__D_c",
+              2
+            ],
+            [
+              "g3p_c",
+              1,
+              "xu5p__D_c",
+              3
+            ],
+            [
+              "g3p_c",
+              2,
+              "xu5p__D_c",
+              4
+            ],
+            [
+              "g3p_c",
+              3,
+              "xu5p__D_c",
+              5
+            ],
+            [
+              "s7p_c",
+              3,
+              "r5p_c",
+              1
+            ],
+            [
+              "s7p_c",
+              4,
+              "r5p_c",
+              2
+            ],
+            [
+              "s7p_c",
+              5,
+              "r5p_c",
+              3
+            ],
+            [
+              "s7p_c",
+              6,
+              "r5p_c",
+              4
+            ],
+            [
+              "s7p_c",
+              7,
+              "r5p_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "TKT1",
+          -1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "TKT1",
+          "reverse"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r34",
+        "atom_map": "HIJ + FGABCDE -> FGHIJ + ABCDE",
+        "relationship": "one_to_one",
+        "notes": "Explicit reverse source direction"
+      }
+    },
+    {
+      "component_id": "tala_forward",
+      "projection_id": "tala_forward",
+      "substrates": [
+        "s7p_c",
+        "g3p_c"
+      ],
+      "products": [
+        "f6p_c",
+        "e4p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "s7p_c",
+              1,
+              "f6p_c",
+              1
+            ],
+            [
+              "s7p_c",
+              2,
+              "f6p_c",
+              2
+            ],
+            [
+              "s7p_c",
+              3,
+              "f6p_c",
+              3
+            ],
+            [
+              "g3p_c",
+              1,
+              "f6p_c",
+              4
+            ],
+            [
+              "g3p_c",
+              2,
+              "f6p_c",
+              5
+            ],
+            [
+              "g3p_c",
+              3,
+              "f6p_c",
+              6
+            ],
+            [
+              "s7p_c",
+              4,
+              "e4p_c",
+              1
+            ],
+            [
+              "s7p_c",
+              5,
+              "e4p_c",
+              2
+            ],
+            [
+              "s7p_c",
+              6,
+              "e4p_c",
+              3
+            ],
+            [
+              "s7p_c",
+              7,
+              "e4p_c",
+              4
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "TALA",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "TALA",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r35",
+        "atom_map": "ABC + DEFGHIJ -> DEFABC + GHIJ",
+        "relationship": "one_to_one",
+        "notes": "Explicit direction"
+      }
+    },
+    {
+      "component_id": "tala_reverse",
+      "projection_id": "tala_reverse",
+      "substrates": [
+        "f6p_c",
+        "e4p_c"
+      ],
+      "products": [
+        "s7p_c",
+        "g3p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "f6p_c",
+              1,
+              "s7p_c",
+              1
+            ],
+            [
+              "f6p_c",
+              2,
+              "s7p_c",
+              2
+            ],
+            [
+              "f6p_c",
+              3,
+              "s7p_c",
+              3
+            ],
+            [
+              "e4p_c",
+              1,
+              "s7p_c",
+              4
+            ],
+            [
+              "e4p_c",
+              2,
+              "s7p_c",
+              5
+            ],
+            [
+              "e4p_c",
+              3,
+              "s7p_c",
+              6
+            ],
+            [
+              "e4p_c",
+              4,
+              "s7p_c",
+              7
+            ],
+            [
+              "f6p_c",
+              4,
+              "g3p_c",
+              1
+            ],
+            [
+              "f6p_c",
+              5,
+              "g3p_c",
+              2
+            ],
+            [
+              "f6p_c",
+              6,
+              "g3p_c",
+              3
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "TALA",
+          -1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "TALA",
+          "reverse"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r36",
+        "atom_map": "GHIJ + DEFABC -> DEFGHIJ + ABC",
+        "relationship": "one_to_one",
+        "notes": "Explicit reverse source direction"
+      }
+    },
+    {
+      "component_id": "tkt2_forward",
+      "projection_id": "tkt2_forward",
+      "substrates": [
+        "xu5p__D_c",
+        "e4p_c"
+      ],
+      "products": [
+        "f6p_c",
+        "g3p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "xu5p__D_c",
+              1,
+              "f6p_c",
+              1
+            ],
+            [
+              "xu5p__D_c",
+              2,
+              "f6p_c",
+              2
+            ],
+            [
+              "e4p_c",
+              1,
+              "f6p_c",
+              3
+            ],
+            [
+              "e4p_c",
+              2,
+              "f6p_c",
+              4
+            ],
+            [
+              "e4p_c",
+              3,
+              "f6p_c",
+              5
+            ],
+            [
+              "e4p_c",
+              4,
+              "f6p_c",
+              6
+            ],
+            [
+              "xu5p__D_c",
+              3,
+              "g3p_c",
+              1
+            ],
+            [
+              "xu5p__D_c",
+              4,
+              "g3p_c",
+              2
+            ],
+            [
+              "xu5p__D_c",
+              5,
+              "g3p_c",
+              3
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "TKT2",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "TKT2",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r37",
+        "atom_map": "ABCD + EFGHI -> EFABCD + GHI",
+        "relationship": "one_to_one",
+        "notes": "Explicit direction required by Theta_0 FVA"
+      }
+    },
+    {
+      "component_id": "tkt2_reverse",
+      "projection_id": "tkt2_reverse",
+      "substrates": [
+        "f6p_c",
+        "g3p_c"
+      ],
+      "products": [
+        "xu5p__D_c",
+        "e4p_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "f6p_c",
+              1,
+              "xu5p__D_c",
+              1
+            ],
+            [
+              "f6p_c",
+              2,
+              "xu5p__D_c",
+              2
+            ],
+            [
+              "g3p_c",
+              1,
+              "xu5p__D_c",
+              3
+            ],
+            [
+              "g3p_c",
+              2,
+              "xu5p__D_c",
+              4
+            ],
+            [
+              "g3p_c",
+              3,
+              "xu5p__D_c",
+              5
+            ],
+            [
+              "f6p_c",
+              3,
+              "e4p_c",
+              1
+            ],
+            [
+              "f6p_c",
+              4,
+              "e4p_c",
+              2
+            ],
+            [
+              "f6p_c",
+              5,
+              "e4p_c",
+              3
+            ],
+            [
+              "f6p_c",
+              6,
+              "e4p_c",
+              4
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "TKT2",
+          -1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "TKT2",
+          "reverse"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r38",
+        "atom_map": "GHI + EFABCD -> EFGHI + ABCD",
+        "relationship": "one_to_one",
+        "notes": "Explicit reverse source direction"
+      }
+    },
+    {
+      "component_id": "ppc_forward",
+      "projection_id": "ppc_forward",
+      "substrates": [
+        "pep_c",
+        "co2_c"
+      ],
+      "products": [
+        "oaa_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "pep_c",
+              1,
+              "oaa_c",
+              1
+            ],
+            [
+              "pep_c",
+              2,
+              "oaa_c",
+              2
+            ],
+            [
+              "pep_c",
+              3,
+              "oaa_c",
+              3
+            ],
+            [
+              "co2_c",
+              1,
+              "oaa_c",
+              4
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PPC",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "PPC",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r40",
+        "atom_map": "ABC + D -> ABCD",
+        "relationship": "one_to_one",
+        "notes": "Carboxyl carbon is OAA position 4"
+      }
+    },
+    {
+      "component_id": "ppck_forward",
+      "projection_id": "ppck_forward",
+      "substrates": [
+        "oaa_c"
+      ],
+      "products": [
+        "pep_c",
+        "co2_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "oaa_c",
+              1,
+              "pep_c",
+              1
+            ],
+            [
+              "oaa_c",
+              2,
+              "pep_c",
+              2
+            ],
+            [
+              "oaa_c",
+              3,
+              "pep_c",
+              3
+            ],
+            [
+              "oaa_c",
+              4,
+              "co2_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PPCK",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "PPCK",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r41",
+        "atom_map": "ABCD -> ABC + D",
+        "relationship": "one_to_one",
+        "notes": "Explicit decarboxylation"
+      }
+    },
+    {
+      "component_id": "me1_forward",
+      "projection_id": "me1_forward",
+      "substrates": [
+        "mal__L_c"
+      ],
+      "products": [
+        "pyr_c",
+        "co2_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "mal__L_c",
+              1,
+              "pyr_c",
+              1
+            ],
+            [
+              "mal__L_c",
+              2,
+              "pyr_c",
+              2
+            ],
+            [
+              "mal__L_c",
+              3,
+              "pyr_c",
+              3
+            ],
+            [
+              "mal__L_c",
+              4,
+              "co2_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "ME1",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "ME1",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r42",
+        "atom_map": "ABCD -> ABC + D",
+        "relationship": "one_to_one",
+        "notes": "Same source map serves the NAD enzyme"
+      }
+    },
+    {
+      "component_id": "me2_forward",
+      "projection_id": "me2_forward",
+      "substrates": [
+        "mal__L_c"
+      ],
+      "products": [
+        "pyr_c",
+        "co2_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "mal__L_c",
+              1,
+              "pyr_c",
+              1
+            ],
+            [
+              "mal__L_c",
+              2,
+              "pyr_c",
+              2
+            ],
+            [
+              "mal__L_c",
+              3,
+              "pyr_c",
+              3
+            ],
+            [
+              "mal__L_c",
+              4,
+              "co2_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "ME2",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "ME2",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r42",
+        "atom_map": "ABCD -> ABC + D",
+        "relationship": "one_to_one",
+        "notes": "Same carbon chemistry serves the NADP enzyme"
+      }
+    },
+    {
+      "component_id": "acetate_overflow_net",
+      "projection_id": "acetate_overflow_net",
+      "substrates": [
+        "accoa_c"
+      ],
+      "products": [
+        "ac_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "accoa_c",
+              1,
+              "ac_c",
+              1
+            ],
+            [
+              "accoa_c",
+              2,
+              "ac_c",
+              2
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PTAr",
+          1
+        ]
+      ],
+      "equivalent_expressions": [
+        [
+          [
+            "ACKr",
+            -1
+          ]
+        ]
+      ],
+      "covered": [
+        [
+          "PTAr",
+          "forward"
+        ],
+        [
+          "ACKr",
+          "reverse"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r49",
+        "atom_map": "AB -> AB",
+        "relationship": "lumped",
+        "notes": "actp_c is an unbranched intermediate; ACt2r and EX_ac_e are downstream turnover-only export; frozen-class lump equality independently verified"
+      }
+    },
+    {
+      "component_id": "pfl_forward",
+      "projection_id": "pfl_forward",
+      "substrates": [
+        "pyr_c"
+      ],
+      "products": [
+        "accoa_c",
+        "for_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "pyr_c",
+              2,
+              "accoa_c",
+              1
+            ],
+            [
+              "pyr_c",
+              3,
+              "accoa_c",
+              2
+            ],
+            [
+              "pyr_c",
+              1,
+              "for_c",
+              1
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "PFL",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "PFL",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "r51",
+        "atom_map": "ABC -> BC + A",
+        "relationship": "one_to_one",
+        "notes": "Explicit formate carbon fate"
+      }
+    },
+    {
+      "component_id": "gln_to_glu",
+      "projection_id": "gln_to_glu",
+      "substrates": [
+        "gln__L_c"
+      ],
+      "products": [
+        "glu__L_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "gln__L_c",
+              1,
+              "glu__L_c",
+              1
+            ],
+            [
+              "gln__L_c",
+              2,
+              "glu__L_c",
+              2
+            ],
+            [
+              "gln__L_c",
+              3,
+              "glu__L_c",
+              3
+            ],
+            [
+              "gln__L_c",
+              4,
+              "glu__L_c",
+              4
+            ],
+            [
+              "gln__L_c",
+              5,
+              "glu__L_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "GLUN",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "GLUN",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "Example_3:r47_gls",
+        "atom_map": "ABCDE -> ABCDE",
+        "relationship": "one_to_one",
+        "notes": "Direct explicit map in checked vendor source"
+      }
+    },
+    {
+      "component_id": "glu_to_gln",
+      "projection_id": "glu_to_gln",
+      "substrates": [
+        "glu__L_c"
+      ],
+      "products": [
+        "gln__L_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "glu__L_c",
+              1,
+              "gln__L_c",
+              1
+            ],
+            [
+              "glu__L_c",
+              2,
+              "gln__L_c",
+              2
+            ],
+            [
+              "glu__L_c",
+              3,
+              "gln__L_c",
+              3
+            ],
+            [
+              "glu__L_c",
+              4,
+              "gln__L_c",
+              4
+            ],
+            [
+              "glu__L_c",
+              5,
+              "gln__L_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "GLNS",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "GLNS",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "Example_7:r48_gls",
+        "atom_map": "ABCDE -> ABCDE",
+        "relationship": "one_to_one",
+        "notes": "Required COBRA-forward GLNS skeleton direction is explicit in checked Example 7; no derived inversion is needed"
+      }
+    },
+    {
+      "component_id": "glu_to_akg",
+      "projection_id": "glu_to_akg",
+      "substrates": [
+        "glu__L_c"
+      ],
+      "products": [
+        "akg_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "glu__L_c",
+              1,
+              "akg_c",
+              1
+            ],
+            [
+              "glu__L_c",
+              2,
+              "akg_c",
+              2
+            ],
+            [
+              "glu__L_c",
+              3,
+              "akg_c",
+              3
+            ],
+            [
+              "glu__L_c",
+              4,
+              "akg_c",
+              4
+            ],
+            [
+              "glu__L_c",
+              5,
+              "akg_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "GLUDy",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "GLUDy",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "Example_3:r49_gludh",
+        "atom_map": "ABCDE -> ABCDE",
+        "relationship": "one_to_one",
+        "notes": "Direct explicit direction"
+      }
+    },
+    {
+      "component_id": "akg_to_glu",
+      "projection_id": "akg_to_glu",
+      "substrates": [
+        "akg_c"
+      ],
+      "products": [
+        "glu__L_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "akg_c",
+              1,
+              "glu__L_c",
+              1
+            ],
+            [
+              "akg_c",
+              2,
+              "glu__L_c",
+              2
+            ],
+            [
+              "akg_c",
+              3,
+              "glu__L_c",
+              3
+            ],
+            [
+              "akg_c",
+              4,
+              "glu__L_c",
+              4
+            ],
+            [
+              "akg_c",
+              5,
+              "glu__L_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "GLUDy",
+          -1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "GLUDy",
+          "reverse"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "Example_3:r50_gludh",
+        "atom_map": "ABCDE -> ABCDE",
+        "relationship": "one_to_one",
+        "notes": "Direct explicit reverse direction"
+      }
+    },
+    {
+      "component_id": "glusy_component_from_gln",
+      "projection_id": "glusy_two_skeleton_production",
+      "substrates": [
+        "gln__L_c"
+      ],
+      "products": [
+        "glu__L_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "gln__L_c",
+              1,
+              "glu__L_c",
+              1
+            ],
+            [
+              "gln__L_c",
+              2,
+              "glu__L_c",
+              2
+            ],
+            [
+              "gln__L_c",
+              3,
+              "glu__L_c",
+              3
+            ],
+            [
+              "gln__L_c",
+              4,
+              "glu__L_c",
+              4
+            ],
+            [
+              "gln__L_c",
+              5,
+              "glu__L_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "GLUSy",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "GLUSy",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "Example_3:r47_gls;Example_3:r50_gludh",
+        "atom_map": "ABCDE -> ABCDE ; ABCDE -> ABCDE",
+        "relationship": "decomposed",
+        "notes": "Parent resolution after independent B/C/D review: the task explicitly permits two source-backed skeleton components at the same physical flux"
+      }
+    },
+    {
+      "component_id": "glusy_component_from_akg",
+      "projection_id": "glusy_two_skeleton_production",
+      "substrates": [
+        "akg_c"
+      ],
+      "products": [
+        "glu__L_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "akg_c",
+              1,
+              "glu__L_c",
+              1
+            ],
+            [
+              "akg_c",
+              2,
+              "glu__L_c",
+              2
+            ],
+            [
+              "akg_c",
+              3,
+              "glu__L_c",
+              3
+            ],
+            [
+              "akg_c",
+              4,
+              "glu__L_c",
+              4
+            ],
+            [
+              "akg_c",
+              5,
+              "glu__L_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "GLUSy",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "GLUSy",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "Example_3:r47_gls;Example_3:r50_gludh",
+        "atom_map": "ABCDE -> ABCDE ; ABCDE -> ABCDE",
+        "relationship": "decomposed",
+        "notes": "Parent resolution after independent B/C/D review: the task explicitly permits two source-backed skeleton components at the same physical flux"
+      }
+    },
+    {
+      "component_id": "biomass_akg_product",
+      "projection_id": "biomass_akg_product",
+      "substrates": [
+        "glu__L_c"
+      ],
+      "products": [
+        "akg_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "glu__L_c",
+              1,
+              "akg_c",
+              1
+            ],
+            [
+              "glu__L_c",
+              2,
+              "akg_c",
+              2
+            ],
+            [
+              "glu__L_c",
+              3,
+              "akg_c",
+              3
+            ],
+            [
+              "glu__L_c",
+              4,
+              "akg_c",
+              4
+            ],
+            [
+              "glu__L_c",
+              5,
+              "akg_c",
+              5
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "BIOMASS_Ecoli_core_w_GAM",
+          4.1182
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "BIOMASS_Ecoli_core_w_GAM",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "EcoSalPlus:10.1128/ecosalplus.10.2.1;Example_3:r49_gludh",
+        "atom_map": "ABCDE -> ABCDE",
+        "relationship": "decomposed",
+        "notes": "Only the 4.1182 Glu-to-aKG transamination-derived component is atom resolved; residual Glu 0.8232 and every other biomass precursor remain turnover sinks; no biomass pseudo-product map"
+      }
+    },
+    {
+      "component_id": "succinate_import_transport",
+      "projection_id": "succinate_import_transport",
+      "substrates": [
+        "succ_e"
+      ],
+      "products": [
+        "succ_c"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "succ_e",
+              1,
+              "succ_c",
+              1
+            ],
+            [
+              "succ_e",
+              2,
+              "succ_c",
+              2
+            ],
+            [
+              "succ_e",
+              3,
+              "succ_c",
+              3
+            ],
+            [
+              "succ_e",
+              4,
+              "succ_c",
+              4
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "SUCCt2_2",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "SUCCt2_2",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "BiGG:e_coli_core:SUCCt2_2;R1_STAGE_B2_SUCCINATE_IDENTITY_TRANSPORT",
+        "atom_map": "ABCD -> ABCD",
+        "relationship": "identity_transport_allowlisted",
+        "notes": "Strict R1-only allow-list validated same canonical succinate identity, C4H4O4, 1:1 carbon stoichiometry, distinct compartments, and carbon-zero proton co-participants; no generic inference"
+      }
+    },
+    {
+      "component_id": "succinate_export_transport",
+      "projection_id": "succinate_export_transport",
+      "substrates": [
+        "succ_c"
+      ],
+      "products": [
+        "succ_e"
+      ],
+      "branches": [
+        {
+          "id": "source_map",
+          "weight": 1.0,
+          "transitions": [
+            [
+              "succ_c",
+              1,
+              "succ_e",
+              1
+            ],
+            [
+              "succ_c",
+              2,
+              "succ_e",
+              2
+            ],
+            [
+              "succ_c",
+              3,
+              "succ_e",
+              3
+            ],
+            [
+              "succ_c",
+              4,
+              "succ_e",
+              4
+            ]
+          ]
+        }
+      ],
+      "expression": [
+        [
+          "SUCCt3",
+          1
+        ]
+      ],
+      "equivalent_expressions": [],
+      "covered": [
+        [
+          "SUCCt3",
+          "forward"
+        ]
+      ],
+      "symmetry": "none",
+      "provenance": {
+        "source_ids": "BiGG:e_coli_core:SUCCt3;R1_STAGE_B2_SUCCINATE_IDENTITY_TRANSPORT",
+        "atom_map": "ABCD -> ABCD",
+        "relationship": "identity_transport_allowlisted",
+        "notes": "Strict R1-only allow-list validated same canonical succinate identity, C4H4O4, 1:1 carbon stoichiometry, distinct compartments, and carbon-zero proton co-participants; no generic inference"
+      }
+    }
+  ]
+}
