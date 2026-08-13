@@ -23,6 +23,7 @@ jobs:
           fi
       - run: python -m compileall -q codex/src codex/tests
       - run: pytest -q codex/tests/test_native_highs_flux_analysis.py
+      - run: pytest -q codex/tests/test_native_highs_vffva.py
       - run: pytest -q codex/tests/test_native_highs_cobra_parity.py
       - run: pytest -q codex/tests/test_cobra_analysis.py codex/tests/test_cobra_flux_projection.py codex/tests/test_standalone_model_projection.py
       - run: pytest -q codex/tests/test_native_highs_import_isolation.py
