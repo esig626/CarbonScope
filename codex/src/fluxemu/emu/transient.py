@@ -26,7 +26,7 @@ from fluxemu.model import (
 )
 
 from .graph import CompiledEMUPlan, EMU, EMUContribution, compile_emu_plan
-from .stationary import _contribution_mid, _directed_flux, _turnover, _validate_mid
+from .stationary import _contribution_mid, _contribution_rate, _turnover, _validate_mid
 from .tracers import source_emu_mid
 
 if TYPE_CHECKING:
@@ -190,7 +190,7 @@ def _evaluate_sample(
             production = np.zeros(emu.size + 1, dtype=float)
             for contribution in by_product.get(emu, ()):
                 effective = (
-                    _directed_flux(stationary_plan, contribution.reaction_id, flux)
+                    _contribution_rate(stationary_plan, contribution, flux)
                     * contribution.branch_weight
                 )
                 production += effective * _contribution_mid(contribution, mids)
@@ -261,7 +261,7 @@ def _evaluate_sample(
                 denominator = 0.0
                 for contribution in by_product.get(emu, ()):
                     effective = (
-                        _directed_flux(stationary_plan, contribution.reaction_id, flux)
+                        _contribution_rate(stationary_plan, contribution, flux)
                         * contribution.branch_weight
                     )
                     numerator += effective * _contribution_mid(contribution, mids)

@@ -1,6 +1,9 @@
 .DS_Store
 __pycache__/
 *.py[cod]
+codex/results/real_model_50_50_u13c_glucose/**/*.png
+codex/results/real_model_50_50_u13c_glucose/**/*.jpg
+codex/results/real_model_50_50_u13c_glucose/**/*.jpeg
 .pytest_cache/
 .venv/
 *.egg-info/

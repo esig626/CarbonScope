@@ -1,0 +1,2416 @@
+{
+  "schema_version": 1,
+  "source": {
+    "model_id": "e_coli_core",
+    "sbml_sha256": "5bc1d84fba9d2120e4ce1476b45fcceebee998733bf0669f84f5dfdae6631aeb",
+    "prototype_commit": "55b0bb73d2d90fa77599663140afd7f4f9a52f97"
+  },
+  "metabolites": [
+    {
+      "id": "13dpg_c",
+      "balanced": true
+    },
+    {
+      "id": "2pg_c",
+      "balanced": true
+    },
+    {
+      "id": "3pg_c",
+      "balanced": true
+    },
+    {
+      "id": "6pgc_c",
+      "balanced": true
+    },
+    {
+      "id": "6pgl_c",
+      "balanced": true
+    },
+    {
+      "id": "ac_c",
+      "balanced": true
+    },
+    {
+      "id": "ac_e",
+      "balanced": true
+    },
+    {
+      "id": "acald_c",
+      "balanced": true
+    },
+    {
+      "id": "acald_e",
+      "balanced": true
+    },
+    {
+      "id": "accoa_c",
+      "balanced": true
+    },
+    {
+      "id": "acon_C_c",
+      "balanced": true
+    },
+    {
+      "id": "actp_c",
+      "balanced": true
+    },
+    {
+      "id": "adp_c",
+      "balanced": true
+    },
+    {
+      "id": "akg_c",
+      "balanced": true
+    },
+    {
+      "id": "akg_e",
+      "balanced": true
+    },
+    {
+      "id": "amp_c",
+      "balanced": true
+    },
+    {
+      "id": "atp_c",
+      "balanced": true
+    },
+    {
+      "id": "cit_c",
+      "balanced": true
+    },
+    {
+      "id": "co2_c",
+      "balanced": true
+    },
+    {
+      "id": "co2_e",
+      "balanced": true
+    },
+    {
+      "id": "coa_c",
+      "balanced": true
+    },
+    {
+      "id": "dhap_c",
+      "balanced": true
+    },
+    {
+      "id": "e4p_c",
+      "balanced": true
+    },
+    {
+      "id": "etoh_c",
+      "balanced": true
+    },
+    {
+      "id": "etoh_e",
+      "balanced": true
+    },
+    {
+      "id": "f6p_c",
+      "balanced": true
+    },
+    {
+      "id": "fdp_c",
+      "balanced": true
+    },
+    {
+      "id": "for_c",
+      "balanced": true
+    },
+    {
+      "id": "for_e",
+      "balanced": true
+    },
+    {
+      "id": "fru_e",
+      "balanced": true
+    },
+    {
+      "id": "fum_c",
+      "balanced": true
+    },
+    {
+      "id": "fum_e",
+      "balanced": true
+    },
+    {
+      "id": "g3p_c",
+      "balanced": true
+    },
+    {
+      "id": "g6p_c",
+      "balanced": true
+    },
+    {
+      "id": "glc__D_e",
+      "balanced": true
+    },
+    {
+      "id": "gln__L_c",
+      "balanced": true
+    },
+    {
+      "id": "gln__L_e",
+      "balanced": true
+    },
+    {
+      "id": "glu__L_c",
+      "balanced": true
+    },
+    {
+      "id": "glu__L_e",
+      "balanced": true
+    },
+    {
+      "id": "glx_c",
+      "balanced": true
+    },
+    {
+      "id": "h2o_c",
+      "balanced": true
+    },
+    {
+      "id": "h2o_e",
+      "balanced": true
+    },
+    {
+      "id": "h_c",
+      "balanced": true
+    },
+    {
+      "id": "h_e",
+      "balanced": true
+    },
+    {
+      "id": "icit_c",
+      "balanced": true
+    },
+    {
+      "id": "lac__D_c",
+      "balanced": true
+    },
+    {
+      "id": "lac__D_e",
+      "balanced": true
+    },
+    {
+      "id": "mal__L_c",
+      "balanced": true
+    },
+    {
+      "id": "mal__L_e",
+      "balanced": true
+    },
+    {
+      "id": "nad_c",
+      "balanced": true
+    },
+    {
+      "id": "nadh_c",
+      "balanced": true
+    },
+    {
+      "id": "nadp_c",
+      "balanced": true
+    },
+    {
+      "id": "nadph_c",
+      "balanced": true
+    },
+    {
+      "id": "nh4_c",
+      "balanced": true
+    },
+    {
+      "id": "nh4_e",
+      "balanced": true
+    },
+    {
+      "id": "o2_c",
+      "balanced": true
+    },
+    {
+      "id": "o2_e",
+      "balanced": true
+    },
+    {
+      "id": "oaa_c",
+      "balanced": true
+    },
+    {
+      "id": "pep_c",
+      "balanced": true
+    },
+    {
+      "id": "pi_c",
+      "balanced": true
+    },
+    {
+      "id": "pi_e",
+      "balanced": true
+    },
+    {
+      "id": "pyr_c",
+      "balanced": true
+    },
+    {
+      "id": "pyr_e",
+      "balanced": true
+    },
+    {
+      "id": "q8_c",
+      "balanced": true
+    },
+    {
+      "id": "q8h2_c",
+      "balanced": true
+    },
+    {
+      "id": "r5p_c",
+      "balanced": true
+    },
+    {
+      "id": "ru5p__D_c",
+      "balanced": true
+    },
+    {
+      "id": "s7p_c",
+      "balanced": true
+    },
+    {
+      "id": "succ_c",
+      "balanced": true
+    },
+    {
+      "id": "succ_e",
+      "balanced": true
+    },
+    {
+      "id": "succoa_c",
+      "balanced": true
+    },
+    {
+      "id": "xu5p__D_c",
+      "balanced": true
+    }
+  ],
+  "reactions": [
+    {
+      "id": "ACALD",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "acald_c",
+          -1.0
+        ],
+        [
+          "coa_c",
+          -1.0
+        ],
+        [
+          "nad_c",
+          -1.0
+        ],
+        [
+          "accoa_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "nadh_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ACALDt",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "acald_e",
+          -1.0
+        ],
+        [
+          "acald_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ACKr",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "ac_c",
+          -1.0
+        ],
+        [
+          "atp_c",
+          -1.0
+        ],
+        [
+          "actp_c",
+          1.0
+        ],
+        [
+          "adp_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ACONTa",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "cit_c",
+          -1.0
+        ],
+        [
+          "acon_C_c",
+          1.0
+        ],
+        [
+          "h2o_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ACONTb",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "acon_C_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "icit_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ACt2r",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "ac_e",
+          -1.0
+        ],
+        [
+          "h_e",
+          -1.0
+        ],
+        [
+          "ac_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ADK1",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "amp_c",
+          -1.0
+        ],
+        [
+          "atp_c",
+          -1.0
+        ],
+        [
+          "adp_c",
+          2.0
+        ]
+      ]
+    },
+    {
+      "id": "AKGDH",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "akg_c",
+          -1.0
+        ],
+        [
+          "coa_c",
+          -1.0
+        ],
+        [
+          "nad_c",
+          -1.0
+        ],
+        [
+          "co2_c",
+          1.0
+        ],
+        [
+          "nadh_c",
+          1.0
+        ],
+        [
+          "succoa_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "AKGt2r",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "akg_e",
+          -1.0
+        ],
+        [
+          "h_e",
+          -1.0
+        ],
+        [
+          "akg_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ALCD2x",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "etoh_c",
+          -1.0
+        ],
+        [
+          "nad_c",
+          -1.0
+        ],
+        [
+          "acald_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "nadh_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ATPM",
+      "lower_bound": 8.39,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "atp_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "adp_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "pi_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ATPS4r",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "adp_c",
+          -1.0
+        ],
+        [
+          "h_e",
+          -4.0
+        ],
+        [
+          "pi_c",
+          -1.0
+        ],
+        [
+          "atp_c",
+          1.0
+        ],
+        [
+          "h2o_c",
+          1.0
+        ],
+        [
+          "h_c",
+          3.0
+        ]
+      ]
+    },
+    {
+      "id": "BIOMASS_Ecoli_core_w_GAM",
+      "lower_bound": 0.5243529041810849,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "3pg_c",
+          -1.496
+        ],
+        [
+          "accoa_c",
+          -3.7478
+        ],
+        [
+          "atp_c",
+          -59.81
+        ],
+        [
+          "e4p_c",
+          -0.361
+        ],
+        [
+          "f6p_c",
+          -0.0709
+        ],
+        [
+          "g3p_c",
+          -0.129
+        ],
+        [
+          "g6p_c",
+          -0.205
+        ],
+        [
+          "gln__L_c",
+          -0.2557
+        ],
+        [
+          "glu__L_c",
+          -4.9414
+        ],
+        [
+          "h2o_c",
+          -59.81
+        ],
+        [
+          "nad_c",
+          -3.547
+        ],
+        [
+          "nadph_c",
+          -13.0279
+        ],
+        [
+          "oaa_c",
+          -1.7867
+        ],
+        [
+          "pep_c",
+          -0.5191
+        ],
+        [
+          "pyr_c",
+          -2.8328
+        ],
+        [
+          "r5p_c",
+          -0.8977
+        ],
+        [
+          "adp_c",
+          59.81
+        ],
+        [
+          "akg_c",
+          4.1182
+        ],
+        [
+          "coa_c",
+          3.7478
+        ],
+        [
+          "h_c",
+          59.81
+        ],
+        [
+          "nadh_c",
+          3.547
+        ],
+        [
+          "nadp_c",
+          13.0279
+        ],
+        [
+          "pi_c",
+          59.81
+        ]
+      ]
+    },
+    {
+      "id": "CO2t",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "co2_e",
+          -1.0
+        ],
+        [
+          "co2_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "CS",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "accoa_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "oaa_c",
+          -1.0
+        ],
+        [
+          "cit_c",
+          1.0
+        ],
+        [
+          "coa_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "CYTBD",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h_c",
+          -2.0
+        ],
+        [
+          "o2_c",
+          -0.5
+        ],
+        [
+          "q8h2_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          1.0
+        ],
+        [
+          "h_e",
+          2.0
+        ],
+        [
+          "q8_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "D_LACt2",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h_e",
+          -1.0
+        ],
+        [
+          "lac__D_e",
+          -1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "lac__D_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ENO",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "2pg_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          1.0
+        ],
+        [
+          "pep_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ETOHt2r",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "etoh_e",
+          -1.0
+        ],
+        [
+          "h_e",
+          -1.0
+        ],
+        [
+          "etoh_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_ac_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "ac_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_acald_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "acald_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_akg_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "akg_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_co2_e",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "co2_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_etoh_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "etoh_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_for_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "for_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_fru_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "fru_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_fum_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "fum_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_glc__D_e",
+      "lower_bound": -10.0,
+      "upper_bound": -10.0,
+      "stoichiometry": [
+        [
+          "glc__D_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_gln__L_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "gln__L_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_glu__L_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "glu__L_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_h_e",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_h2o_e",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h2o_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_lac__D_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "lac__D_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_mal__L_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "mal__L_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_nh4_e",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "nh4_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_o2_e",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "o2_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_pi_e",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "pi_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_pyr_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "pyr_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "EX_succ_e",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "succ_e",
+          -1.0
+        ]
+      ]
+    },
+    {
+      "id": "FBA",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "fdp_c",
+          -1.0
+        ],
+        [
+          "dhap_c",
+          1.0
+        ],
+        [
+          "g3p_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "FBP",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "fdp_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "f6p_c",
+          1.0
+        ],
+        [
+          "pi_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "FORt2",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "for_e",
+          -1.0
+        ],
+        [
+          "h_e",
+          -1.0
+        ],
+        [
+          "for_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "FORt",
+      "lower_bound": -1000.0,
+      "upper_bound": 0.0,
+      "stoichiometry": [
+        [
+          "for_e",
+          -1.0
+        ],
+        [
+          "for_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "FRD7",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "fum_c",
+          -1.0
+        ],
+        [
+          "q8h2_c",
+          -1.0
+        ],
+        [
+          "q8_c",
+          1.0
+        ],
+        [
+          "succ_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "FRUpts2",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "fru_e",
+          -1.0
+        ],
+        [
+          "pep_c",
+          -1.0
+        ],
+        [
+          "f6p_c",
+          1.0
+        ],
+        [
+          "pyr_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "FUM",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "fum_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "mal__L_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "FUMt2_2",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "fum_e",
+          -1.0
+        ],
+        [
+          "h_e",
+          -2.0
+        ],
+        [
+          "fum_c",
+          1.0
+        ],
+        [
+          "h_c",
+          2.0
+        ]
+      ]
+    },
+    {
+      "id": "G6PDH2r",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "g6p_c",
+          -1.0
+        ],
+        [
+          "nadp_c",
+          -1.0
+        ],
+        [
+          "6pgl_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "nadph_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "GAPD",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "g3p_c",
+          -1.0
+        ],
+        [
+          "nad_c",
+          -1.0
+        ],
+        [
+          "pi_c",
+          -1.0
+        ],
+        [
+          "13dpg_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "nadh_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "GLCpts",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "glc__D_e",
+          -1.0
+        ],
+        [
+          "pep_c",
+          -1.0
+        ],
+        [
+          "g6p_c",
+          1.0
+        ],
+        [
+          "pyr_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "GLNS",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "atp_c",
+          -1.0
+        ],
+        [
+          "glu__L_c",
+          -1.0
+        ],
+        [
+          "nh4_c",
+          -1.0
+        ],
+        [
+          "adp_c",
+          1.0
+        ],
+        [
+          "gln__L_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "pi_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "GLNabc",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "atp_c",
+          -1.0
+        ],
+        [
+          "gln__L_e",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "adp_c",
+          1.0
+        ],
+        [
+          "gln__L_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "pi_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "GLUDy",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "glu__L_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "nadp_c",
+          -1.0
+        ],
+        [
+          "akg_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "nadph_c",
+          1.0
+        ],
+        [
+          "nh4_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "GLUN",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "gln__L_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "glu__L_c",
+          1.0
+        ],
+        [
+          "nh4_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "GLUSy",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "akg_c",
+          -1.0
+        ],
+        [
+          "gln__L_c",
+          -1.0
+        ],
+        [
+          "h_c",
+          -1.0
+        ],
+        [
+          "nadph_c",
+          -1.0
+        ],
+        [
+          "glu__L_c",
+          2.0
+        ],
+        [
+          "nadp_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "GLUt2r",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "glu__L_e",
+          -1.0
+        ],
+        [
+          "h_e",
+          -1.0
+        ],
+        [
+          "glu__L_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "GND",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "6pgc_c",
+          -1.0
+        ],
+        [
+          "nadp_c",
+          -1.0
+        ],
+        [
+          "co2_c",
+          1.0
+        ],
+        [
+          "nadph_c",
+          1.0
+        ],
+        [
+          "ru5p__D_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "H2Ot",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h2o_e",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ICDHyr",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "icit_c",
+          -1.0
+        ],
+        [
+          "nadp_c",
+          -1.0
+        ],
+        [
+          "akg_c",
+          1.0
+        ],
+        [
+          "co2_c",
+          1.0
+        ],
+        [
+          "nadph_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ICL",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "icit_c",
+          -1.0
+        ],
+        [
+          "glx_c",
+          1.0
+        ],
+        [
+          "succ_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "LDH_D",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "lac__D_c",
+          -1.0
+        ],
+        [
+          "nad_c",
+          -1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "nadh_c",
+          1.0
+        ],
+        [
+          "pyr_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "MALS",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "accoa_c",
+          -1.0
+        ],
+        [
+          "glx_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "coa_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "mal__L_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "MALt2_2",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h_e",
+          -2.0
+        ],
+        [
+          "mal__L_e",
+          -1.0
+        ],
+        [
+          "h_c",
+          2.0
+        ],
+        [
+          "mal__L_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "MDH",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "mal__L_c",
+          -1.0
+        ],
+        [
+          "nad_c",
+          -1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "nadh_c",
+          1.0
+        ],
+        [
+          "oaa_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ME1",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "mal__L_c",
+          -1.0
+        ],
+        [
+          "nad_c",
+          -1.0
+        ],
+        [
+          "co2_c",
+          1.0
+        ],
+        [
+          "nadh_c",
+          1.0
+        ],
+        [
+          "pyr_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "ME2",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "mal__L_c",
+          -1.0
+        ],
+        [
+          "nadp_c",
+          -1.0
+        ],
+        [
+          "co2_c",
+          1.0
+        ],
+        [
+          "nadph_c",
+          1.0
+        ],
+        [
+          "pyr_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "NADH16",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h_c",
+          -4.0
+        ],
+        [
+          "nadh_c",
+          -1.0
+        ],
+        [
+          "q8_c",
+          -1.0
+        ],
+        [
+          "h_e",
+          3.0
+        ],
+        [
+          "nad_c",
+          1.0
+        ],
+        [
+          "q8h2_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "NADTRHD",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "nad_c",
+          -1.0
+        ],
+        [
+          "nadph_c",
+          -1.0
+        ],
+        [
+          "nadh_c",
+          1.0
+        ],
+        [
+          "nadp_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "NH4t",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "nh4_e",
+          -1.0
+        ],
+        [
+          "nh4_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "O2t",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "o2_e",
+          -1.0
+        ],
+        [
+          "o2_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PDH",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "coa_c",
+          -1.0
+        ],
+        [
+          "nad_c",
+          -1.0
+        ],
+        [
+          "pyr_c",
+          -1.0
+        ],
+        [
+          "accoa_c",
+          1.0
+        ],
+        [
+          "co2_c",
+          1.0
+        ],
+        [
+          "nadh_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PFK",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "atp_c",
+          -1.0
+        ],
+        [
+          "f6p_c",
+          -1.0
+        ],
+        [
+          "adp_c",
+          1.0
+        ],
+        [
+          "fdp_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PFL",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "coa_c",
+          -1.0
+        ],
+        [
+          "pyr_c",
+          -1.0
+        ],
+        [
+          "accoa_c",
+          1.0
+        ],
+        [
+          "for_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PGI",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "g6p_c",
+          -1.0
+        ],
+        [
+          "f6p_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PGK",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "3pg_c",
+          -1.0
+        ],
+        [
+          "atp_c",
+          -1.0
+        ],
+        [
+          "13dpg_c",
+          1.0
+        ],
+        [
+          "adp_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PGL",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "6pgl_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "6pgc_c",
+          1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PGM",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "2pg_c",
+          -1.0
+        ],
+        [
+          "3pg_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PIt2r",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h_e",
+          -1.0
+        ],
+        [
+          "pi_e",
+          -1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "pi_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PPC",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "co2_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "pep_c",
+          -1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "oaa_c",
+          1.0
+        ],
+        [
+          "pi_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PPCK",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "atp_c",
+          -1.0
+        ],
+        [
+          "oaa_c",
+          -1.0
+        ],
+        [
+          "adp_c",
+          1.0
+        ],
+        [
+          "co2_c",
+          1.0
+        ],
+        [
+          "pep_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PPS",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "atp_c",
+          -1.0
+        ],
+        [
+          "h2o_c",
+          -1.0
+        ],
+        [
+          "pyr_c",
+          -1.0
+        ],
+        [
+          "amp_c",
+          1.0
+        ],
+        [
+          "h_c",
+          2.0
+        ],
+        [
+          "pep_c",
+          1.0
+        ],
+        [
+          "pi_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PTAr",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "accoa_c",
+          -1.0
+        ],
+        [
+          "pi_c",
+          -1.0
+        ],
+        [
+          "actp_c",
+          1.0
+        ],
+        [
+          "coa_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PYK",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "adp_c",
+          -1.0
+        ],
+        [
+          "h_c",
+          -1.0
+        ],
+        [
+          "pep_c",
+          -1.0
+        ],
+        [
+          "atp_c",
+          1.0
+        ],
+        [
+          "pyr_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "PYRt2",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h_e",
+          -1.0
+        ],
+        [
+          "pyr_e",
+          -1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "pyr_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "RPE",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "ru5p__D_c",
+          -1.0
+        ],
+        [
+          "xu5p__D_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "RPI",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "r5p_c",
+          -1.0
+        ],
+        [
+          "ru5p__D_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "SUCCt2_2",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h_e",
+          -2.0
+        ],
+        [
+          "succ_e",
+          -1.0
+        ],
+        [
+          "h_c",
+          2.0
+        ],
+        [
+          "succ_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "SUCCt3",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h_e",
+          -1.0
+        ],
+        [
+          "succ_c",
+          -1.0
+        ],
+        [
+          "h_c",
+          1.0
+        ],
+        [
+          "succ_e",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "SUCDi",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "q8_c",
+          -1.0
+        ],
+        [
+          "succ_c",
+          -1.0
+        ],
+        [
+          "fum_c",
+          1.0
+        ],
+        [
+          "q8h2_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "SUCOAS",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "atp_c",
+          -1.0
+        ],
+        [
+          "coa_c",
+          -1.0
+        ],
+        [
+          "succ_c",
+          -1.0
+        ],
+        [
+          "adp_c",
+          1.0
+        ],
+        [
+          "pi_c",
+          1.0
+        ],
+        [
+          "succoa_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "TALA",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "g3p_c",
+          -1.0
+        ],
+        [
+          "s7p_c",
+          -1.0
+        ],
+        [
+          "e4p_c",
+          1.0
+        ],
+        [
+          "f6p_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "THD2",
+      "lower_bound": 0.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "h_e",
+          -2.0
+        ],
+        [
+          "nadh_c",
+          -1.0
+        ],
+        [
+          "nadp_c",
+          -1.0
+        ],
+        [
+          "h_c",
+          2.0
+        ],
+        [
+          "nad_c",
+          1.0
+        ],
+        [
+          "nadph_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "TKT1",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "r5p_c",
+          -1.0
+        ],
+        [
+          "xu5p__D_c",
+          -1.0
+        ],
+        [
+          "g3p_c",
+          1.0
+        ],
+        [
+          "s7p_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "TKT2",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "e4p_c",
+          -1.0
+        ],
+        [
+          "xu5p__D_c",
+          -1.0
+        ],
+        [
+          "f6p_c",
+          1.0
+        ],
+        [
+          "g3p_c",
+          1.0
+        ]
+      ]
+    },
+    {
+      "id": "TPI",
+      "lower_bound": -1000.0,
+      "upper_bound": 1000.0,
+      "stoichiometry": [
+        [
+          "dhap_c",
+          -1.0
+        ],
+        [
+          "g3p_c",
+          1.0
+        ]
+      ]
+    }
+  ],
+  "common_viability": {
+    "reaction_id": "BIOMASS_Ecoli_core_w_GAM",
+    "lower_bound": 0.5243529041810849,
+    "eta": 0.6,
+    "mu_max": 0.8739215069684749
+  },
+  "objectives": {
+    "biomass": "BIOMASS_Ecoli_core_w_GAM",
+    "acetate": "EX_ac_e"
+  },
+  "reaction_order_sha256": "7c375cbe07c3f7b496de65500cb0c7852caff7b709c6bcae6622e3a1e214c364"
+}
