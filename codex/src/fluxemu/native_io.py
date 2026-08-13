@@ -7,7 +7,8 @@ from fluxemu.carbon_transitions import load_default_library
 from fluxemu.exceptions import MappingError
 from fluxemu.model import (AtomPosition, AtomTransition, CanonicalModel, FluxProjectionExpression, FluxProjectionRule,
  FluxProjectionTerm, IsotopeMetabolite, IsotopeModel, IsotopeParticipant, IsotopeReaction, MappingBranch,
- ObservationPrecursor, ObservationTarget, StationaryExperimentSemantics, Target, Tracer, validate_stationary_experiment)
+ ObservationPrecursor, ObservationTarget, PhysicalDirectionRef, StationaryExperimentSemantics, Target, Tracer,
+ validate_stationary_experiment)
 
 
 def _mapping(value: Any, name: str) -> Mapping[str, Any]:
@@ -50,7 +51,13 @@ def load_native_stationary_spec(path: str | Path, flux_model):
         branches=[]
         for branch in transition.branch_for_direction(direction):
             branches.append(MappingBranch(branch.branch_id,branch.weight,tuple(AtomTransition(AtomPosition(str(names[a.source.metabolite]),a.source.position),AtomPosition(str(names[a.destination.metabolite]),a.destination.position)) for a in branch.atom_map)))
-        projection=FluxProjectionRule(f"{rid}:{direction}",FluxProjectionExpression((FluxProjectionTerm(rid,1.0),)),"positive_part",1e-12)
+        projection=FluxProjectionRule(
+            f"{rid}:{direction}",
+            FluxProjectionExpression((FluxProjectionTerm(rid,1.0),)),
+            "positive_part",
+            1e-12,
+            covered_physical_directions=(PhysicalDirectionRef(rid,direction),),
+        )
         reactions.append(IsotopeReaction(rid,direction,True,participants(mapped_subs),participants(mapped_prods),tuple(branches),flux_projection=projection,provenance=(("transition_id",tid),)))
     required = isotope.get("required_reactions", ())
     if not isinstance(required, list) or not all(isinstance(x, str) for x in required): raise MappingError("isotope_model.required_reactions must be a list of reaction IDs")
