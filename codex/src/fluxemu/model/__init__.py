@@ -36,6 +36,7 @@ from .schema import (
     Tracer,
     TransientExperimentSemantics,
 )
+from .sbml import load_sbml_flux_model
 from .serialisation import deterministic_serialise, serialise
 from .validation import (
     MIXTURE_ABS_TOLERANCE,
@@ -65,6 +66,7 @@ __all__ = [
     "IsotopeParticipant",
     "IsotopeReaction",
     "LinearObjective",
+    "load_sbml_flux_model",
     "MIXTURE_ABS_TOLERANCE",
     "MappingBranch",
     "ObjectiveTerm",

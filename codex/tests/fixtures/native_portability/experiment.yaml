@@ -1,0 +1,18 @@
+schema_version: 1
+fva_fraction_of_optimum: 1.0
+isotope_model:
+  metabolites:
+    feed_X: {carbon_count: 6}
+    pool_Y: {carbon_count: 6}
+  required_reactions: [foreign_hx]
+  assignments:
+    - reaction_id: foreign_hx
+      transition_id: glycolysis.hexokinase
+      direction: forward
+      metabolite_map: {glucose: feed_X, glucose_6_phosphate: pool_Y}
+experiment:
+  tracers:
+    - metabolite_id: feed_X
+      isotopomers: {'#000000': 0.5, '#111111': 0.5}
+  targets:
+    - {target_id: portable_mid, metabolite_id: pool_Y, atom_positions: [1, 2, 3, 4, 5, 6]}
