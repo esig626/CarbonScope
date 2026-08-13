@@ -13,7 +13,7 @@ jobs:
           cache: pip
           cache-dependency-path: codex/pyproject.toml
       - name: Install dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e './codex[transient,mfapy]' pytest
+        run: python -m pip install --upgrade pip && python -m pip install -e './codex[compat,transient,mfapy]' pytest
       - name: Check patch whitespace
         run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
       - name: Compile production package
