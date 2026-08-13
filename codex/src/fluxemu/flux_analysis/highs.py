@@ -1,4 +1,8 @@
-"""Cold-start native HiGHS reference FBA/FVA over canonical ``FluxModel``."""
+"""Native HiGHS FBA/FVA over canonical ``FluxModel``.
+
+The reference FVA intentionally cold-starts each endpoint.  Production FVA uses
+worker-local reusable HiGHS models and dynamically scheduled endpoint jobs.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +10,8 @@ from dataclasses import dataclass
 import hashlib
 import json
 import math
+import multiprocessing
+import os
 from typing import Sequence
 
 import pandas as pd
@@ -172,3 +178,133 @@ def run_highs_fva_reference(model: FluxModel, fraction_of_optimum: float = 1.0) 
         minima.append(low); maxima.append(high)
     ranges = pd.DataFrame({"minimum": minima, "maximum": maxima}, index=lp.reaction_ids)
     return FVAResult(ranges, fraction, fba.objective_value, lp.objective_direction)
+
+
+@dataclass(frozen=True, slots=True)
+class _EndpointResult:
+    reaction_index: int
+    direction: str
+    value: float
+    worker_pid: int
+
+
+class _ReusableFVAWorker:
+    """One retained LP whose simplex state is reused across endpoint solves."""
+
+    def __init__(self, lp: CompiledFluxLP, retention: tuple[str, float]):
+        highspy = _highspy()
+        self.lp, self.retention, self.endpoint_count = lp, retention, 0
+        self.solver = highspy.Highs()
+        self.solver.setOptionValue("output_flag", False)
+        self.solver.setOptionValue("threads", 1)
+        self.solver.setOptionValue("solver", "simplex")
+        n = len(lp.reaction_ids)
+        self.solver.addCols(n, [0.0] * n, list(lp.lower_bounds), list(lp.upper_bounds),
+                            0, [0] * (n + 1), [], [])
+        lower = [0.0] * len(lp.balanced_metabolite_ids)
+        upper = [0.0] * len(lower)
+        starts = list(lp.row_starts)
+        indices = list(lp.column_indices)
+        values = list(lp.coefficients)
+        sense, bound = retention
+        lower.append(bound if sense == ">=" else -highspy.kHighsInf)
+        upper.append(bound if sense == "<=" else highspy.kHighsInf)
+        indices.extend(i for i, value in enumerate(lp.objective_coefficients) if value)
+        values.extend(value for value in lp.objective_coefficients if value)
+        starts.append(len(indices))
+        self.solver.addRows(len(lower), lower, upper, len(indices), starts, indices, values)
+
+    def solve(self, task: tuple[int, str]) -> _EndpointResult:
+        j, direction = task
+        reaction_id = self.lp.reaction_ids[j]
+        operation = f"FVA {direction}imum for reaction {reaction_id!r}"
+        try:
+            # changeColCost invalidates the objective but retains the model and the
+            # incumbent simplex basis. HiGHS therefore reoptimizes on the next run.
+            if self.endpoint_count:
+                previous = getattr(self, "_previous_index")
+                self.solver.changeColCost(previous, 0.0)
+            self.solver.changeColCost(j, 1.0)
+            self._previous_index = j
+            self.solver.setMaximize() if direction == "max" else self.solver.setMinimize()
+            self.solver.run()
+            highspy = _highspy()
+            status = self.solver.getModelStatus()
+            status_name = self.solver.modelStatusToString(status)
+            if status != highspy.HighsModelStatus.kOptimal:
+                raise AnalysisError(f"HiGHS status {status_name}")
+            fluxes = [float(v) for v in self.solver.getSolution().col_value]
+            value = float(self.solver.getObjectiveValue())
+            if len(fluxes) != len(self.lp.reaction_ids) or not all(map(math.isfinite, fluxes)) or not math.isfinite(value):
+                raise AnalysisError("malformed or non-finite complete primal")
+            costs = [0.0] * len(fluxes); costs[j] = 1.0
+            _validate(self.lp, fluxes, value, costs)
+            biological = sum(c * v for c, v in zip(self.lp.objective_coefficients, fluxes))
+            sense, bound = self.retention
+            violation = max(bound - biological, 0.0) if sense == ">=" else max(biological - bound, 0.0)
+            if violation > OBJECTIVE_TOLERANCE:
+                raise AnalysisError(f"retained biological objective violation {violation:g}")
+        except Exception as error:
+            if isinstance(error, AnalysisError) and str(error).startswith(operation):
+                raise
+            status_name = locals().get("status_name", "not available")
+            raise AnalysisError(f"{operation} failed: solver status {status_name}; {error}") from error
+        self.endpoint_count += 1
+        return _EndpointResult(j, direction, value, os.getpid())
+
+
+_PROCESS_WORKER: _ReusableFVAWorker | None = None
+
+
+def _initialize_fva_process(lp: CompiledFluxLP, retention: tuple[str, float]) -> None:
+    global _PROCESS_WORKER
+    _PROCESS_WORKER = _ReusableFVAWorker(lp, retention)
+
+
+def _solve_process_endpoint(task: tuple[int, str]) -> _EndpointResult:
+    if _PROCESS_WORKER is None:  # pragma: no cover - defensive process contract
+        raise AnalysisError("FVA worker was not initialized")
+    return _PROCESS_WORKER.solve(task)
+
+
+def run_highs_vffva(model: FluxModel, fraction_of_optimum: float = 1.0, *,
+                     workers: int | None = None,
+                     instrumentation: dict[str, int] | None = None) -> FVAResult:
+    """Run VFFVA-style dynamically scheduled native HiGHS FVA.
+
+    Each worker creates one LP and repeatedly changes only column costs and the
+    objective sense. Repeated ``Highs.run`` calls naturally retain the current
+    simplex basis; no basis export/import is needed.
+    """
+    fraction = _fraction(fraction_of_optimum)
+    lp = compile_flux_lp(model)
+    fluxes, optimum, _ = _solve(lp, lp.objective_coefficients, lp.objective_direction, "FBA")
+    _validate(lp, fluxes, optimum, lp.objective_coefficients)
+    retention = (">=" if lp.objective_direction == "max" else "<=", optimum * fraction)
+    tasks = [(j, direction) for j in range(len(lp.reaction_ids)) for direction in ("min", "max")]
+    if workers is None:
+        workers = min(4, os.cpu_count() or 1, len(tasks))
+    if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
+        raise AnalysisError("workers must be a positive integer")
+    workers = min(workers, len(tasks))
+    if workers == 1:
+        worker = _ReusableFVAWorker(lp, retention)
+        results = [worker.solve(task) for task in tasks]
+    else:
+        # imap_unordered(chunksize=1) is a shared dynamic task queue: a process
+        # receives its next independent endpoint only after completing one.
+        context = multiprocessing.get_context("spawn")
+        with context.Pool(workers, _initialize_fva_process, (lp, retention)) as pool:
+            results = list(pool.imap_unordered(_solve_process_endpoint, tasks, chunksize=1))
+    minima = [math.nan] * len(lp.reaction_ids); maxima = [math.nan] * len(lp.reaction_ids)
+    for result in results:
+        (minima if result.direction == "min" else maxima)[result.reaction_index] = result.value
+    if not all(math.isfinite(v) for v in minima + maxima):
+        raise AnalysisError("FVA failed to return every endpoint")
+    if instrumentation is not None:
+        process_ids = {result.worker_pid for result in results}
+        instrumentation.update(solver_instances=len(process_ids), matrix_builds=len(process_ids),
+                               retention_rows=len(process_ids), endpoint_solves=len(results),
+                               objective_changes=len(results))
+    ranges = pd.DataFrame({"minimum": minima, "maximum": maxima}, index=lp.reaction_ids)
+    return FVAResult(ranges, fraction, optimum, lp.objective_direction)

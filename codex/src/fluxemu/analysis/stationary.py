@@ -11,7 +11,7 @@ from fluxemu.flux_analysis import (
     FBAResult,
     FVAResult,
     run_highs_fba,
-    run_highs_fva_reference,
+    run_highs_vffva,
 )
 from fluxemu.model import (
     CanonicalModel,
@@ -44,12 +44,12 @@ def run_native_fba(model: CanonicalModel) -> FBAResult:
 
 
 def run_native_fva(
-    model: CanonicalModel, fraction_of_optimum: float = 1.0
+    model: CanonicalModel, fraction_of_optimum: float = 1.0, *, workers: int | None = None
 ) -> FVAResult:
-    """Validate ``model`` and delegate its flux component to reference FVA."""
+    """Validate ``model`` and delegate to reusable, dynamically scheduled FVA."""
 
     validate_canonical_model(model)
-    return run_highs_fva_reference(model.flux_model, fraction_of_optimum)
+    return run_highs_vffva(model.flux_model, fraction_of_optimum, workers=workers)
 
 
 def _fba_flux_state(model: CanonicalModel, fba: FBAResult) -> CanonicalFluxState:

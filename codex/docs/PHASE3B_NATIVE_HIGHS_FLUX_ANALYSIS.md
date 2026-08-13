@@ -15,8 +15,9 @@ isotope metadata can never silently alter native FBA feasibility. In contrast,
 reviewed tracer-source and excreted pools may be unbalanced. The implementations
 select these policies explicitly rather than conflating them.
 
-The public `run_highs_fba` and `run_highs_fva_reference` APIs import highspy only
-when execution begins. Install `fluxemu[highs]` (`highspy>=1.11,<1.13`). CI prints
+The public `run_highs_fba`, `run_highs_fva_reference`, and `run_highs_vffva` APIs
+import highspy only when execution begins. The standard install supplies
+`highspy>=1.11,<1.13`. CI prints
 the exact installed version. Solver output is disabled, one thread and simplex are
 selected, and every non-optimal status becomes an explicit `AnalysisError`.
 
@@ -29,14 +30,28 @@ a cold independent LP for each reaction minimum and maximum, in canonical order,
 with exactly one endpoint cost. Endpoint feasibility and objective retention are
 independently checked. Thus it performs two endpoint solves per reaction plus FBA.
 
-COBRApy remains a compatibility and parity oracle, not a native dependency. The
-benchmark emits diagnostic JSON medians after warm-up; runner timings are not a
-scientific performance result and no performance superiority is claimed.
+Production `run_highs_vffva` compiles once, solves the biological objective once,
+and constructs the retained-objective row once in every worker-local HiGHS model.
+Each of the `2N` endpoint jobs changes only one column cost and objective sense.
+Repeated `Highs.run()` calls on the same simplex model retain HiGHS' incumbent
+basis and reoptimize it; explicit `getBasis`/`setBasis` round trips are deliberately
+avoided because the basis never leaves its owning solver. HiGHS internal threads
+are fixed at one. A single worker uses the same reusable worker object. Multiple
+spawned processes consume `imap_unordered(..., chunksize=1)`, which dynamically
+assigns the next endpoint to the next available process, and results are restored
+to canonical reaction order.
+
+The architecture is inspired by M. Ben Guebila, *VFFVA: dynamic load balancing
+enables large-scale flux variability analysis*, BMC Bioinformatics 21, 519 (2020),
+DOI: 10.1186/s12859-020-03711-2. FluxEMU neither contains nor executes original
+VFFVA code. This is VFFVA-style dynamically scheduled native HiGHS FVA.
+
+COBRApy remains a compatibility and parity oracle, not a native dependency. No
+CPLEX, GLPK, external VFFVA executable, or MPI runtime is used.
 
 ## Deliberate limitations and next boundary
 
-This phase does not implement native sampling, inverse MFA, or the VFFVA-inspired
-performance layer. A later FastFVA milestone is reserved for one persistent HiGHS
-LP, cheap objective switching, basis reuse/warm starts, strategic solve ordering,
-dynamic scheduling, and multiprocessing without rebuilding unnecessary Python
-state. Stationary/transient EMU and atom-mapping behavior are unchanged.
+This phase does not implement native sampling or inverse MFA. Performance
+benchmarking is intentionally postponed. Stationary/transient EMU and atom-mapping
+behavior are unchanged; FVA endpoints remain diagnostic and only the complete FBA
+primal enters EMU.

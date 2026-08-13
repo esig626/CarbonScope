@@ -16,7 +16,7 @@ from fluxemu.analysis import run_native_fba, run_native_fva, run_native_stationa
 from fluxemu.emu import compile_emu_plan, evaluate_stationary
 from fluxemu.exceptions import AnalysisError
 from fluxemu.execution import CanonicalFluxState
-from fluxemu.flux_analysis import run_highs_fba, run_highs_fva_reference
+from fluxemu.flux_analysis import run_highs_fba, run_highs_fva_reference, run_highs_vffva
 from fluxemu.model import (
     AtomPosition,
     AtomTransition,
@@ -119,16 +119,16 @@ def test_manual_composition_parity_same_model_and_declared_order(monkeypatch):
 
     seen: dict[str, object] = {}
     original_fba = analysis_module.run_highs_fba
-    original_fva = analysis_module.run_highs_fva_reference
+    original_fva = analysis_module.run_highs_vffva
     original_compile = analysis_module.compile_emu_plan
 
     def recording_fba(flux_model):
         seen["fba_model"] = flux_model
         return original_fba(flux_model)
 
-    def recording_fva(flux_model, fraction):
+    def recording_fva(flux_model, fraction, *, workers=None):
         seen["fva_model"] = flux_model
-        return original_fva(flux_model, fraction)
+        return original_fva(flux_model, fraction, workers=1)
 
     def recording_compile(canonical_model, stationary_experiment):
         seen["emu_model"] = canonical_model
@@ -136,7 +136,7 @@ def test_manual_composition_parity_same_model_and_declared_order(monkeypatch):
         return original_compile(canonical_model, stationary_experiment)
 
     monkeypatch.setattr(analysis_module, "run_highs_fba", recording_fba)
-    monkeypatch.setattr(analysis_module, "run_highs_fva_reference", recording_fva)
+    monkeypatch.setattr(analysis_module, "run_highs_vffva", recording_fva)
     monkeypatch.setattr(analysis_module, "compile_emu_plan", recording_compile)
     result = run_native_stationary_analysis(model, experiment)
 
@@ -192,9 +192,9 @@ def test_convenience_wrappers_delegate_without_reconstructing_model(monkeypatch)
     )
     monkeypatch.setattr(
         analysis_module,
-        "run_highs_fva_reference",
-        lambda value, fraction: calls.append(("fva", value, fraction))
-        or run_highs_fva_reference(value, fraction),
+        "run_highs_vffva",
+        lambda value, fraction, *, workers=None: calls.append(("fva", value, fraction))
+        or run_highs_vffva(value, fraction, workers=1),
     )
     run_native_fba(model)
     run_native_fva(model, 0.75)
