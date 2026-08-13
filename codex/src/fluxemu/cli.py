@@ -15,7 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fluxemu")
     subcommands = parser.add_subparsers(dest="command", required=True)
     run = subcommands.add_parser("run", help="run the complete forward-EMU pipeline")
-    run.add_argument("--model", required=True, type=Path, help="COBRA SBML model")
+    run.add_argument("--model", required=True, type=Path, help="SBML Level 3 FBC model")
     run.add_argument(
         "--experiment", required=True, type=Path, help="FluxEMU experiment YAML"
     )
@@ -40,8 +40,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"fluxemu: {error}", file=sys.stderr)
         return 2
     print(
-        f"FluxEMU completed: {len(result.sampling.samples)} samples, "
-        f"{len(result.forward.mids)} MID rows -> {Path(namespace.output).resolve()}"
+        f"FluxEMU native stationary analysis completed: "
+        f"{len(result.analysis.mids.forward.values)} MID rows -> "
+        f"{Path(namespace.output).resolve()}"
     )
     return 0
 

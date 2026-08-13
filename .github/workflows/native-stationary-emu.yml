@@ -20,8 +20,8 @@ jobs:
           cache: pip
           cache-dependency-path: codex/pyproject.toml
 
-      - name: Install native and mfapy shadow dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e './codex[mfapy]' pytest matplotlib
+      - name: Install native, compatibility, and mfapy shadow dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e './codex[compat,mfapy]' pytest matplotlib
 
       - name: Check patch whitespace
         run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD

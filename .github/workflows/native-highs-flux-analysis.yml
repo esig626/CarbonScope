@@ -9,7 +9,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
-      - run: python -m pip install './codex[highs]' pytest
+      - run: python -m pip install './codex[compat]' pytest
       - run: python -c "import highspy; print(highspy.HIGHS_VERSION_MAJOR, highspy.HIGHS_VERSION_MINOR, highspy.HIGHS_VERSION_PATCH)"
       - name: Check patch whitespace
         shell: bash
