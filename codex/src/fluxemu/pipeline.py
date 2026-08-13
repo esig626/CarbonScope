@@ -29,7 +29,7 @@ def run_pipeline(model_path, experiment_path, output_directory, *, cli_arguments
     (output/"predicted_mids.json").write_text(json.dumps(mids,indent=2)+"\n")
     diagnostics=[{"sample_id":d.sample_id,"emu_size":d.emu_size,"matrix_dimension":d.matrix_dimension,"rank":d.rank,"condition_number":d.condition_number,"max_absolute_residual":d.max_absolute_residual,"minimum_component":d.minimum_component,"max_normalization_error":d.max_normalization_error} for d in result.mids.layer_diagnostics]
     (output/"emu_diagnostics.json").write_text(json.dumps(diagnostics,indent=2)+"\n")
-    manifest={"schema_version":1,"engine":"fluxemu-native-stationary","sampling_performed":False,"objective_value":result.fba.objective_value,"model_sha256":_sha256(model_path),"experiment_sha256":_sha256(experiment_path),"canonical_model_fingerprint":model_fingerprint(model),"experiment_fingerprint":experiment_fingerprint(experiment),"fva_fraction_of_optimum":fraction,"cli_arguments":list(cli_arguments)}
+    manifest={"schema_version":1,"engine":"fluxemu-native-stationary","sampling_performed":False,"objective_value":result.fba.objective_value,"model_sha256":_sha256(model_path),"experiment_sha256":_sha256(experiment_path),"canonical_model_fingerprint":model_fingerprint(model),"experiment_fingerprint":experiment_fingerprint(model,experiment),"fva_fraction_of_optimum":fraction,"cli_arguments":list(cli_arguments)}
     (output/"manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n")
     return NativePipelineResult(result,output,manifest)
 
