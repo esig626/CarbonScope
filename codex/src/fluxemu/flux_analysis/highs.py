@@ -7,24 +7,28 @@ worker-local reusable HiGHS models and dynamically scheduled endpoint jobs.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fractions import Fraction
+from functools import lru_cache
 import hashlib
 import json
 import math
 import multiprocessing
 import os
-from numbers import Real
 from typing import Sequence
 
+import numpy as np
 import pandas as pd
 
 from fluxemu.exceptions import AnalysisError
 from fluxemu.model.schema import FluxModel
-from fluxemu.model.serialisation import deterministic_serialise
 from fluxemu.model.validation import CanonicalModelError, validate_flux_model
-from .results import FBAResult, FVAResult, PrimalDiagnostics
+from .results import FBAResult, FVAResult, PrimalDiagnostics, _fva_ranges_sha256
 
 FEASIBILITY_TOLERANCE = 1e-7
 OBJECTIVE_TOLERANCE = 1e-7
+SOLVER_FEASIBILITY_TOLERANCE = 1e-9
+HIGHS_SMALL_MATRIX_VALUE = 1e-12
+FVA_NUMERICAL_COLLAPSE_TOLERANCE = 1e-10
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,15 +40,198 @@ class CompiledFluxLP:
     row_starts: tuple[int, ...]
     column_indices: tuple[int, ...]
     coefficients: tuple[float, ...]
+    solver_row_starts: tuple[int, ...]
+    solver_column_indices: tuple[int, ...]
+    solver_coefficients: tuple[float, ...]
+    balance_row_space_basis: tuple[tuple[float, ...], ...]
+    balance_rank: int
+    affine_equality_basis: tuple[tuple[float, ...], ...]
+    affine_equality_rhs: tuple[float, ...]
+    affine_rank: int
     lower_bounds: tuple[float, ...]
     upper_bounds: tuple[float, ...]
     objective_coefficients: tuple[float, ...]
+    effective_objective_coefficients: tuple[float, ...]
+    objective_constant: float
     objective_direction: str
     fingerprint: str
 
     @property
     def nonzero_count(self) -> int:
         return len(self.coefficients)
+
+
+RANK_BASE_FACTOR = 8.0
+AFFINE_CONDITIONING_FLOOR = math.sqrt(np.finfo(float).eps)
+
+
+def _condition_affine_equalities(
+    matrix: np.ndarray,
+    rhs: np.ndarray,
+    *,
+    description: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+    """Return a stable equivalent ``Q v = q`` and its orthogonal null basis.
+
+    Rows are normalized before factorization, so a uniformly rescaled
+    conservation law is scientifically identical.  A nonzero singular
+    direction below ``sqrt(machine epsilon)`` is rejected rather than retained:
+    its row space cannot be recovered accurately enough for the public 1e-7
+    feasibility contract.
+    """
+
+    if matrix.ndim != 2 or rhs.ndim != 1 or matrix.shape[0] != rhs.shape[0]:
+        raise AnalysisError(f"{description} equality system is malformed")
+    dimension = matrix.shape[1]
+    normalized_rows: list[np.ndarray] = []
+    normalized_rhs: list[float] = []
+    for row, bound in zip(matrix, rhs):
+        norm = math.hypot(*(float(value) for value in row))
+        if not math.isfinite(norm) or not math.isfinite(float(bound)):
+            raise AnalysisError(f"{description} equality system is non-finite")
+        if norm == 0.0:
+            if abs(float(bound)) > FEASIBILITY_TOLERANCE:
+                raise AnalysisError(
+                    f"{description} affine equalities are inconsistent"
+                )
+            continue
+        normalized_rows.append(row / norm)
+        normalized_rhs.append(float(bound) / norm)
+    if not normalized_rows:
+        return (
+            np.empty((0, dimension), dtype=float),
+            np.empty(0, dtype=float),
+            np.eye(dimension, dtype=float),
+            0,
+        )
+
+    scaled = np.vstack(normalized_rows)
+    scaled_rhs = np.asarray(normalized_rhs, dtype=float)
+    try:
+        left, singular_values, right = np.linalg.svd(scaled, full_matrices=True)
+    except np.linalg.LinAlgError as error:
+        raise AnalysisError(f"could not factor {description} equality system") from error
+    largest = float(singular_values[0])
+    # Only singular values at the immediate machine-noise floor may represent
+    # exact redundant rows.  Matrix-size-scaled rank heuristics can silently
+    # erase small but real conservation laws (for example a 1e-14 secondary
+    # direction in a four-column system).
+    base_relative = RANK_BASE_FACTOR * np.finfo(float).eps
+    relative = singular_values / largest
+    ambiguous = relative[
+        (relative > base_relative) & (relative <= AFFINE_CONDITIONING_FLOOR)
+    ]
+    if ambiguous.size:
+        raise AnalysisError(
+            f"{description} equality system is numerically ill-conditioned or has "
+            "ambiguous rank: relative_singular_value="
+            f"{float(ambiguous[0]):g}, required>{AFFINE_CONDITIONING_FLOOR:g}"
+        )
+    rank = int(np.count_nonzero(relative > AFFINE_CONDITIONING_FLOOR))
+    exact_rank: int | None = None
+    if rank < min(matrix.shape) or matrix.shape[0] > rank:
+        exact_rank = _exact_matrix_rank(matrix)
+        if exact_rank > rank:
+            raise AnalysisError(
+                f"{description} equality system has an exact independent "
+                "direction below numerical resolution: "
+                f"stable_rank={rank}, exact_rank={exact_rank}"
+            )
+    if matrix.shape[0] > rank:
+        if exact_rank is None:  # pragma: no cover - guarded by the branch above
+            exact_rank = _exact_matrix_rank(matrix)
+        augmented_rank = _exact_matrix_rank(
+            np.column_stack((matrix, rhs))
+        )
+        if augmented_rank > exact_rank:
+            raise AnalysisError(
+                f"{description} affine equalities are exactly inconsistent"
+            )
+    row_basis = right[:rank, :].copy()
+    null_basis = right[rank:, :].copy()
+    transformed_rhs = (
+        (left[:, :rank].T @ scaled_rhs) / singular_values[:rank]
+        if rank
+        else np.empty(0, dtype=float)
+    )
+    reconstructed_rhs = (
+        left[:, :rank] @ (singular_values[:rank] * transformed_rhs)
+        if rank
+        else np.zeros_like(scaled_rhs)
+    )
+    consistency_error = float(np.linalg.norm(scaled_rhs - reconstructed_rhs))
+    consistency_scale = max(1.0, float(np.linalg.norm(scaled_rhs)))
+    if consistency_error > FEASIBILITY_TOLERANCE * consistency_scale:
+        raise AnalysisError(
+            f"{description} affine equalities are inconsistent: normalized "
+            f"residual={consistency_error:g}"
+        )
+    return row_basis, transformed_rhs, null_basis, rank
+
+
+def _exact_matrix_rank(matrix: np.ndarray) -> int:
+    """Compute binary-float-exact rank for discarded-singular-value checks."""
+
+    contiguous = np.ascontiguousarray(matrix, dtype=np.float64)
+    return _exact_matrix_rank_cached(contiguous.shape, contiguous.tobytes())
+
+
+@lru_cache(maxsize=64)
+def _exact_matrix_rank_cached(shape: tuple[int, int], data: bytes) -> int:
+    matrix = np.frombuffer(data, dtype=np.float64).reshape(shape)
+    rows = [
+        [Fraction.from_float(float(value)) for value in row]
+        for row in matrix
+        if np.any(row)
+    ]
+    if not rows:
+        return 0
+    rank = 0
+    column_count = matrix.shape[1]
+    for column in range(column_count):
+        pivot = next(
+            (row for row in range(rank, len(rows)) if rows[row][column]),
+            None,
+        )
+        if pivot is None:
+            continue
+        rows[rank], rows[pivot] = rows[pivot], rows[rank]
+        divisor = rows[rank][column]
+        rows[rank] = [value / divisor for value in rows[rank]]
+        for row in range(rank + 1, len(rows)):
+            multiplier = rows[row][column]
+            if multiplier:
+                rows[row] = [
+                    value - multiplier * pivot_value
+                    for value, pivot_value in zip(rows[row], rows[rank])
+                ]
+        rank += 1
+        if rank == len(rows):
+            break
+    return rank
+
+
+def _orthonormal_row_space(matrix: np.ndarray) -> tuple[np.ndarray, int]:
+    """Return a conditioned basis, failing closed on numerical rank ambiguity."""
+
+    contiguous = np.ascontiguousarray(matrix, dtype=np.float64)
+    rows, rank = _orthonormal_row_space_cached(
+        contiguous.shape, contiguous.tobytes()
+    )
+    return np.asarray(rows, dtype=float).reshape(rank, contiguous.shape[1]), rank
+
+
+@lru_cache(maxsize=32)
+def _orthonormal_row_space_cached(
+    shape: tuple[int, int], data: bytes
+) -> tuple[tuple[tuple[float, ...], ...], int]:
+    matrix = np.frombuffer(data, dtype=np.float64).reshape(shape)
+    basis, _, _, rank = _condition_affine_equalities(
+        matrix,
+        np.zeros(matrix.shape[0], dtype=float),
+        description="balanced-metabolite",
+    )
+    return tuple(tuple(float(value) for value in row) for row in basis), rank
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +243,8 @@ class RetainedObjectiveConstraint:
     bound: float
     sense: str
     objective_direction: str
+    effective_optimum: float
+    effective_bound: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,30 +254,256 @@ class PreparedFluxRegion:
     lp: CompiledFluxLP
     fba: FBAResult
     retention: RetainedObjectiveConstraint
-    flux_model: FluxModel
-    flux_model_fingerprint: str
 
 
-def _flux_model_fingerprint(model: FluxModel) -> str:
-    """Hash every ordered source-model field without rebuilding the compiled LP."""
+def _condition_objective(
+    objective: np.ndarray,
+    equality_basis: np.ndarray,
+    fixed_indices: np.ndarray,
+    fixed_values: np.ndarray,
+    canonical_balance_matrix: np.ndarray,
+    lower_bounds: np.ndarray,
+    upper_bounds: np.ndarray,
+) -> tuple[np.ndarray, float]:
+    """Construct an exact binary-rational objective quotient.
 
-    return hashlib.sha256(deterministic_serialise(model).encode("utf-8")).hexdigest()
+    Exact elimination yields ``c = c_eff + alpha A`` for the supplied binary
+    floats.  Results are cached by every canonical numeric input: integrity
+    validation and repeated warm compilation therefore reuse the proof rather
+    than repeating an expensive rational RREF.
+    """
+
+    objective_array = np.ascontiguousarray(objective, dtype=np.float64)
+    basis_array = np.ascontiguousarray(equality_basis, dtype=np.float64)
+    balance_array = np.ascontiguousarray(
+        canonical_balance_matrix, dtype=np.float64
+    )
+    fixed_array = np.ascontiguousarray(fixed_values, dtype=np.float64)
+    lower_array = np.ascontiguousarray(lower_bounds, dtype=np.float64)
+    upper_array = np.ascontiguousarray(upper_bounds, dtype=np.float64)
+    effective, constant = _condition_objective_cached(
+        objective_array.shape,
+        objective_array.tobytes(),
+        basis_array.shape,
+        basis_array.tobytes(),
+        tuple(int(index) for index in fixed_indices),
+        fixed_array.tobytes(),
+        balance_array.shape,
+        balance_array.tobytes(),
+        lower_array.tobytes(),
+        upper_array.tobytes(),
+    )
+    return np.asarray(effective, dtype=float), constant
 
 
-def _compiled_lp_fingerprint(lp: CompiledFluxLP) -> str:
-    """Recompute the identity carried by immutable compiled-LP fields."""
+def _objective_pivot_columns(
+    equality_basis: np.ndarray,
+    lower_bounds: np.ndarray,
+    upper_bounds: np.ndarray,
+    fixed: set[int],
+) -> tuple[int, ...]:
+    """Choose stable exact-elimination pivots in flux-coordinate scale.
+
+    A column-pivoted orthogonal selection proves numerical independence, while
+    the coordinate magnitude only breaks choices between valid directions.
+    This avoids eliminating a tightly bounded scientific objective coordinate
+    in favour of much larger auxiliary fluxes.
+    """
+
+    rank, dimension = equality_basis.shape
+    if rank == 0:
+        return ()
+    try:
+        _, _, right = np.linalg.svd(equality_basis, full_matrices=False)
+    except np.linalg.LinAlgError as error:
+        raise AnalysisError(
+            "could not select stable biological-objective quotient pivots"
+        ) from error
+    row_basis = right[:rank, :]
+    selected: list[int] = []
+    orthonormal: list[np.ndarray] = []
+    for _ in range(rank):
+        best_column: int | None = None
+        best_residual: np.ndarray | None = None
+        best_norm = 0.0
+        best_score = -math.inf
+        existing = (
+            np.vstack(orthonormal)
+            if orthonormal
+            else np.empty((0, rank), dtype=float)
+        )
+        for column in range(dimension):
+            if column in fixed or column in selected:
+                continue
+            residual = row_basis[:, column].copy()
+            if len(existing):
+                for _ in range(2):
+                    residual -= existing.T @ (existing @ residual)
+            residual_norm = math.hypot(*(float(value) for value in residual))
+            if residual_norm <= RANK_BASE_FACTOR * np.finfo(float).eps:
+                continue
+            coordinate_scale = max(
+                abs(float(lower_bounds[column])),
+                abs(float(upper_bounds[column])),
+                float(upper_bounds[column] - lower_bounds[column]),
+            )
+            if coordinate_scale <= 0.0 or not math.isfinite(coordinate_scale):
+                raise AnalysisError(
+                    "biological-objective quotient has an invalid free-coordinate "
+                    "scale"
+                )
+            score = math.log(residual_norm) + math.log(coordinate_scale)
+            if score > best_score:
+                best_column = column
+                best_residual = residual
+                best_norm = residual_norm
+                best_score = score
+        if best_column is None or best_residual is None:
+            raise AnalysisError(
+                "could not select a full-rank biological-objective quotient"
+            )
+        selected.append(best_column)
+        orthonormal.append(best_residual / best_norm)
+    return tuple(selected)
+
+
+@lru_cache(maxsize=32)
+def _condition_objective_cached(
+    objective_shape: tuple[int, ...],
+    objective_data: bytes,
+    basis_shape: tuple[int, int],
+    basis_data: bytes,
+    fixed_indices: tuple[int, ...],
+    fixed_values_data: bytes,
+    balance_shape: tuple[int, int],
+    balance_data: bytes,
+    lower_bounds_data: bytes,
+    upper_bounds_data: bytes,
+) -> tuple[tuple[float, ...], float]:
+    """Return a binary-rational-exact affine quotient for immutable inputs."""
+
+    objective = np.frombuffer(objective_data, dtype=np.float64).reshape(
+        objective_shape
+    )
+    equality_basis = np.frombuffer(basis_data, dtype=np.float64).reshape(
+        basis_shape
+    )
+    balance_matrix = np.frombuffer(balance_data, dtype=np.float64).reshape(
+        balance_shape
+    )
+    fixed_values = np.frombuffer(fixed_values_data, dtype=np.float64)
+    lower_bounds = np.frombuffer(lower_bounds_data, dtype=np.float64)
+    upper_bounds = np.frombuffer(upper_bounds_data, dtype=np.float64)
+    fixed = set(fixed_indices)
+    fixed_value_by_index = dict(zip(fixed_indices, fixed_values))
+    working = [Fraction.from_float(float(value)) for value in objective]
+    objective_constant = sum(
+        (
+            working[index] * Fraction.from_float(float(fixed_value_by_index[index]))
+            for index in fixed_indices
+        ),
+        Fraction(0),
+    )
+    for index in fixed:
+        working[index] = Fraction(0)
+
+    rows: list[list[Fraction]] = []
+    for canonical_row in balance_matrix:
+        row = [
+            Fraction(0)
+            if column in fixed
+            else Fraction.from_float(float(value))
+            for column, value in enumerate(canonical_row)
+        ]
+        if not any(row):
+            continue
+        bound = -sum(
+            (
+                Fraction.from_float(float(canonical_row[index]))
+                * Fraction.from_float(float(fixed_value_by_index[index]))
+                for index in fixed_indices
+            ),
+            Fraction(0),
+        )
+        rows.append(row + [bound])
+
+    pivot_columns = _objective_pivot_columns(
+        equality_basis, lower_bounds, upper_bounds, fixed
+    )
+    for pivot_row, column in enumerate(pivot_columns):
+        pivot: int | None = None
+        pivot_size = -1.0
+        for candidate_row in range(pivot_row, len(rows)):
+            value = rows[candidate_row][column]
+            if value:
+                try:
+                    size = abs(float(value))
+                except OverflowError:
+                    size = math.inf
+                if size > pivot_size:
+                    pivot = candidate_row
+                    pivot_size = size
+        if pivot is None:
+            raise AnalysisError(
+                "exact and conditioned affine ranks disagree during objective "
+                "quotient construction"
+            )
+        rows[pivot_row], rows[pivot] = rows[pivot], rows[pivot_row]
+        divisor = rows[pivot_row][column]
+        rows[pivot_row] = [value / divisor for value in rows[pivot_row]]
+        for row in range(len(rows)):
+            if row == pivot_row:
+                continue
+            multiplier = rows[row][column]
+            if multiplier:
+                rows[row] = [
+                    value - multiplier * pivot_value
+                    for value, pivot_value in zip(rows[row], rows[pivot_row])
+                ]
+    for row, pivot_column in zip(rows, pivot_columns):
+        coefficient = working[pivot_column]
+        if coefficient:
+            objective_constant += coefficient * row[-1]
+            for column in range(objective.size):
+                if column != pivot_column:
+                    working[column] -= coefficient * row[column]
+            working[pivot_column] = Fraction(0)
+    try:
+        effective = np.asarray([float(value) for value in working], dtype=float)
+        constant = float(objective_constant)
+    except (OverflowError, ValueError) as error:
+        raise AnalysisError(
+            "biological objective quotient is outside floating-point range"
+        ) from error
+    if not np.isfinite(effective).all() or not math.isfinite(constant):
+        raise AnalysisError("biological objective conditioning produced non-finite data")
+    return tuple(float(value) for value in effective), constant
+
+
+def _compiled_lp_fingerprint(
+    reaction_ids: Sequence[str],
+    balanced_metabolite_ids: Sequence[str],
+    row_starts: Sequence[int],
+    column_indices: Sequence[int],
+    coefficients: Sequence[float],
+    lower_bounds: Sequence[float],
+    upper_bounds: Sequence[float],
+    objective_coefficients: Sequence[float],
+    objective_direction: str,
+) -> str:
+    """Hash the canonical, unconditioned LP identity."""
 
     identity = json.dumps(
         [
-            lp.reaction_ids,
-            lp.balanced_metabolite_ids,
-            lp.row_starts,
-            lp.column_indices,
-            lp.coefficients,
-            lp.lower_bounds,
-            lp.upper_bounds,
-            lp.objective_coefficients,
-            lp.objective_direction,
+            list(reaction_ids),
+            list(balanced_metabolite_ids),
+            list(row_starts),
+            list(column_indices),
+            [float(value) for value in coefficients],
+            [float(value) for value in lower_bounds],
+            [float(value) for value in upper_bounds],
+            [float(value) for value in objective_coefficients],
+            objective_direction,
         ],
         separators=(",", ":"),
         ensure_ascii=True,
@@ -96,84 +511,253 @@ def _compiled_lp_fingerprint(lp: CompiledFluxLP) -> str:
     return hashlib.sha256(identity.encode()).hexdigest()
 
 
-def _validate_compiled_lp_structure(lp: CompiledFluxLP) -> None:
-    """Fail closed on forged CSR records before indexing or fingerprint use."""
+def _condition_balance_after_fixed_substitution(
+    balance_matrix: np.ndarray,
+    lower_bounds: np.ndarray,
+    upper_bounds: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, int, np.ndarray, np.ndarray, np.ndarray]:
+    """Condition mass balance after substituting explicit fixed coordinates."""
 
-    tuple_fields = (
-        lp.reaction_ids,
-        lp.balanced_metabolite_ids,
-        lp.row_starts,
-        lp.column_indices,
-        lp.coefficients,
-        lp.lower_bounds,
-        lp.upper_bounds,
-        lp.objective_coefficients,
+    matrix = np.ascontiguousarray(balance_matrix, dtype=np.float64)
+    lower = np.ascontiguousarray(lower_bounds, dtype=np.float64)
+    upper = np.ascontiguousarray(upper_bounds, dtype=np.float64)
+    (
+        affine_rows,
+        conditioned_bounds,
+        affine_rank,
+        canonical_rows,
+        canonical_bounds,
+        fixed,
+    ) = _condition_balance_after_fixed_substitution_cached(
+        matrix.shape,
+        matrix.tobytes(),
+        lower.tobytes(),
+        upper.tobytes(),
     )
-    if not all(isinstance(field, tuple) for field in tuple_fields):
-        raise AnalysisError("prepared compiled LP contains non-tuple fields")
-    if (
-        not lp.reaction_ids
-        or any(not isinstance(identifier, str) or not identifier for identifier in lp.reaction_ids)
-        or len(set(lp.reaction_ids)) != len(lp.reaction_ids)
-        or any(
-            not isinstance(identifier, str) or not identifier
-            for identifier in lp.balanced_metabolite_ids
+    return (
+        np.asarray(affine_rows, dtype=float).reshape(affine_rank, matrix.shape[1]),
+        np.asarray(conditioned_bounds, dtype=float),
+        affine_rank,
+        np.asarray(canonical_rows, dtype=float).reshape(matrix.shape),
+        np.asarray(canonical_bounds, dtype=float),
+        np.asarray(fixed, dtype=int),
+    )
+
+
+@lru_cache(maxsize=32)
+def _condition_balance_after_fixed_substitution_cached(
+    shape: tuple[int, int],
+    matrix_data: bytes,
+    lower_data: bytes,
+    upper_data: bytes,
+) -> tuple[
+    tuple[tuple[float, ...], ...],
+    tuple[float, ...],
+    int,
+    tuple[tuple[float, ...], ...],
+    tuple[float, ...],
+    tuple[int, ...],
+]:
+    balance_matrix = np.frombuffer(matrix_data, dtype=np.float64).reshape(shape)
+    lower_bounds = np.frombuffer(lower_data, dtype=np.float64)
+    upper_bounds = np.frombuffer(upper_data, dtype=np.float64)
+    n = balance_matrix.shape[1]
+    fixed_indices = np.flatnonzero(lower_bounds == upper_bounds)
+    free_indices = np.flatnonzero(lower_bounds != upper_bounds)
+    reduced_matrix = balance_matrix[:, free_indices]
+    reduced_rhs = np.asarray(
+        [
+            -math.fsum(
+                float(balance_matrix[row, index]) * float(lower_bounds[index])
+                for index in fixed_indices
+            )
+            for row in range(balance_matrix.shape[0])
+        ],
+        dtype=float,
+    )
+    _, _, _, affine_rank = (
+        _condition_affine_equalities(
+            reduced_matrix,
+            reduced_rhs,
+            description="mass-balance after fixed-bound substitution",
         )
-        or len(set(lp.balanced_metabolite_ids)) != len(lp.balanced_metabolite_ids)
-    ):
-        raise AnalysisError("prepared compiled LP contains malformed identifiers")
-    n = len(lp.reaction_ids)
-    m = len(lp.balanced_metabolite_ids)
-    if (
-        len(lp.row_starts) != m + 1
-        or len(lp.column_indices) != len(lp.coefficients)
-        or len(lp.lower_bounds) != n
-        or len(lp.upper_bounds) != n
-        or len(lp.objective_coefficients) != n
-    ):
-        raise AnalysisError("prepared compiled LP contains inconsistent vector lengths")
-    if (
-        any(isinstance(value, bool) or not isinstance(value, int) for value in lp.row_starts)
-        or lp.row_starts[0] != 0
-        or lp.row_starts[-1] != len(lp.column_indices)
-        or any(left > right for left, right in zip(lp.row_starts, lp.row_starts[1:]))
-    ):
-        raise AnalysisError("prepared compiled LP contains malformed CSR row starts")
-    if any(
-        isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < n
-        for index in lp.column_indices
-    ):
-        raise AnalysisError("prepared compiled LP contains an out-of-range column index")
-    numeric_fields = (
-        lp.coefficients,
-        lp.lower_bounds,
-        lp.upper_bounds,
-        lp.objective_coefficients,
     )
-    if any(
-        isinstance(value, bool)
-        or not isinstance(value, Real)
-        or not math.isfinite(float(value))
-        for field in numeric_fields
-        for value in field
-    ):
-        raise AnalysisError("prepared compiled LP contains malformed or non-finite numbers")
-    if any(lower > upper for lower, upper in zip(lp.lower_bounds, lp.upper_bounds)):
-        raise AnalysisError("prepared compiled LP contains inconsistent reaction bounds")
-    if lp.objective_direction not in {"max", "min"}:
-        raise AnalysisError("prepared compiled LP contains an invalid objective direction")
+    reduced_basis, conditioned_rhs = _select_independent_normalized_equalities(
+        reduced_matrix, reduced_rhs, affine_rank
+    )
+    affine_basis = np.zeros((affine_rank, n), dtype=float)
+    if affine_rank:
+        affine_basis[:, free_indices] = reduced_basis
+    canonical_affine_matrix = np.zeros_like(balance_matrix)
+    canonical_affine_matrix[:, free_indices] = reduced_matrix
+    return (
+        tuple(tuple(float(value) for value in row) for row in affine_basis),
+        tuple(float(value) for value in conditioned_rhs),
+        affine_rank,
+        tuple(
+            tuple(float(value) for value in row)
+            for row in canonical_affine_matrix
+        ),
+        tuple(float(value) for value in reduced_rhs),
+        tuple(int(value) for value in fixed_indices),
+    )
 
 
-def _finite_aggregate(values: Sequence[float], error_message: str) -> float:
-    """Stably aggregate duplicate linear terms and reject overflow."""
+def _select_independent_normalized_equalities(
+    matrix: np.ndarray, rhs: np.ndarray, rank: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Select a stable sparse original-row basis with deterministic pivoting."""
 
-    try:
-        result = math.fsum(float(value) for value in values)
-    except (OverflowError, TypeError, ValueError) as error:
-        raise AnalysisError(error_message) from error
-    if not math.isfinite(result):
-        raise AnalysisError(error_message)
-    return result
+    dimension = matrix.shape[1]
+    candidates: list[tuple[np.ndarray, float]] = []
+    for row, bound in zip(matrix, rhs):
+        norm = math.hypot(*(float(value) for value in row))
+        if norm > 0.0:
+            candidates.append((row / norm, float(bound) / norm))
+    selected_rows: list[np.ndarray] = []
+    selected_rhs: list[float] = []
+    orthonormal_rows: list[np.ndarray] = []
+    remaining = list(range(len(candidates)))
+    while len(selected_rows) < rank:
+        best_position: int | None = None
+        best_residual: np.ndarray | None = None
+        best_norm = -1.0
+        existing = (
+            np.vstack(orthonormal_rows)
+            if orthonormal_rows
+            else np.empty((0, dimension), dtype=float)
+        )
+        for position, candidate_index in enumerate(remaining):
+            residual = candidates[candidate_index][0].copy()
+            if len(existing):
+                for _ in range(2):
+                    residual -= existing.T @ (existing @ residual)
+            residual_norm = math.hypot(*(float(value) for value in residual))
+            if residual_norm > best_norm:
+                best_position = position
+                best_residual = residual
+                best_norm = residual_norm
+        if (
+            best_position is None
+            or best_residual is None
+            or best_norm <= AFFINE_CONDITIONING_FLOOR
+        ):
+            raise AnalysisError(
+                "could not select a stable sparse mass-balance row basis"
+            )
+        candidate_index = remaining.pop(best_position)
+        row, bound = candidates[candidate_index]
+        selected_rows.append(row)
+        selected_rhs.append(bound)
+        orthonormal_rows.append(best_residual / best_norm)
+    return (
+        np.vstack(selected_rows).reshape(rank, dimension)
+        if rank
+        else np.empty((0, dimension), dtype=float),
+        np.asarray(selected_rhs, dtype=float),
+    )
+
+
+def _validate_objective_solver_resolution(
+    objective: np.ndarray,
+    lower_bounds: np.ndarray,
+    upper_bounds: np.ndarray,
+) -> None:
+    """Reject material objective activity below HiGHS coefficient resolution."""
+
+    scale = max((abs(float(value)) for value in objective), default=0.0)
+    if scale == 0.0:
+        return
+    contributions = tuple(
+        abs(float(coefficient)) * float(upper - lower)
+        for coefficient, lower, upper in zip(
+            objective, lower_bounds, upper_bounds
+        )
+    )
+    activity = math.fsum(contributions)
+    unresolved_contributions = tuple(
+        contribution
+        for coefficient, contribution in zip(objective, contributions)
+        if 0.0
+        < abs(float(coefficient)) / scale
+        <= max(HIGHS_SMALL_MATRIX_VALUE, SOLVER_FEASIBILITY_TOLERANCE)
+    )
+    unresolved_activity = math.fsum(unresolved_contributions)
+    if unresolved_activity > OBJECTIVE_TOLERANCE * activity:
+        raise AnalysisError(
+            "biological objective has material aggregate bounded activity below "
+            "HiGHS coefficient resolution: "
+            f"unresolved_activity={unresolved_activity:g}, "
+            f"total_activity={activity:g}"
+        )
+
+
+def _validate_optimal_face_solver_resolution(lp: CompiledFluxLP) -> None:
+    """Reject objectives whose exact optimal face is below solver resolution."""
+
+    objective = np.asarray(lp.effective_objective_coefficients, dtype=float)
+    scale = max((abs(float(value)) for value in objective), default=0.0)
+    if scale == 0.0:
+        return
+    threshold = max(HIGHS_SMALL_MATRIX_VALUE, SOLVER_FEASIBILITY_TOLERANCE)
+    ambiguous = tuple(
+        (column, abs(float(coefficient)) / scale)
+        for column, (coefficient, lower, upper) in enumerate(
+            zip(objective, lp.lower_bounds, lp.upper_bounds)
+        )
+        if lower != upper
+        and 0.0 < abs(float(coefficient)) / scale <= threshold
+    )
+    if ambiguous:
+        column, normalized = min(ambiguous, key=lambda item: item[1])
+        raise AnalysisError(
+            "exact retained optimal face is ambiguous at HiGHS objective "
+            "resolution: "
+            f"reaction={lp.reaction_ids[column]!r}, "
+            f"normalized_coefficient={normalized:g}"
+        )
+
+
+def _validate_mass_balance_solver_resolution(
+    affine_equalities: np.ndarray,
+    lower_bounds: np.ndarray,
+    upper_bounds: np.ndarray,
+) -> None:
+    """Reject equality terms that HiGHS would discard but can be material.
+
+    The rows supplied here are the selected, normalized rows written to the
+    solver. A bound magnitude is deliberately used instead of only the bound
+    span: a tiny coefficient on a large-offset coordinate can materially alter
+    an affine equality even when that coordinate has a narrow range.
+    """
+
+    for row_index, row in enumerate(affine_equalities):
+        unresolved: list[tuple[int, float, float]] = []
+        for column, coefficient in enumerate(row):
+            magnitude = abs(float(coefficient))
+            if not 0.0 < magnitude <= HIGHS_SMALL_MATRIX_VALUE:
+                continue
+            coordinate_magnitude = max(
+                abs(float(lower_bounds[column])),
+                abs(float(upper_bounds[column])),
+            )
+            contribution = magnitude * coordinate_magnitude
+            unresolved.append((column, magnitude, contribution))
+        try:
+            unresolved_activity = math.fsum(item[2] for item in unresolved)
+        except (OverflowError, ValueError):
+            unresolved_activity = math.inf
+        if not math.isfinite(unresolved_activity) or (
+            unresolved_activity > FEASIBILITY_TOLERANCE
+        ):
+            largest = max(unresolved, key=lambda item: item[2])
+            raise AnalysisError(
+                "mass-balance equality has material aggregate bounded "
+                "coefficients below HiGHS matrix resolution: "
+                f"row={row_index}, largest_column={largest[0]}, "
+                f"largest_normalized_coefficient={largest[1]:g}, "
+                f"unresolved_maximum_contribution={unresolved_activity:g}"
+            )
 
 
 def compile_flux_lp(model: FluxModel) -> CompiledFluxLP:
@@ -187,23 +771,33 @@ def compile_flux_lp(model: FluxModel) -> CompiledFluxLP:
     reaction_ids = tuple(r.reaction_id for r in model.reactions)
     if tuple(dict.fromkeys(reaction_ids)) != reaction_ids:
         raise AnalysisError("invalid canonical flux model: nondeterministic reaction ordering")
+    try:
+        hash(model)
+    except TypeError:
+        return _compile_validated_flux_lp(model)
+    return _compile_validated_flux_lp_cached(model)
+
+
+@lru_cache(maxsize=16)
+def _compile_validated_flux_lp_cached(model: FluxModel) -> CompiledFluxLP:
+    """Cache only fully validated immutable canonical model values."""
+
+    return _compile_validated_flux_lp(model)
+
+
+def _compile_validated_flux_lp(model: FluxModel) -> CompiledFluxLP:
+    reaction_ids = tuple(reaction.reaction_id for reaction in model.reactions)
     reaction_index = {rid: i for i, rid in enumerate(reaction_ids)}
     balanced = tuple(m.metabolite_id for m in model.metabolites if m.steady_state_balanced)
     terms_by_metabolite: dict[str, list[tuple[int, float]]] = {mid: [] for mid in balanced}
     for column, reaction in enumerate(model.reactions):
-        grouped: dict[str, list[float]] = {}
+        accumulated: dict[str, list[float]] = {}
         for term in reaction.stoichiometric_terms:
-            grouped.setdefault(term.metabolite_id, []).append(float(term.coefficient))
-        accumulated = {
-            metabolite_id: _finite_aggregate(
-                coefficients,
-                "invalid canonical flux model: aggregated stoichiometric "
-                f"coefficient is non-finite for reaction {reaction.reaction_id!r}, "
-                f"metabolite {metabolite_id!r}",
+            accumulated.setdefault(term.metabolite_id, []).append(
+                float(term.coefficient)
             )
-            for metabolite_id, coefficients in grouped.items()
-        }
-        for mid, value in accumulated.items():
+        for mid, coefficients in accumulated.items():
+            value = math.fsum(coefficients)
             if mid in terms_by_metabolite and value != 0.0:
                 terms_by_metabolite[mid].append((column, value))
     starts = [0]; indices: list[int] = []; values: list[float] = []
@@ -212,45 +806,209 @@ def compile_flux_lp(model: FluxModel) -> CompiledFluxLP:
         if any(i < 0 or i >= len(reaction_ids) for i, _ in entries):
             raise AnalysisError("invalid canonical flux model: malformed sparse index")
         indices.extend(i for i, _ in entries); values.extend(v for _, v in entries); starts.append(len(indices))
-    grouped_objective: list[list[float]] = [[] for _ in reaction_ids]
+    balance_matrix = np.zeros((len(balanced), len(reaction_ids)), dtype=float)
+    for row in range(len(balanced)):
+        for offset in range(starts[row], starts[row + 1]):
+            balance_matrix[row, indices[offset]] = values[offset]
+    row_space_basis, balance_rank = _orthonormal_row_space(balance_matrix)
+    lower_bounds = np.asarray(
+        [float(reaction.lower_bound) for reaction in model.reactions], dtype=float
+    )
+    upper_bounds = np.asarray(
+        [float(reaction.upper_bound) for reaction in model.reactions], dtype=float
+    )
+    (
+        affine_basis,
+        conditioned_rhs,
+        affine_rank,
+        affine_matrix,
+        affine_rhs,
+        fixed_indices,
+    ) = _condition_balance_after_fixed_substitution(
+        balance_matrix, lower_bounds, upper_bounds
+    )
+    _validate_mass_balance_solver_resolution(
+        affine_basis, lower_bounds, upper_bounds
+    )
+    solver_starts = [0]
+    solver_indices: list[int] = []
+    solver_values: list[float] = []
+    for row in affine_basis:
+        for column, value in enumerate(row):
+            if value != 0.0:
+                solver_indices.append(column)
+                solver_values.append(float(value))
+        solver_starts.append(len(solver_indices))
+    objective_terms: list[list[float]] = [[] for _ in reaction_ids]
     for term in model.objective.terms:
-        index = reaction_index[term.reaction_id]
-        grouped_objective[index].append(float(term.coefficient))
-    objective = [
-        _finite_aggregate(
-            coefficients,
-            (
-                "invalid canonical flux model: aggregated objective coefficient "
-                f"is non-finite for reaction {reaction_ids[index]!r}"
-            ),
+        objective_terms[reaction_index[term.reaction_id]].append(
+            float(term.coefficient)
         )
-        for index, coefficients in enumerate(grouped_objective)
-    ]
+    objective = [math.fsum(coefficients) for coefficients in objective_terms]
+    objective_array = np.asarray(objective, dtype=float)
+    effective_objective, objective_constant = _condition_objective(
+        objective_array,
+        affine_basis,
+        fixed_indices,
+        lower_bounds[fixed_indices],
+        balance_matrix,
+        lower_bounds,
+        upper_bounds,
+    )
+    _validate_objective_solver_resolution(
+        effective_objective, lower_bounds, upper_bounds
+    )
     direction = {"maximise": "max", "minimise": "min"}[model.objective.direction]
-    compiled = CompiledFluxLP(
+    fingerprint = _compiled_lp_fingerprint(
         reaction_ids,
         balanced,
-        tuple(starts),
-        tuple(indices),
-        tuple(values),
-        tuple(float(r.lower_bound) for r in model.reactions),
-        tuple(float(r.upper_bound) for r in model.reactions),
-        tuple(objective),
+        starts,
+        indices,
+        values,
+        lower_bounds,
+        upper_bounds,
+        objective,
         direction,
-        "",
     )
     return CompiledFluxLP(
-        reaction_ids=compiled.reaction_ids,
-        balanced_metabolite_ids=compiled.balanced_metabolite_ids,
-        row_starts=compiled.row_starts,
-        column_indices=compiled.column_indices,
-        coefficients=compiled.coefficients,
-        lower_bounds=compiled.lower_bounds,
-        upper_bounds=compiled.upper_bounds,
-        objective_coefficients=compiled.objective_coefficients,
-        objective_direction=compiled.objective_direction,
-        fingerprint=_compiled_lp_fingerprint(compiled),
+        reaction_ids=reaction_ids,
+        balanced_metabolite_ids=balanced,
+        row_starts=tuple(starts),
+        column_indices=tuple(indices),
+        coefficients=tuple(values),
+        solver_row_starts=tuple(solver_starts),
+        solver_column_indices=tuple(solver_indices),
+        solver_coefficients=tuple(solver_values),
+        balance_row_space_basis=tuple(
+            tuple(float(value) for value in row) for row in row_space_basis
+        ),
+        balance_rank=balance_rank,
+        affine_equality_basis=tuple(
+            tuple(float(value) for value in row) for row in affine_basis
+        ),
+        affine_equality_rhs=tuple(float(value) for value in conditioned_rhs),
+        affine_rank=affine_rank,
+        lower_bounds=tuple(float(value) for value in lower_bounds),
+        upper_bounds=tuple(float(value) for value in upper_bounds),
+        objective_coefficients=tuple(objective),
+        effective_objective_coefficients=tuple(
+            float(value) for value in effective_objective
+        ),
+        objective_constant=objective_constant,
+        objective_direction=direction,
+        fingerprint=fingerprint,
     )
+
+
+def _condition_objective_after_fixed_coordinates(
+    lp: CompiledFluxLP,
+    fixed_indices: Sequence[int],
+    fixed_values: Sequence[float],
+) -> tuple[tuple[float, ...], float, float]:
+    """Recompute the exact affine quotient after fixing more coordinates.
+
+    Original fixed bounds are included automatically.  The returned tuple is
+    ``(effective_coefficients, objective_constant, effective_scale)``.
+    """
+
+    if len(fixed_indices) != len(fixed_values):
+        raise AnalysisError("fixed objective coordinates are malformed")
+    n = len(lp.reaction_ids)
+    fixed: dict[int, float] = {
+        index: lower
+        for index, (lower, upper) in enumerate(
+            zip(lp.lower_bounds, lp.upper_bounds)
+        )
+        if lower == upper
+    }
+    supplied: set[int] = set()
+    for raw_index, raw_value in zip(fixed_indices, fixed_values):
+        if (
+            isinstance(raw_index, bool)
+            or not isinstance(raw_index, (int, np.integer))
+            or not 0 <= int(raw_index) < n
+            or int(raw_index) in supplied
+        ):
+            raise AnalysisError("fixed objective coordinates are malformed")
+        index = int(raw_index)
+        supplied.add(index)
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError, OverflowError) as error:
+            raise AnalysisError("fixed objective coordinates are malformed") from error
+        if (
+            not math.isfinite(value)
+            or value < lp.lower_bounds[index] - FEASIBILITY_TOLERANCE
+            or value > lp.upper_bounds[index] + FEASIBILITY_TOLERANCE
+            or index in fixed
+            and abs(value - fixed[index]) > FEASIBILITY_TOLERANCE
+        ):
+            raise AnalysisError(
+                "fixed objective coordinate is inconsistent with reaction bounds"
+            )
+        fixed[index] = value
+
+    balance_matrix = np.zeros((len(lp.balanced_metabolite_ids), n), dtype=float)
+    for row in range(len(lp.balanced_metabolite_ids)):
+        for offset in range(lp.row_starts[row], lp.row_starts[row + 1]):
+            balance_matrix[row, lp.column_indices[offset]] = lp.coefficients[offset]
+    lower_bounds = np.asarray(lp.lower_bounds, dtype=float).copy()
+    upper_bounds = np.asarray(lp.upper_bounds, dtype=float).copy()
+    ordered_indices = np.asarray(sorted(fixed), dtype=int)
+    ordered_values = np.asarray(
+        [fixed[index] for index in ordered_indices], dtype=float
+    )
+    lower_bounds[ordered_indices] = ordered_values
+    upper_bounds[ordered_indices] = ordered_values
+    free_indices = np.asarray(
+        [index for index in range(n) if index not in fixed], dtype=int
+    )
+    free_matrix = balance_matrix[:, free_indices]
+    conditioned_rows = np.asarray(lp.balance_row_space_basis, dtype=float).reshape(
+        lp.balance_rank, n
+    )
+    if lp.balance_rank:
+        conditioned_free = conditioned_rows[:, free_indices]
+        conditioned_fixed = conditioned_rows[:, ordered_indices]
+        induced_rhs = -(conditioned_fixed @ ordered_values)
+        try:
+            least_squares = np.linalg.lstsq(
+                conditioned_free,
+                induced_rhs,
+                rcond=AFFINE_CONDITIONING_FLOOR,
+            )[0]
+        except np.linalg.LinAlgError as error:
+            raise AnalysisError(
+                "could not validate fixed-coordinate mass-balance consistency"
+            ) from error
+        consistency_residual = float(
+            np.linalg.norm(conditioned_free @ least_squares - induced_rhs)
+        )
+        if consistency_residual > FEASIBILITY_TOLERANCE:
+            raise AnalysisError(
+                "mass-balance after fixed-coordinate substitution is "
+                "inconsistent: conditioned residual="
+                f"{consistency_residual:g}"
+            )
+    free_row_basis, _, _, affine_rank = _condition_affine_equalities(
+        free_matrix,
+        np.zeros(free_matrix.shape[0], dtype=float),
+        description="mass-balance after sampled-face coordinate reduction",
+    )
+    affine_basis = np.zeros((affine_rank, n), dtype=float)
+    if affine_rank:
+        affine_basis[:, free_indices] = free_row_basis
+    effective, constant = _condition_objective(
+        np.asarray(lp.objective_coefficients, dtype=float),
+        affine_basis,
+        ordered_indices,
+        ordered_values,
+        balance_matrix,
+        lower_bounds,
+        upper_bounds,
+    )
+    scale = max((abs(float(value)) for value in effective), default=0.0)
+    return tuple(float(value) for value in effective), constant, scale
 
 
 def _highspy():
@@ -261,102 +1019,188 @@ def _highspy():
     return highspy
 
 
-def _finite_dot(
-    coefficients: Sequence[float],
-    values: Sequence[float],
-    context: str,
-    *,
-    inputs_prevalidated: bool = False,
-) -> float:
-    """Evaluate one linear form and reject every non-finite intermediate."""
+def _objective_scale(lp: CompiledFluxLP) -> float:
+    """Return a positive scale for numerically stable biological objectives."""
 
-    if len(coefficients) != len(values):
-        raise AnalysisError(f"{context} has inconsistent vector lengths")
+    return max(
+        (abs(value) for value in lp.effective_objective_coefficients),
+        default=0.0,
+    )
 
-    if inputs_prevalidated:
-        def products():
-            for coefficient, value in zip(coefficients, values):
-                product = coefficient * value
-                if not math.isfinite(product):
-                    raise AnalysisError(f"{context} produced a non-finite product")
-                yield product
-    else:
-        def products():
-            for coefficient, value in zip(coefficients, values):
-                if (
-                    isinstance(coefficient, bool)
-                    or isinstance(value, bool)
-                    or not isinstance(coefficient, Real)
-                    or not isinstance(value, Real)
-                ):
-                    raise AnalysisError(f"{context} contains a non-numeric value")
-                try:
-                    left = float(coefficient)
-                    right = float(value)
-                    product = left * right
-                except (OverflowError, TypeError, ValueError) as error:
-                    raise AnalysisError(
-                        f"{context} overflowed while evaluating a product"
-                    ) from error
-                if not (
-                    math.isfinite(left)
-                    and math.isfinite(right)
-                    and math.isfinite(product)
-                ):
-                    raise AnalysisError(f"{context} produced a non-finite product")
-                yield product
+
+def _objective_activity_scale(lp: CompiledFluxLP) -> float:
+    """Bound the objective variation over the canonical coordinate box."""
 
     try:
-        result = math.fsum(products())
-    except OverflowError as error:
-        raise AnalysisError(f"{context} overflowed during summation") from error
-    if not math.isfinite(result):
-        raise AnalysisError(f"{context} produced a non-finite result")
-    return result
+        scale = math.fsum(
+            abs(coefficient) * (upper - lower)
+            for coefficient, lower, upper in zip(
+                lp.effective_objective_coefficients,
+                lp.lower_bounds,
+                lp.upper_bounds,
+            )
+        )
+    except (OverflowError, ValueError) as error:
+        raise AnalysisError(
+            "biological objective activity scale is outside floating-point range"
+        ) from error
+    if not math.isfinite(scale):
+        raise AnalysisError(
+            "biological objective activity scale is outside floating-point range"
+        )
+    return scale
 
 
-def _finite_sparse_row_value(
+def _effective_objective_value(
+    lp: CompiledFluxLP, fluxes: Sequence[float]
+) -> float:
+    return math.fsum(
+        coefficient * value
+        for coefficient, value in zip(
+            lp.effective_objective_coefficients, fluxes
+        )
+    )
+
+
+def _biological_objective_value(
+    lp: CompiledFluxLP, fluxes: Sequence[float]
+) -> float:
+    """Evaluate the declared objective through its stable affine quotient."""
+
+    return math.fsum((lp.objective_constant, _effective_objective_value(lp, fluxes)))
+
+
+def _declared_objective_value(
+    lp: CompiledFluxLP, fluxes: Sequence[float]
+) -> float:
+    """Evaluate the literal canonical ``c^T v`` with accurate summation."""
+
+    return math.fsum(
+        coefficient * value
+        for coefficient, value in zip(lp.objective_coefficients, fluxes)
+    )
+
+
+def _validate_declared_objective_equivalence(
     lp: CompiledFluxLP,
     fluxes: Sequence[float],
-    row: int,
+    stable_value: float,
+    operation: str,
+    *active_values: float,
 ) -> float:
-    """Evaluate one prevalidated CSR balance row without slice allocations."""
-
-    context = f"mass balance for metabolite {lp.balanced_metabolite_ids[row]!r}"
-
-    def products():
-        for offset in range(lp.row_starts[row], lp.row_starts[row + 1]):
-            coefficient = lp.coefficients[offset]
-            value = fluxes[lp.column_indices[offset]]
-            product = coefficient * value
-            if not math.isfinite(product):
-                raise AnalysisError(f"{context} produced a non-finite product")
-            yield product
+    """Fail closed when an approximate primal breaks exact affine equivalence."""
 
     try:
-        result = math.fsum(products())
-    except OverflowError as error:
-        raise AnalysisError(f"{context} overflowed during summation") from error
-    if not math.isfinite(result):
-        raise AnalysisError(f"{context} produced a non-finite result")
-    return result
+        declared = _declared_objective_value(lp, fluxes)
+    except (OverflowError, ValueError) as error:
+        raise AnalysisError(
+            f"{operation} declared biological objective is not finite"
+        ) from error
+    scale = max(
+        _objective_activity_scale(lp),
+        *(abs(float(value)) for value in active_values),
+    )
+    tolerance = OBJECTIVE_TOLERANCE * scale if scale > 0.0 else OBJECTIVE_TOLERANCE
+    discrepancy = abs(declared - stable_value)
+    if not math.isfinite(declared) or discrepancy > tolerance:
+        raise AnalysisError(
+            f"{operation} declared biological objective differs from its stable "
+            "affine quotient: "
+            f"declared={declared:g}, quotient={stable_value:g}, "
+            f"discrepancy={discrepancy:g}"
+        )
+    return declared
 
 
-def _solve(lp: CompiledFluxLP, costs: Sequence[float], direction: str, operation: str,
-           retention: tuple[str, float] | None = None) -> tuple[list[float], float, str]:
+def _retained_objective_violation(
+    lp: CompiledFluxLP,
+    value: float,
+    sense: str,
+    bound: float,
+    *,
+    effective_value: float | None = None,
+    effective_bound: float | None = None,
+) -> tuple[float, float]:
+    """Return reported raw and stable quotient-normalized row violations."""
+
+    raw = max(bound - value, 0.0) if sense == ">=" else max(value - bound, 0.0)
+    if effective_value is None:
+        effective_value = value - lp.objective_constant
+    if effective_bound is None:
+        effective_bound = bound - lp.objective_constant
+    effective_violation = (
+        max(effective_bound - effective_value, 0.0)
+        if sense == ">="
+        else max(effective_value - effective_bound, 0.0)
+    )
+    scale = max(
+        _objective_activity_scale(lp),
+        abs(effective_value),
+        abs(effective_bound),
+    )
+    return (
+        raw,
+        effective_violation / scale if scale > 0.0 else effective_violation,
+    )
+
+
+def _solve(
+    lp: CompiledFluxLP,
+    costs: Sequence[float],
+    direction: str,
+    operation: str,
+    retention: RetainedObjectiveConstraint | None = None,
+) -> tuple[list[float], float, str]:
     highspy = _highspy(); solver = highspy.Highs()
     solver.setOptionValue("output_flag", False); solver.setOptionValue("threads", 1)
     solver.setOptionValue("solver", "simplex")
+    solver.setOptionValue(
+        "primal_feasibility_tolerance", SOLVER_FEASIBILITY_TOLERANCE
+    )
+    solver.setOptionValue(
+        "dual_feasibility_tolerance", SOLVER_FEASIBILITY_TOLERANCE
+    )
+    solver.setOptionValue("small_matrix_value", HIGHS_SMALL_MATRIX_VALUE)
     n = len(lp.reaction_ids)
     solver.addCols(n, list(costs), list(lp.lower_bounds), list(lp.upper_bounds), 0, [0] * (n + 1), [], [])
-    lower = [0.0] * len(lp.balanced_metabolite_ids); upper = [0.0] * len(lower)
-    starts = list(lp.row_starts); indices = list(lp.column_indices); values = list(lp.coefficients)
+    lower = list(lp.affine_equality_rhs)
+    upper = list(lp.affine_equality_rhs)
+    starts = list(lp.solver_row_starts)
+    indices = list(lp.solver_column_indices)
+    values = list(lp.solver_coefficients)
     if retention is not None:
-        sense, bound = retention
-        lower.append(bound if sense == ">=" else -highspy.kHighsInf)
-        upper.append(bound if sense == "<=" else highspy.kHighsInf)
-        indices.extend(i for i, value in enumerate(lp.objective_coefficients) if value != 0.0)
-        values.extend(value for value in lp.objective_coefficients if value != 0.0)
+        sense = retention.sense
+        effective_bound = retention.effective_bound
+        objective_scale = _objective_scale(lp)
+        normalized_bound = (
+            effective_bound / objective_scale
+            if objective_scale > 0.0
+            else effective_bound
+        )
+        optimal_face = (
+            retention.fraction_of_optimum == 1.0
+            or retention.bound == retention.biological_optimum
+        )
+        lower.append(
+            normalized_bound
+            if optimal_face or sense == ">="
+            else -highspy.kHighsInf
+        )
+        upper.append(
+            normalized_bound
+            if optimal_face or sense == "<="
+            else highspy.kHighsInf
+        )
+        indices.extend(
+            i
+            for i, value in enumerate(lp.effective_objective_coefficients)
+            if value != 0.0
+        )
+        values.extend(
+            value / objective_scale if objective_scale > 0.0 else value
+            for value in lp.effective_objective_coefficients
+            if value != 0.0
+        )
         starts.append(len(indices))
     solver.addRows(len(lower), lower, upper, len(indices), starts, indices, values)
     solver.setMaximize() if direction == "max" else solver.setMinimize()
@@ -372,61 +1216,74 @@ def _solve(lp: CompiledFluxLP, costs: Sequence[float], direction: str, operation
     return solution, objective, status_name
 
 
-def _validate(
-    lp: CompiledFluxLP,
-    fluxes: Sequence[float],
-    reported: float,
-    costs: Sequence[float],
-    *,
-    lp_prevalidated: bool = False,
-) -> PrimalDiagnostics:
-    if not lp_prevalidated:
-        _validate_compiled_lp_structure(lp)
-    try:
-        if isinstance(reported, bool) or not isinstance(reported, Real):
-            raise TypeError
-        reported_value = float(reported)
-    except (TypeError, ValueError, OverflowError) as error:
-        raise AnalysisError("independent primal validation received malformed numbers") from error
-    if len(fluxes) != len(lp.reaction_ids) or len(costs) != len(lp.reaction_ids):
-        raise AnalysisError("independent primal validation received wrong vector lengths")
-    if not math.isfinite(reported_value) or any(
-        isinstance(value, bool)
-        or not isinstance(value, Real)
-        or not math.isfinite(float(value))
-        for values in (fluxes, costs)
-        for value in values
+@lru_cache(maxsize=32)
+def _primal_validation_matrices(
+    reaction_count: int,
+    metabolite_count: int,
+    row_starts: tuple[int, ...],
+    column_indices: tuple[int, ...],
+    coefficients: tuple[float, ...],
+    balance_rank: int,
+    row_space_basis: tuple[tuple[float, ...], ...],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Cache dense read-only matrices used for repeated primal certification."""
+
+    raw = np.zeros((metabolite_count, reaction_count), dtype=float)
+    normalized = np.zeros_like(raw)
+    for row in range(metabolite_count):
+        start, stop = row_starts[row], row_starts[row + 1]
+        indices = column_indices[start:stop]
+        values = coefficients[start:stop]
+        raw[row, list(indices)] = values
+        norm = math.hypot(*(float(value) for value in values))
+        if norm > 0.0:
+            normalized[row, list(indices)] = np.asarray(values, dtype=float) / norm
+    row_space = np.asarray(row_space_basis, dtype=float).reshape(
+        balance_rank, reaction_count
+    )
+    for matrix in (raw, normalized, row_space):
+        matrix.setflags(write=False)
+    return raw, normalized, row_space
+
+
+def _validate(lp: CompiledFluxLP, fluxes: Sequence[float], reported: float,
+              costs: Sequence[float]) -> PrimalDiagnostics:
+    lower = max((max(lb - v, 0.0) for lb, v in zip(lp.lower_bounds, fluxes)), default=0.0)
+    upper = max((max(v - ub, 0.0) for ub, v in zip(lp.upper_bounds, fluxes)), default=0.0)
+    raw_matrix, normalized_matrix, row_space = _primal_validation_matrices(
+        len(lp.reaction_ids),
+        len(lp.balanced_metabolite_ids),
+        lp.row_starts,
+        lp.column_indices,
+        lp.coefficients,
+        lp.balance_rank,
+        lp.balance_row_space_basis,
+    )
+    vector = np.asarray(fluxes, dtype=float)
+    raw_residual = float(
+        np.max(np.abs(raw_matrix @ vector), initial=0.0)
+    )
+    max_row_residual = float(
+        np.max(np.abs(normalized_matrix @ vector), initial=0.0)
+    )
+    conditioned_residual = (
+        float(np.linalg.norm(row_space @ vector))
+        if lp.balance_rank
+        else 0.0
+    )
+    recalculated = math.fsum(c * v for c, v in zip(costs, fluxes)); error = abs(recalculated - reported)
+    diagnostics = PrimalDiagnostics(
+        max_lower_bound_violation=lower,
+        max_upper_bound_violation=upper,
+        max_mass_balance_residual=max_row_residual,
+        objective_recalculation_error=error,
+        max_raw_mass_balance_residual=raw_residual,
+        conditioned_row_space_residual=conditioned_residual,
+    )
+    if (
+        max(lower, upper, conditioned_residual) > FEASIBILITY_TOLERANCE
+        or error > OBJECTIVE_TOLERANCE
     ):
-        raise AnalysisError("independent primal validation received non-finite numbers")
-    lower = max(
-        (
-            max(lb - value, 0.0)
-            for lb, value in zip(lp.lower_bounds, fluxes)
-        ),
-        default=0.0,
-    )
-    upper = max(
-        (
-            max(value - ub, 0.0)
-            for ub, value in zip(lp.upper_bounds, fluxes)
-        ),
-        default=0.0,
-    )
-    residual = 0.0
-    for row in range(len(lp.balanced_metabolite_ids)):
-        value = _finite_sparse_row_value(lp, fluxes, row)
-        residual = max(residual, abs(value))
-    recalculated = _finite_dot(
-        costs,
-        fluxes,
-        "objective recalculation",
-        inputs_prevalidated=True,
-    )
-    error = abs(recalculated - reported_value)
-    if not all(math.isfinite(value) for value in (lower, upper, residual, error)):
-        raise AnalysisError("independent primal validation produced non-finite diagnostics")
-    diagnostics = PrimalDiagnostics(lower, upper, residual, error)
-    if max(lower, upper, residual) > FEASIBILITY_TOLERANCE or error > OBJECTIVE_TOLERANCE:
         raise AnalysisError(f"independent primal validation failed: {diagnostics}")
     return diagnostics
 
@@ -434,20 +1291,38 @@ def _validate(
 def _run_compiled_fba(lp: CompiledFluxLP) -> FBAResult:
     """Solve and independently validate the biological objective on ``lp``."""
 
-    fluxes, objective, status = _solve(lp, lp.objective_coefficients, lp.objective_direction, "FBA")
+    objective_scale = _objective_scale(lp)
+    solver_costs = tuple(
+        value / objective_scale if objective_scale > 0.0 else value
+        for value in lp.effective_objective_coefficients
+    )
+    fluxes, solver_objective, status = _solve(
+        lp, solver_costs, lp.objective_direction, "FBA"
+    )
+    try:
+        effective_objective = _effective_objective_value(lp, fluxes)
+        objective = math.fsum((lp.objective_constant, effective_objective))
+    except (OverflowError, ValueError) as error:
+        raise AnalysisError("FBA returned a non-finite biological objective") from error
+    if not math.isfinite(objective):
+        raise AnalysisError("FBA returned a non-finite biological objective")
+    _validate_declared_objective_equivalence(
+        lp, fluxes, objective, "FBA", effective_objective
+    )
     diagnostics = _validate(
         lp,
         fluxes,
-        objective,
-        lp.objective_coefficients,
-        lp_prevalidated=True,
+        solver_objective,
+        solver_costs,
     )
     return FBAResult(objective, "optimal", lp.objective_direction,
                      pd.Series(fluxes, index=lp.reaction_ids, dtype=float), diagnostics)
 
 
 def run_highs_fba(model: FluxModel) -> FBAResult:
-    return _run_compiled_fba(compile_flux_lp(model))
+    lp = compile_flux_lp(model)
+    _validate_optimal_face_solver_resolution(lp)
+    return _run_compiled_fba(lp)
 
 
 def _fraction(value: float) -> float:
@@ -461,50 +1336,74 @@ def _fraction(value: float) -> float:
     return result
 
 
-def _retained_objective_constraint(
+def _retained_effective_bound(
     lp: CompiledFluxLP,
-    fba: FBAResult,
-    fraction_of_optimum: float,
-) -> RetainedObjectiveConstraint:
-    """Build the one canonical multiplicative objective-retention constraint.
+    biological_optimum: float,
+    effective_optimum: float,
+    fraction: float,
+) -> tuple[float, float]:
+    """Return the declared and conservatively representable quotient bounds."""
 
-    The formula is deliberately literal: for maximisation the bound is
-    ``c @ v >= fraction * z_star`` and for minimisation it is the reversed
-    inequality.  Consequently, fractions below one make the requested region
-    empty for a negative maximum or a positive minimum.  That case is rejected
-    here, before any endpoint or sampling solve can obscure the reason.
-    """
-
-    fraction = _fraction(fraction_of_optimum)
+    bound = biological_optimum * fraction
+    if fraction == 1.0:
+        return bound, effective_optimum
+    exact_target = Fraction.from_float(bound) - Fraction.from_float(
+        lp.objective_constant
+    )
     try:
-        if isinstance(fba.objective_value, bool):
-            raise TypeError
-        optimum = float(fba.objective_value)
-    except (TypeError, ValueError, OverflowError) as error:
-        raise AnalysisError("biological optimum must be a finite number") from error
-    if not math.isfinite(optimum):
-        raise AnalysisError("biological optimum must be a finite number")
-    retained_bound = optimum * fraction
-    tightens_past_optimum = (
-        retained_bound > optimum
-        if lp.objective_direction == "max"
-        else retained_bound < optimum
-    )
-    if tightens_past_optimum:
+        effective_bound = float(exact_target)
+    except (OverflowError, ValueError) as error:
         raise AnalysisError(
-            "retained objective region is empty: "
-            f"direction={lp.objective_direction}, "
-            f"biological_optimum={optimum:g}, "
-            f"fraction_of_optimum={fraction:g}, "
-            f"retained_bound={retained_bound:g}"
+            "retained biological objective bound is outside floating-point range"
+        ) from error
+    candidate = Fraction.from_float(effective_bound)
+    if lp.objective_direction == "max" and candidate < exact_target:
+        effective_bound = math.nextafter(effective_bound, math.inf)
+    elif lp.objective_direction == "min" and candidate > exact_target:
+        effective_bound = math.nextafter(effective_bound, -math.inf)
+    if not math.isfinite(effective_bound):
+        raise AnalysisError(
+            "retained biological objective bound is outside floating-point range"
         )
-    return RetainedObjectiveConstraint(
-        fraction_of_optimum=fraction,
-        biological_optimum=optimum,
-        bound=retained_bound,
-        sense=">=" if lp.objective_direction == "max" else "<=",
-        objective_direction=lp.objective_direction,
+    represented_bound = math.fsum((lp.objective_constant, effective_bound))
+    relaxed = (
+        represented_bound < bound
+        if lp.objective_direction == "max"
+        else represented_bound > bound
     )
+    distortion_scale = max(abs(biological_optimum), abs(bound))
+    distortion = abs(represented_bound - bound)
+    if (
+        relaxed
+        or not math.isfinite(represented_bound)
+        or (distortion_scale == 0.0 and distortion != 0.0)
+        or (
+            distortion_scale > 0.0
+            and distortion > OBJECTIVE_TOLERANCE * distortion_scale
+        )
+    ):
+        raise AnalysisError(
+            "retained biological objective bound is not representable without "
+            "material numerical distortion"
+        )
+    return bound, effective_bound
+
+
+def _validate_fractional_optimum_sign(
+    direction: str, optimum: float, fraction: float
+) -> None:
+    """Reject multiplicative retention that is stricter than the optimum."""
+
+    if fraction == 1.0:
+        return
+    incompatible = (direction == "max" and optimum < 0.0) or (
+        direction == "min" and optimum > 0.0
+    )
+    if incompatible:
+        raise AnalysisError(
+            "fraction-of-optimum arithmetic is infeasible for a negative "
+            "maximization optimum or positive minimization optimum"
+        )
 
 
 def prepare_highs_flux_region(
@@ -514,15 +1413,187 @@ def prepare_highs_flux_region(
 
     fraction = _fraction(fraction_of_optimum)
     lp = compile_flux_lp(model)
+    if fraction == 1.0:
+        _validate_optimal_face_solver_resolution(lp)
     fba = _run_compiled_fba(lp)
-    retention = _retained_objective_constraint(lp, fba, fraction)
-    return PreparedFluxRegion(
-        lp=lp,
-        fba=fba,
-        retention=retention,
-        flux_model=model,
-        flux_model_fingerprint=_flux_model_fingerprint(model),
+    _validate_fractional_optimum_sign(
+        lp.objective_direction, fba.objective_value, fraction
     )
+    sense = ">=" if lp.objective_direction == "max" else "<="
+    effective_optimum = _effective_objective_value(lp, tuple(fba.fluxes))
+    bound, effective_bound = _retained_effective_bound(
+        lp, fba.objective_value, effective_optimum, fraction
+    )
+    if bound == fba.objective_value:
+        _validate_optimal_face_solver_resolution(lp)
+    retention = RetainedObjectiveConstraint(
+        fraction,
+        fba.objective_value,
+        bound,
+        sense,
+        lp.objective_direction,
+        effective_optimum,
+        effective_bound,
+    )
+    return PreparedFluxRegion(lp, fba, retention)
+
+
+def _validate_compiled_lp_integrity(lp: CompiledFluxLP) -> None:
+    """Recompute public compiled-LP identity and all conditioned derivatives."""
+
+    n = len(lp.reaction_ids)
+    m = len(lp.balanced_metabolite_ids)
+    if (
+        n == 0
+        or len(set(lp.reaction_ids)) != n
+        or len(lp.row_starts) != m + 1
+        or not lp.row_starts
+        or lp.row_starts[0] != 0
+        or tuple(sorted(lp.row_starts)) != tuple(lp.row_starts)
+        or lp.row_starts[-1] != len(lp.column_indices)
+        or len(lp.column_indices) != len(lp.coefficients)
+        or any(
+            not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < n
+            for index in lp.column_indices
+        )
+        or any(
+            len(values) != n
+            for values in (
+                lp.lower_bounds,
+                lp.upper_bounds,
+                lp.objective_coefficients,
+                lp.effective_objective_coefficients,
+            )
+        )
+        or lp.objective_direction not in {"max", "min"}
+    ):
+        raise AnalysisError("prepared compiled LP has malformed canonical structure")
+    numeric_values = (
+        *lp.coefficients,
+        *lp.lower_bounds,
+        *lp.upper_bounds,
+        *lp.objective_coefficients,
+        *lp.effective_objective_coefficients,
+        lp.objective_constant,
+    )
+    try:
+        if not all(math.isfinite(float(value)) for value in numeric_values):
+            raise AnalysisError("prepared compiled LP contains non-finite numeric data")
+        expected_fingerprint = _compiled_lp_fingerprint(
+            lp.reaction_ids,
+            lp.balanced_metabolite_ids,
+            lp.row_starts,
+            lp.column_indices,
+            lp.coefficients,
+            lp.lower_bounds,
+            lp.upper_bounds,
+            lp.objective_coefficients,
+            lp.objective_direction,
+        )
+    except (TypeError, ValueError, OverflowError) as error:
+        raise AnalysisError("prepared compiled LP contains malformed identity data") from error
+    if lp.fingerprint != expected_fingerprint:
+        raise AnalysisError(
+            "prepared compiled LP fingerprint is stale or inconsistent with its "
+            "canonical fields"
+        )
+
+    balance_matrix = np.zeros((m, n), dtype=float)
+    for row in range(m):
+        seen: set[int] = set()
+        for offset in range(lp.row_starts[row], lp.row_starts[row + 1]):
+            column = lp.column_indices[offset]
+            if column in seen:
+                raise AnalysisError(
+                    "prepared compiled LP contains duplicate sparse coordinates"
+                )
+            seen.add(column)
+            balance_matrix[row, column] = lp.coefficients[offset]
+    expected_balance, expected_balance_rank = _orthonormal_row_space(balance_matrix)
+    lower_bounds = np.asarray(lp.lower_bounds, dtype=float)
+    upper_bounds = np.asarray(lp.upper_bounds, dtype=float)
+    (
+        expected_affine,
+        expected_rhs,
+        expected_affine_rank,
+        affine_matrix,
+        affine_rhs,
+        fixed_indices,
+    ) = _condition_balance_after_fixed_substitution(
+        balance_matrix, lower_bounds, upper_bounds
+    )
+    expected_effective, expected_constant = _condition_objective(
+        np.asarray(lp.objective_coefficients, dtype=float),
+        expected_affine,
+        fixed_indices,
+        lower_bounds[fixed_indices],
+        balance_matrix,
+        lower_bounds,
+        upper_bounds,
+    )
+    _validate_mass_balance_solver_resolution(
+        expected_affine, lower_bounds, upper_bounds
+    )
+    _validate_objective_solver_resolution(
+        expected_effective, lower_bounds, upper_bounds
+    )
+
+    try:
+        stored_balance = np.asarray(lp.balance_row_space_basis, dtype=float).reshape(
+            lp.balance_rank, n
+        )
+        stored_affine = np.asarray(lp.affine_equality_basis, dtype=float).reshape(
+            lp.affine_rank, n
+        )
+        stored_rhs = np.asarray(lp.affine_equality_rhs, dtype=float)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise AnalysisError("prepared compiled LP has malformed conditioned data") from error
+    if (
+        lp.balance_rank != expected_balance_rank
+        or lp.affine_rank != expected_affine_rank
+        or stored_rhs.shape != (lp.affine_rank,)
+        or not np.isfinite(stored_balance).all()
+        or not np.isfinite(stored_affine).all()
+        or not np.isfinite(stored_rhs).all()
+        or not np.allclose(stored_balance, expected_balance, rtol=1e-12, atol=1e-12)
+        or not np.allclose(stored_affine, expected_affine, rtol=1e-12, atol=1e-12)
+        or not np.allclose(stored_rhs, expected_rhs, rtol=1e-12, atol=1e-12)
+        or not np.allclose(
+            np.asarray(lp.effective_objective_coefficients, dtype=float),
+            expected_effective,
+            rtol=1e-12,
+            atol=1e-14,
+        )
+        or not math.isclose(
+            lp.objective_constant,
+            expected_constant,
+            rel_tol=1e-12,
+            abs_tol=1e-14,
+        )
+    ):
+        raise AnalysisError(
+            "prepared compiled LP conditioned representation is inconsistent with "
+            "its canonical fields"
+        )
+
+    expected_starts = [0]
+    expected_indices: list[int] = []
+    expected_values: list[float] = []
+    for row in expected_affine:
+        for column, value in enumerate(row):
+            if value != 0.0:
+                expected_indices.append(column)
+                expected_values.append(float(value))
+        expected_starts.append(len(expected_indices))
+    if (
+        lp.solver_row_starts != tuple(expected_starts)
+        or lp.solver_column_indices != tuple(expected_indices)
+        or lp.solver_coefficients != tuple(expected_values)
+    ):
+        raise AnalysisError(
+            "prepared compiled LP solver matrix is inconsistent with its affine "
+            "equalities"
+        )
 
 
 def _validate_prepared_flux_region(prepared: PreparedFluxRegion) -> None:
@@ -530,98 +1601,14 @@ def _validate_prepared_flux_region(prepared: PreparedFluxRegion) -> None:
 
     if not isinstance(prepared, PreparedFluxRegion):
         raise AnalysisError("prepared analysis requires a PreparedFluxRegion")
-    lp, fba, retention, model, source_fingerprint = (
-        prepared.lp,
-        prepared.fba,
-        prepared.retention,
-        prepared.flux_model,
-        prepared.flux_model_fingerprint,
-    )
+    lp, fba, retention = prepared.lp, prepared.fba, prepared.retention
     if (
         not isinstance(lp, CompiledFluxLP)
         or not isinstance(fba, FBAResult)
         or not isinstance(retention, RetainedObjectiveConstraint)
-        or not isinstance(model, FluxModel)
-        or not isinstance(source_fingerprint, str)
     ):
         raise AnalysisError("prepared flux region contains malformed records")
-    try:
-        validate_flux_model(model)
-    except (CanonicalModelError, AttributeError) as error:
-        raise AnalysisError(f"prepared flux region contains an invalid model: {error}") from error
-    _validate_compiled_lp_structure(lp)
-    if source_fingerprint != _flux_model_fingerprint(model):
-        raise AnalysisError("prepared canonical model fingerprint is inconsistent")
-    if lp.fingerprint != _compiled_lp_fingerprint(lp):
-        raise AnalysisError("prepared compiled-LP fingerprint is inconsistent")
-    model_reaction_ids = tuple(reaction.reaction_id for reaction in model.reactions)
-    model_balanced_ids = tuple(
-        metabolite.metabolite_id
-        for metabolite in model.metabolites
-        if metabolite.steady_state_balanced
-    )
-    if (
-        model_reaction_ids != lp.reaction_ids
-        or model_balanced_ids != lp.balanced_metabolite_ids
-        or tuple(float(reaction.lower_bound) for reaction in model.reactions)
-        != lp.lower_bounds
-        or tuple(float(reaction.upper_bound) for reaction in model.reactions)
-        != lp.upper_bounds
-    ):
-        raise AnalysisError("prepared canonical model does not match its compiled LP")
-    reaction_index = {
-        reaction_id: index for index, reaction_id in enumerate(model_reaction_ids)
-    }
-    grouped_objective: list[list[float]] = [[] for _ in model_reaction_ids]
-    for term in model.objective.terms:
-        index = reaction_index[term.reaction_id]
-        grouped_objective[index].append(float(term.coefficient))
-    model_objective = [
-        _finite_aggregate(
-            coefficients,
-            (
-                "prepared canonical model has a non-finite aggregated objective "
-                f"coefficient for reaction {model_reaction_ids[index]!r}"
-            ),
-        )
-        for index, coefficients in enumerate(grouped_objective)
-    ]
-    model_direction = {
-        "maximise": "max",
-        "minimise": "min",
-    }[model.objective.direction]
-    if (
-        tuple(model_objective) != lp.objective_coefficients
-        or model_direction != lp.objective_direction
-    ):
-        raise AnalysisError("prepared canonical model objective does not match its compiled LP")
-    for row, metabolite_id in enumerate(model_balanced_ids):
-        expected_entries: list[tuple[int, float]] = []
-        for column, reaction in enumerate(model.reactions):
-            coefficient = _finite_aggregate(
-                tuple(
-                    float(term.coefficient)
-                    for term in reaction.stoichiometric_terms
-                    if term.metabolite_id == metabolite_id
-                ),
-                "prepared canonical model has a non-finite aggregated "
-                f"stoichiometric coefficient for reaction {reaction.reaction_id!r}, "
-                f"metabolite {metabolite_id!r}",
-            )
-            if coefficient != 0.0:
-                expected_entries.append((column, coefficient))
-        actual_entries = list(
-            zip(
-                lp.column_indices[lp.row_starts[row] : lp.row_starts[row + 1]],
-                lp.coefficients[lp.row_starts[row] : lp.row_starts[row + 1]],
-            )
-        )
-        if expected_entries != actual_entries:
-            raise AnalysisError(
-                "prepared canonical model stoichiometry does not match its compiled LP"
-            )
-    if not isinstance(fba.fluxes, pd.Series):
-        raise AnalysisError("prepared FBA fluxes must be a pandas Series")
+    _validate_compiled_lp_integrity(lp)
     if tuple(fba.fluxes.index) != lp.reaction_ids:
         raise AnalysisError("prepared FBA reaction order does not match its compiled LP")
     if fba.status != "optimal" or fba.objective_direction != lp.objective_direction:
@@ -637,65 +1624,147 @@ def _validate_prepared_flux_region(prepared: PreparedFluxRegion) -> None:
         raise AnalysisError("prepared FBA contains malformed numeric values") from error
     if not math.isfinite(optimum):
         raise AnalysisError("prepared FBA objective is non-finite")
-    if not all(math.isfinite(value) for value in fluxes):
-        raise AnalysisError("prepared FBA primal contains non-finite values")
     try:
+        effective_optimum_from_fluxes = _effective_objective_value(lp, fluxes)
+        stable_optimum = math.fsum(
+            (lp.objective_constant, effective_optimum_from_fluxes)
+        )
+        if stable_optimum != optimum:
+            raise AnalysisError(
+                "prepared FBA objective is inconsistent with its compiled LP"
+            )
+        _validate_declared_objective_equivalence(
+            lp,
+            fluxes,
+            stable_optimum,
+            "prepared FBA",
+            effective_optimum_from_fluxes,
+        )
         _validate(
             lp,
             fluxes,
-            optimum,
-            lp.objective_coefficients,
-            lp_prevalidated=True,
+            effective_optimum_from_fluxes,
+            lp.effective_objective_coefficients,
         )
     except (IndexError, TypeError, ValueError, OverflowError) as error:
         raise AnalysisError("prepared FBA primal is malformed") from error
     fraction = _fraction(retention.fraction_of_optimum)
     try:
-        if isinstance(retention.biological_optimum, bool) or isinstance(
-            retention.bound, bool
+        if (
+            isinstance(retention.biological_optimum, bool)
+            or isinstance(retention.bound, bool)
+            or isinstance(retention.effective_optimum, bool)
+            or isinstance(retention.effective_bound, bool)
         ):
             raise TypeError
         recorded_optimum = float(retention.biological_optimum)
         recorded_bound = float(retention.bound)
+        recorded_effective_optimum = float(retention.effective_optimum)
+        recorded_effective_bound = float(retention.effective_bound)
     except (TypeError, ValueError, OverflowError) as error:
         raise AnalysisError("prepared retained-objective values are malformed") from error
-    if not math.isfinite(recorded_optimum) or not math.isfinite(recorded_bound):
+    if not all(
+        map(
+            math.isfinite,
+            (
+                recorded_optimum,
+                recorded_bound,
+                recorded_effective_optimum,
+                recorded_effective_bound,
+            ),
+        )
+    ):
         raise AnalysisError("prepared retained-objective values must be finite")
-    expected = _retained_objective_constraint(lp, fba, fraction)
+    _validate_fractional_optimum_sign(
+        lp.objective_direction, optimum, fraction
+    )
+    expected_sense = ">=" if lp.objective_direction == "max" else "<="
+    expected_bound, expected_effective_bound = _retained_effective_bound(
+        lp, optimum, effective_optimum_from_fluxes, fraction
+    )
     if (
-        retention.objective_direction != expected.objective_direction
-        or retention.sense != expected.sense
-        or recorded_optimum != expected.biological_optimum
-        or recorded_bound != expected.bound
+        retention.objective_direction != lp.objective_direction
+        or retention.sense != expected_sense
+        or recorded_optimum != optimum
+        or recorded_bound != expected_bound
+        or recorded_effective_optimum != effective_optimum_from_fluxes
+        or recorded_effective_bound != expected_effective_bound
     ):
         raise AnalysisError("prepared retained-objective metadata is inconsistent")
+    if recorded_bound == recorded_optimum:
+        _validate_optimal_face_solver_resolution(lp)
 
 
 def run_highs_fva_reference(model: FluxModel, fraction_of_optimum: float = 1.0) -> FVAResult:
-    fraction = _fraction(fraction_of_optimum); lp = compile_flux_lp(model); fba = _run_compiled_fba(lp)
-    retained = _retained_objective_constraint(lp, fba, fraction)
-    retention = (retained.sense, retained.bound)
+    prepared = prepare_highs_flux_region(model, fraction_of_optimum)
+    fraction = prepared.retention.fraction_of_optimum
+    lp = prepared.lp
+    fba = prepared.fba
+    retention = prepared.retention
     minima: list[float] = []; maxima: list[float] = []
     for j, reaction_id in enumerate(lp.reaction_ids):
         costs = [0.0] * len(lp.reaction_ids); costs[j] = 1.0
         low_flux, low, _ = _solve(lp, costs, "min", f"FVA minimum for reaction {reaction_id!r}", retention)
-        _validate(lp, low_flux, low, costs, lp_prevalidated=True)
+        _validate(lp, low_flux, low, costs)
         high_flux, high, _ = _solve(lp, costs, "max", f"FVA maximum for reaction {reaction_id!r}", retention)
-        _validate(lp, high_flux, high, costs, lp_prevalidated=True)
+        _validate(lp, high_flux, high, costs)
         # Independently enforce the retained biological objective at every endpoint.
         for endpoint in (low_flux, high_flux):
-            value = _finite_dot(
-                lp.objective_coefficients,
+            value = _biological_objective_value(lp, endpoint)
+            declared = _validate_declared_objective_equivalence(
+                lp,
                 endpoint,
-                f"FVA endpoint for reaction {reaction_id!r} retained objective",
-                inputs_prevalidated=True,
+                value,
+                f"FVA endpoint for reaction {reaction_id!r}",
+                retention.effective_optimum,
+                retention.effective_bound,
             )
-            violation = max(retention[1] - value, 0.0) if retention[0] == ">=" else max(value - retention[1], 0.0)
-            if violation > OBJECTIVE_TOLERANCE:
+            direct_violation = (
+                max(retention.bound - declared, 0.0)
+                if retention.sense == ">="
+                else max(declared - retention.bound, 0.0)
+            )
+            direct_scale = max(
+                _objective_activity_scale(lp),
+                abs(retention.effective_optimum),
+                abs(retention.effective_bound),
+            )
+            direct_tolerance = (
+                OBJECTIVE_TOLERANCE * direct_scale
+                if direct_scale > 0.0
+                else OBJECTIVE_TOLERANCE
+            )
+            if direct_violation > direct_tolerance:
+                raise AnalysisError(
+                    f"FVA endpoint for reaction {reaction_id!r} violates the "
+                    "declared biological objective retention: "
+                    f"declared={declared:g}, bound={retention.bound:g}, "
+                    f"violation={direct_violation:g}"
+                )
+            effective_value = _effective_objective_value(lp, endpoint)
+            violation, normalized_violation = _retained_objective_violation(
+                lp,
+                value,
+                prepared.retention.sense,
+                prepared.retention.bound,
+                effective_value=effective_value,
+                effective_bound=prepared.retention.effective_bound,
+            )
+            if normalized_violation > OBJECTIVE_TOLERANCE:
                 raise AnalysisError(f"FVA endpoint for reaction {reaction_id!r} violates objective retention")
         minima.append(low); maxima.append(high)
+    _canonicalize_fva_endpoints(
+        lp.reaction_ids, minima, maxima, tuple(fba.fluxes)
+    )
     ranges = pd.DataFrame({"minimum": minima, "maximum": maxima}, index=lp.reaction_ids)
-    return FVAResult(ranges, fraction, fba.objective_value, lp.objective_direction)
+    return FVAResult(
+        ranges,
+        fraction,
+        fba.objective_value,
+        lp.objective_direction,
+        lp.fingerprint,
+        _fva_ranges_sha256(ranges, lp.fingerprint),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -704,32 +1773,105 @@ class _EndpointResult:
     direction: str
     value: float
     worker_pid: int
+    basis_refreshes: int
+
+
+def _canonicalize_fva_endpoints(
+    reaction_ids: Sequence[str],
+    minima: list[float],
+    maxima: list[float],
+    reference_fluxes: Sequence[float],
+) -> None:
+    """Resolve only sub-tolerance endpoint inversion; preserve positive widths."""
+
+    for index, (minimum, maximum, reference) in enumerate(
+        zip(minima, maxima, reference_fluxes)
+    ):
+        width = maximum - minimum
+        if width >= 0.0:
+            continue
+        if -width <= FVA_NUMERICAL_COLLAPSE_TOLERANCE:
+            if (
+                reference >= min(minimum, maximum) - FEASIBILITY_TOLERANCE
+                and reference <= max(minimum, maximum) + FEASIBILITY_TOLERANCE
+            ):
+                collapsed = float(reference)
+            else:
+                collapsed = 0.5 * math.fsum((minimum, maximum))
+            minima[index] = collapsed
+            maxima[index] = collapsed
+        else:
+            raise AnalysisError(
+                f"FVA endpoints are numerically inconsistent for reaction "
+                f"{reaction_ids[index]!r}: minimum={minimum:g}, maximum={maximum:g}"
+            )
 
 
 class _ReusableFVAWorker:
     """One retained LP whose simplex state is reused across endpoint solves."""
 
-    def __init__(self, lp: CompiledFluxLP, retention: tuple[str, float]):
+    def __init__(
+        self,
+        lp: CompiledFluxLP,
+        retention: RetainedObjectiveConstraint,
+        reference_fluxes: Sequence[float],
+    ):
         highspy = _highspy()
-        _validate_compiled_lp_structure(lp)
         self.lp, self.retention, self.endpoint_count = lp, retention, 0
+        self.reference_fluxes = tuple(float(value) for value in reference_fluxes)
         self.solver = highspy.Highs()
         self.solver.setOptionValue("output_flag", False)
         self.solver.setOptionValue("threads", 1)
         self.solver.setOptionValue("solver", "simplex")
+        self.solver.setOptionValue(
+            "primal_feasibility_tolerance", SOLVER_FEASIBILITY_TOLERANCE
+        )
+        self.solver.setOptionValue(
+            "dual_feasibility_tolerance", SOLVER_FEASIBILITY_TOLERANCE
+        )
+        self.solver.setOptionValue(
+            "small_matrix_value", HIGHS_SMALL_MATRIX_VALUE
+        )
         n = len(lp.reaction_ids)
         self.solver.addCols(n, [0.0] * n, list(lp.lower_bounds), list(lp.upper_bounds),
                             0, [0] * (n + 1), [], [])
-        lower = [0.0] * len(lp.balanced_metabolite_ids)
-        upper = [0.0] * len(lower)
-        starts = list(lp.row_starts)
-        indices = list(lp.column_indices)
-        values = list(lp.coefficients)
-        sense, bound = retention
-        lower.append(bound if sense == ">=" else -highspy.kHighsInf)
-        upper.append(bound if sense == "<=" else highspy.kHighsInf)
-        indices.extend(i for i, value in enumerate(lp.objective_coefficients) if value)
-        values.extend(value for value in lp.objective_coefficients if value)
+        lower = list(lp.affine_equality_rhs)
+        upper = list(lp.affine_equality_rhs)
+        starts = list(lp.solver_row_starts)
+        indices = list(lp.solver_column_indices)
+        values = list(lp.solver_coefficients)
+        sense = retention.sense
+        effective_bound = retention.effective_bound
+        objective_scale = _objective_scale(lp)
+        normalized_bound = (
+            effective_bound / objective_scale
+            if objective_scale > 0.0
+            else effective_bound
+        )
+        optimal_face = (
+            retention.fraction_of_optimum == 1.0
+            or retention.bound == retention.biological_optimum
+        )
+        lower.append(
+            normalized_bound
+            if optimal_face or sense == ">="
+            else -highspy.kHighsInf
+        )
+        upper.append(
+            normalized_bound
+            if optimal_face or sense == "<="
+            else highspy.kHighsInf
+        )
+        indices.extend(
+            i
+            for i, value in enumerate(lp.effective_objective_coefficients)
+            if value
+        )
+        values.extend(
+            value / objective_scale if objective_scale > 0.0 else value
+            for value in lp.effective_objective_coefficients
+            if value
+        )
         starts.append(len(indices))
         self.solver.addRows(len(lower), lower, upper, len(indices), starts, indices, values)
 
@@ -737,6 +1879,7 @@ class _ReusableFVAWorker:
         j, direction = task
         reaction_id = self.lp.reaction_ids[j]
         operation = f"FVA {direction}imum for reaction {reaction_id!r}"
+        basis_refreshes = 0
         try:
             # changeColCost invalidates the objective but retains the model and the
             # incumbent simplex basis. HiGHS therefore reoptimizes on the next run.
@@ -746,49 +1889,123 @@ class _ReusableFVAWorker:
             self.solver.changeColCost(j, 1.0)
             self._previous_index = j
             self.solver.setMaximize() if direction == "max" else self.solver.setMinimize()
-            self.solver.run()
-            highspy = _highspy()
-            status = self.solver.getModelStatus()
-            status_name = self.solver.modelStatusToString(status)
-            if status != highspy.HighsModelStatus.kOptimal:
+            _, time_limit = self.solver.getOptionValue("time_limit")
+            if float(time_limit) <= 0.0:
+                status_name = "Time limit reached"
                 raise AnalysisError(f"HiGHS status {status_name}")
-            fluxes = [float(v) for v in self.solver.getSolution().col_value]
-            value = float(self.solver.getObjectiveValue())
-            if len(fluxes) != len(self.lp.reaction_ids) or not all(map(math.isfinite, fluxes)) or not math.isfinite(value):
-                raise AnalysisError("malformed or non-finite complete primal")
-            costs = [0.0] * len(fluxes); costs[j] = 1.0
-            _validate(
-                self.lp,
-                fluxes,
-                value,
-                costs,
-                lp_prevalidated=True,
-            )
-            biological = _finite_dot(
-                self.lp.objective_coefficients,
-                fluxes,
-                f"{operation} retained biological objective",
-                inputs_prevalidated=True,
-            )
-            sense, bound = self.retention
-            violation = max(bound - biological, 0.0) if sense == ">=" else max(biological - bound, 0.0)
-            if violation > OBJECTIVE_TOLERANCE:
-                raise AnalysisError(f"retained biological objective violation {violation:g}")
+            highspy = _highspy()
+            costs = [0.0] * len(self.lp.reaction_ids)
+            costs[j] = 1.0
+            last_error: AnalysisError | None = None
+            for attempt in range(2):
+                if attempt:
+                    self.solver.clearSolver()
+                    basis_refreshes += 1
+                try:
+                    self.solver.run()
+                    status = self.solver.getModelStatus()
+                    status_name = self.solver.modelStatusToString(status)
+                    if status != highspy.HighsModelStatus.kOptimal:
+                        raise AnalysisError(f"HiGHS status {status_name}")
+                    fluxes = [
+                        float(value)
+                        for value in self.solver.getSolution().col_value
+                    ]
+                    value = float(self.solver.getObjectiveValue())
+                    if (
+                        len(fluxes) != len(self.lp.reaction_ids)
+                        or not all(map(math.isfinite, fluxes))
+                        or not math.isfinite(value)
+                    ):
+                        raise AnalysisError("malformed or non-finite complete primal")
+                    _validate(self.lp, fluxes, value, costs)
+                    reference = self.reference_fluxes[j]
+                    excludes_reference = (
+                        direction == "min"
+                        and value
+                        > reference + FVA_NUMERICAL_COLLAPSE_TOLERANCE
+                    ) or (
+                        direction == "max"
+                        and value
+                        < reference - FVA_NUMERICAL_COLLAPSE_TOLERANCE
+                    )
+                    if excludes_reference:
+                        raise AnalysisError(
+                            "endpoint optimum excludes the independently validated "
+                            f"FBA witness {reference:g}"
+                        )
+                    biological = _biological_objective_value(self.lp, fluxes)
+                    declared = _validate_declared_objective_equivalence(
+                        self.lp,
+                        fluxes,
+                        biological,
+                        operation,
+                        self.retention.effective_optimum,
+                        self.retention.effective_bound,
+                    )
+                    direct_violation = (
+                        max(self.retention.bound - declared, 0.0)
+                        if self.retention.sense == ">="
+                        else max(declared - self.retention.bound, 0.0)
+                    )
+                    direct_scale = max(
+                        _objective_activity_scale(self.lp),
+                        abs(self.retention.effective_optimum),
+                        abs(self.retention.effective_bound),
+                    )
+                    direct_tolerance = (
+                        OBJECTIVE_TOLERANCE * direct_scale
+                        if direct_scale > 0.0
+                        else OBJECTIVE_TOLERANCE
+                    )
+                    if direct_violation > direct_tolerance:
+                        raise AnalysisError(
+                            "declared biological objective retention violation: "
+                            f"declared={declared:g}, "
+                            f"bound={self.retention.bound:g}, "
+                            f"violation={direct_violation:g}"
+                        )
+                    effective = _effective_objective_value(self.lp, fluxes)
+                    violation, normalized_violation = _retained_objective_violation(
+                        self.lp,
+                        biological,
+                        self.retention.sense,
+                        self.retention.bound,
+                        effective_value=effective,
+                        effective_bound=self.retention.effective_bound,
+                    )
+                    if normalized_violation > OBJECTIVE_TOLERANCE:
+                        raise AnalysisError(
+                            "retained biological objective violation "
+                            f"{violation:g}"
+                        )
+                    last_error = None
+                    break
+                except AnalysisError as error:
+                    last_error = error
+            if last_error is not None:
+                raise last_error
         except Exception as error:
             if isinstance(error, AnalysisError) and str(error).startswith(operation):
                 raise
             status_name = locals().get("status_name", "not available")
             raise AnalysisError(f"{operation} failed: solver status {status_name}; {error}") from error
         self.endpoint_count += 1
-        return _EndpointResult(j, direction, value, os.getpid())
+        return _EndpointResult(
+            j, direction, value, os.getpid(), basis_refreshes
+        )
 
 
 _PROCESS_WORKER: _ReusableFVAWorker | None = None
 
 
-def _initialize_fva_process(lp: CompiledFluxLP, retention: tuple[str, float]) -> None:
+def _initialize_fva_process(
+    lp: CompiledFluxLP,
+    retention: RetainedObjectiveConstraint,
+    reference_fluxes: Sequence[float],
+) -> None:
     global _PROCESS_WORKER
-    _PROCESS_WORKER = _ReusableFVAWorker(lp, retention)
+    _PROCESS_WORKER = _ReusableFVAWorker(lp, retention, reference_fluxes)
 
 
 def _solve_process_endpoint(task: tuple[int, str]) -> _EndpointResult:
@@ -811,24 +2028,26 @@ def run_prepared_highs_vffva(
     """
     _validate_prepared_flux_region(prepared)
     lp = prepared.lp
-    retention = (prepared.retention.sense, prepared.retention.bound)
+    retention = prepared.retention
     tasks = [(j, direction) for j in range(len(lp.reaction_ids)) for direction in ("min", "max")]
     if workers is None:
-        # Serial is the portable, reusable default.  Callers opt into spawned
-        # process workers explicitly, avoiding recursive top-level execution
-        # on spawn-based platforms and process overhead on ordinary models.
-        workers = 1
+        workers = min(4, os.cpu_count() or 1, len(tasks))
     if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
         raise AnalysisError("workers must be a positive integer")
     workers = min(workers, len(tasks))
+    reference_fluxes = tuple(float(value) for value in prepared.fba.fluxes)
     if workers == 1:
-        worker = _ReusableFVAWorker(lp, retention)
+        worker = _ReusableFVAWorker(lp, retention, reference_fluxes)
         results = [worker.solve(task) for task in tasks]
     else:
         # imap_unordered(chunksize=1) is a shared dynamic task queue: a process
         # receives its next independent endpoint only after completing one.
         context = multiprocessing.get_context("spawn")
-        with context.Pool(workers, _initialize_fva_process, (lp, retention)) as pool:
+        with context.Pool(
+            workers,
+            _initialize_fva_process,
+            (lp, retention, reference_fluxes),
+        ) as pool:
             results = list(pool.imap_unordered(_solve_process_endpoint, tasks, chunksize=1))
     minima = [math.nan] * len(lp.reaction_ids); maxima = [math.nan] * len(lp.reaction_ids)
     seen: set[tuple[int, str]] = set()
@@ -853,13 +2072,19 @@ def run_prepared_highs_vffva(
         process_ids = {result.worker_pid for result in results}
         instrumentation.update(solver_instances=len(process_ids), matrix_builds=len(process_ids),
                                retention_rows=len(process_ids), endpoint_solves=len(results),
-                               objective_changes=len(results))
+                               objective_changes=len(results),
+                               basis_refreshes=sum(result.basis_refreshes for result in results))
+    _canonicalize_fva_endpoints(
+        lp.reaction_ids, minima, maxima, tuple(prepared.fba.fluxes)
+    )
     ranges = pd.DataFrame({"minimum": minima, "maximum": maxima}, index=lp.reaction_ids)
     return FVAResult(
         ranges,
         prepared.retention.fraction_of_optimum,
         prepared.retention.biological_optimum,
         lp.objective_direction,
+        lp.fingerprint,
+        _fva_ranges_sha256(ranges, lp.fingerprint),
     )
 
 

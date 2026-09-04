@@ -37,6 +37,58 @@ def _model(*, direction="maximise", fraction_objective=(("export", 1.0),)):
         direction, tuple(ObjectiveTerm(*term) for term in fraction_objective)))
 
 
+def _constant_objective_model(direction, coefficient):
+    return FluxModel(
+        (),
+        (
+            FluxReaction("Q", (), 1.0, 1.0),
+            FluxReaction("free", (), -1.0, 1.0),
+        ),
+        LinearObjective(direction, (ObjectiveTerm("Q", coefficient),)),
+    )
+
+
+@pytest.mark.parametrize(
+    "runner",
+    [
+        pytest.param(run_highs_fva_reference, id="cold"),
+        pytest.param(
+            lambda model, fraction: run_highs_vffva(
+                model, fraction, workers=1
+            ),
+            id="fast",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("direction", "coefficient"),
+    [("maximise", -1e-12), ("minimise", 1e-12)],
+)
+def test_sign_incompatible_small_constant_objective_fails_before_fva(
+    runner, direction, coefficient
+):
+    with pytest.raises(
+        AnalysisError, match="fraction-of-optimum arithmetic.*infeasible"
+    ):
+        runner(_constant_objective_model(direction, coefficient), 0.8)
+
+
+@pytest.mark.parametrize(
+    ("direction", "coefficient"),
+    [("maximise", 1e-12), ("minimise", -1e-12)],
+)
+def test_sign_compatible_small_constant_objective_keeps_full_fva_region(
+    direction, coefficient
+):
+    model = _constant_objective_model(direction, coefficient)
+    cold = run_highs_fva_reference(model, 0.8)
+    fast = run_highs_vffva(model, 0.8, workers=1)
+
+    pd.testing.assert_frame_equal(cold.ranges, fast.ranges, atol=1e-12, rtol=1e-12)
+    assert tuple(fast.ranges.loc["Q"]) == pytest.approx((1.0, 1.0))
+    assert tuple(fast.ranges.loc["free"]) == pytest.approx((-1.0, 1.0))
+
+
 @pytest.mark.parametrize("fraction", [1.0, 0.9])
 @pytest.mark.parametrize("workers", [1, 2])
 def test_reference_parity_order_and_serial_parallel(fraction, workers):
@@ -57,6 +109,32 @@ def test_minimisation_and_multiterm_objectives_match_reference():
     expected = run_highs_fva_reference(model, 0.9)
     actual = run_highs_vffva(model, 0.9, workers=1)
     pd.testing.assert_frame_equal(actual.ranges, expected.ranges, atol=1e-8, rtol=1e-8)
+
+
+def test_zero_activity_objective_uses_absolute_roundoff_tolerance():
+    model = FluxModel(
+        (FluxMetabolite("M", True),),
+        (
+            FluxReaction("R0", (StoichiometricTerm("M", 4.0),), 0.0, 0.0),
+            FluxReaction("R1", (StoichiometricTerm("M", 4.0),), -1.0, 1.0),
+            FluxReaction("R2", (StoichiometricTerm("M", -3.0),), -1.0, 1.0),
+        ),
+        LinearObjective(
+            "maximise",
+            (
+                ObjectiveTerm("R0", 4.0),
+                ObjectiveTerm("R1", -4.0),
+                ObjectiveTerm("R2", 3.0),
+            ),
+        ),
+    )
+
+    expected = run_highs_fva_reference(model, 0.3)
+    actual = run_highs_vffva(model, 0.3, workers=1)
+    assert expected.objective_value == pytest.approx(0.0, abs=1e-15)
+    pd.testing.assert_frame_equal(actual.ranges, expected.ranges, atol=1e-8, rtol=1e-8)
+    assert tuple(actual.ranges.loc["R1"]) == pytest.approx((-0.75, 0.75))
+    assert tuple(actual.ranges.loc["R2"]) == pytest.approx((-1.0, 1.0))
 
 
 def test_nonzero_minimisation_fraction_and_negative_signed_endpoint():
@@ -99,8 +177,46 @@ def test_one_compile_one_solver_and_one_matrix_handles_all_endpoints(monkeypatch
     metrics = {}
     run_highs_vffva(_model(), workers=1, instrumentation=metrics)
     assert compile_calls == worker_builds == 1
-    assert metrics == {"solver_instances": 1, "matrix_builds": 1, "retention_rows": 1,
-                       "endpoint_solves": 10, "objective_changes": 10}
+    assert metrics == {
+        "solver_instances": 1,
+        "matrix_builds": 1,
+        "retention_rows": 1,
+        "endpoint_solves": 10,
+        "objective_changes": 10,
+        "basis_refreshes": 0,
+    }
+
+
+def test_endpoint_validation_ambiguity_refreshes_same_solver_once(monkeypatch):
+    prepared = prepare_highs_flux_region(_model(), 1.0)
+    original_validate = highs._validate
+    injected = False
+
+    def fail_first_source_endpoint(lp, fluxes, reported, costs):
+        nonlocal injected
+        if not injected and tuple(costs) == (1.0, 0.0, 0.0, 0.0, 0.0):
+            injected = True
+            raise AnalysisError("synthetic endpoint primal ambiguity")
+        return original_validate(lp, fluxes, reported, costs)
+
+    monkeypatch.setattr(highs, "_validate", fail_first_source_endpoint)
+    metrics = {}
+    actual = run_prepared_highs_vffva(
+        prepared,
+        workers=1,
+        instrumentation=metrics,
+    )
+
+    assert injected
+    assert metrics["solver_instances"] == 1
+    assert metrics["matrix_builds"] == 1
+    assert metrics["basis_refreshes"] == 1
+    pd.testing.assert_frame_equal(
+        actual.ranges,
+        run_highs_fva_reference(_model()).ranges,
+        atol=1e-8,
+        rtol=1e-8,
+    )
 
 
 def test_prepared_fva_does_not_recompile_or_resolve_biological_objective(monkeypatch):

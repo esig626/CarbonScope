@@ -231,15 +231,9 @@ def evaluate_stationary(
     diagnostics: list[LayerDiagnostics] = []
     normalization = 0.0
     for state in states:
-        try:
-            state_predictions, state_diagnostics, state_normalization = _evaluate_state(
-                plan, state, tolerance
-            )
-        except (ForwardEMUError, ValidationError, MappingError) as error:
-            exception_type = type(error)
-            raise exception_type(
-                f"flux state {state.sample_id!r}: {error}"
-            ) from error
+        state_predictions, state_diagnostics, state_normalization = _evaluate_state(
+            plan, state, tolerance
+        )
         predictions.extend(state_predictions)
         diagnostics.extend(state_diagnostics)
         normalization = max(normalization, state_normalization)

@@ -1,14 +1,14 @@
 {
-  "command": "PYTHONPATH=src python benchmarks/benchmark_highs_fva_reference.py ecoli-core --repeats 5 --parallel-workers 2",
+  "command": "PYTHONPATH=src python benchmarks/benchmark_highs_fva_reference.py ecoli-core --fraction 0.9 --repeats 5 --parallel-workers 2",
   "correctness": {
     "fast_parallel_vs_cold": {
-      "max_absolute_range_difference": 2.5350809776601227e-12,
+      "max_absolute_range_difference": 1.7009726960282023e-12,
       "order_matches": true,
       "passed": true,
       "tolerance": 1e-07
     },
     "fast_serial_vs_cold": {
-      "max_absolute_range_difference": 8.37019342725398e-12,
+      "max_absolute_range_difference": 3.652189661806915e-12,
       "order_matches": true,
       "passed": true,
       "tolerance": 1e-07
@@ -25,36 +25,36 @@
     "platform": "Linux-6.18.35-x86_64-with-glibc2.39",
     "python": "3.12.13"
   },
-  "fraction_of_optimum": 1.0,
+  "fraction_of_optimum": 0.9,
   "measurements": {
     "cold_native_fva": {
-      "median_seconds": 0.2530300509997687,
+      "median_seconds": 0.3757471490007447,
       "seconds": [
-        0.2530300509997687,
-        0.26225542399970436,
-        0.24509281199971156,
-        0.247948412000369,
-        0.2572329129998252
+        0.3984484149987111,
+        0.3631080719987949,
+        0.357084245999431,
+        0.39174483599890664,
+        0.3757471490007447
       ]
     },
     "fast_native_fva_workers_1": {
-      "median_seconds": 0.06640395599970361,
+      "median_seconds": 0.14912678000109736,
       "seconds": [
-        0.06892616400000406,
-        0.06640395599970361,
-        0.07242441099970165,
-        0.06590823199985607,
-        0.06637588499961566
+        0.14349585300078616,
+        0.12514051899961487,
+        0.14912678000109736,
+        0.15025389500078745,
+        0.15209062900066783
       ]
     },
     "fast_native_fva_workers_2": {
-      "median_seconds": 0.5320995830006723,
+      "median_seconds": 0.900106893001066,
       "seconds": [
-        0.5461009959999501,
-        0.5437041820005106,
-        0.5320995830006723,
-        0.4163826589992823,
-        0.38519983399964985
+        0.9143095220006217,
+        1.0338546479997603,
+        0.8824705059996631,
+        0.8672813150005823,
+        0.900106893001066
       ]
     }
   },
@@ -68,8 +68,8 @@
   "repeats": 5,
   "schema_version": 1,
   "speedups": {
-    "fast_parallel_over_cold": 0.47553138375500104,
-    "fast_serial_over_cold": 3.8104665180023023
+    "fast_parallel_over_cold": 0.41744725201243366,
+    "fast_serial_over_cold": 2.519649046254333
   },
   "warmup_runs_per_path": 1,
   "workers": {
