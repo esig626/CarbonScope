@@ -1,79 +1,170 @@
 {
-  "command": "PYTHONPATH=src python benchmarks/benchmark_highs_fva_reference.py ecoli-core --fraction 0.9 --repeats 5 --parallel-workers 2",
-  "correctness": {
-    "fast_parallel_vs_cold": {
-      "max_absolute_range_difference": 1.7009726960282023e-12,
-      "order_matches": true,
-      "passed": true,
-      "tolerance": 1e-07
-    },
-    "fast_serial_vs_cold": {
-      "max_absolute_range_difference": 3.652189661806915e-12,
-      "order_matches": true,
-      "passed": true,
-      "tolerance": 1e-07
-    }
-  },
+  "schema_version": 2,
   "diagnostic_only": true,
-  "environment": {
-    "cobra": null,
-    "cpu_count": 9,
-    "highs": "1.12.0",
-    "implementation": "CPython",
-    "numpy": "2.3.5",
-    "pandas": "2.2.3",
-    "platform": "Linux-6.18.35-x86_64-with-glibc2.39",
-    "python": "3.12.13"
+  "ci_timing_gate": false,
+  "recorded_utc": "2026-09-04T22:12:59Z",
+  "source_remote_commit": "d1056facd9d41a1bebeb2bc21eeede727766c843",
+  "invocation": {
+    "working_directory": "codex",
+    "command": "PYTHONPATH=src python benchmarks/benchmark_highs_fva_reference.py ecoli-core --fraction 0.9 --repeats 5 --parallel-workers 2",
+    "independent_invocations": 2,
+    "warmup_runs_per_path_per_invocation": 1,
+    "measured_repeats_per_path_per_invocation": 5
   },
   "fraction_of_optimum": 0.9,
-  "measurements": {
-    "cold_native_fva": {
-      "median_seconds": 0.3757471490007447,
-      "seconds": [
-        0.3984484149987111,
-        0.3631080719987949,
-        0.357084245999431,
-        0.39174483599890664,
-        0.3757471490007447
-      ]
-    },
-    "fast_native_fva_workers_1": {
-      "median_seconds": 0.14912678000109736,
-      "seconds": [
-        0.14349585300078616,
-        0.12514051899961487,
-        0.14912678000109736,
-        0.15025389500078745,
-        0.15209062900066783
-      ]
-    },
-    "fast_native_fva_workers_2": {
-      "median_seconds": 0.900106893001066,
-      "seconds": [
-        0.9143095220006217,
-        1.0338546479997603,
-        0.8824705059996631,
-        0.8672813150005823,
-        0.900106893001066
-      ]
-    }
-  },
   "model": {
-    "balanced_metabolites": 72,
-    "fingerprint": "3b21e47c4d9ae5cad5256f124ef2e1e22e12052afa55f95be42a733ce213011c",
     "name": "bundled-e-coli-core-biomass",
-    "nonzeros": 360,
-    "reactions": 95
+    "fingerprint": "3b21e47c4d9ae5cad5256f124ef2e1e22e12052afa55f95be42a733ce213011c",
+    "reactions": 95,
+    "balanced_metabolites": 72,
+    "nonzeros": 360
   },
-  "repeats": 5,
-  "schema_version": 1,
-  "speedups": {
-    "fast_parallel_over_cold": 0.41744725201243366,
-    "fast_serial_over_cold": 2.519649046254333
+  "environment": {
+    "python": "3.12.13",
+    "implementation": "CPython",
+    "platform": "Linux-6.18.35-x86_64-with-glibc2.39",
+    "architecture": "x86_64",
+    "numpy": "2.5.2",
+    "pandas": "3.0.5",
+    "highs": "1.12.0",
+    "cobra": null,
+    "cpu_count": 9
   },
-  "warmup_runs_per_path": 1,
   "workers": {
-    "parallel": 2,
-    "serial": 1
+    "serial": 1,
+    "parallel": 2
+  },
+  "correctness": {
+    "all_invocations_passed": true,
+    "canonical_order_matched": true,
+    "tolerance": 1e-07,
+    "maximum_serial_vs_cold_absolute_range_difference": 3.652189661806915e-12,
+    "maximum_parallel_vs_cold_absolute_range_difference": 2.9034552539997094e-12
+  },
+  "runs": [
+    {
+      "run": 1,
+      "correctness": {
+        "fast_serial_vs_cold": {
+          "passed": true,
+          "order_matches": true,
+          "max_absolute_range_difference": 3.652189661806915e-12,
+          "tolerance": 1e-07
+        },
+        "fast_parallel_vs_cold": {
+          "passed": true,
+          "order_matches": true,
+          "max_absolute_range_difference": 2.362554596402333e-12,
+          "tolerance": 1e-07
+        }
+      },
+      "measurements": {
+        "cold_native_fva": {
+          "seconds": [
+            0.2530445709999185,
+            0.24966493300007642,
+            0.2554484889997184,
+            0.25057754799991017,
+            0.25558016800005134
+          ],
+          "median_seconds": 0.2530445709999185
+        },
+        "fast_native_fva_workers_1": {
+          "seconds": [
+            0.09764668599973447,
+            0.09956573899989962,
+            0.0996764860001349,
+            0.10407680700018318,
+            0.10020782599985978
+          ],
+          "median_seconds": 0.0996764860001349
+        },
+        "fast_native_fva_workers_2": {
+          "seconds": [
+            0.5967546580000089,
+            0.5878532980000273,
+            0.5995434110000133,
+            0.623870882999654,
+            0.5993402849999256
+          ],
+          "median_seconds": 0.5993402849999256
+        }
+      },
+      "speedups": {
+        "fast_serial_over_cold": 2.538658626063283,
+        "fast_parallel_over_cold": 0.4222051768136192
+      }
+    },
+    {
+      "run": 2,
+      "correctness": {
+        "fast_serial_vs_cold": {
+          "passed": true,
+          "order_matches": true,
+          "max_absolute_range_difference": 3.652189661806915e-12,
+          "tolerance": 1e-07
+        },
+        "fast_parallel_vs_cold": {
+          "passed": true,
+          "order_matches": true,
+          "max_absolute_range_difference": 2.9034552539997094e-12,
+          "tolerance": 1e-07
+        }
+      },
+      "measurements": {
+        "cold_native_fva": {
+          "seconds": [
+            0.24913829999968584,
+            0.24580912800001897,
+            0.25160726600006456,
+            0.24785803599979772,
+            0.24977619699984643
+          ],
+          "median_seconds": 0.24913829999968584
+        },
+        "fast_native_fva_workers_1": {
+          "seconds": [
+            0.09800572200038005,
+            0.09971143299981122,
+            0.09880005000013625,
+            0.09999026300010883,
+            0.10037953900018692
+          ],
+          "median_seconds": 0.09971143299981122
+        },
+        "fast_native_fva_workers_2": {
+          "seconds": [
+            0.5968407360001038,
+            0.5997587259998909,
+            0.5962925069998164,
+            0.5947227830001793,
+            0.604634156999964
+          ],
+          "median_seconds": 0.5968407360001038
+        }
+      },
+      "speedups": {
+        "fast_serial_over_cold": 2.4985931151963037,
+        "fast_parallel_over_cold": 0.4174284444278323
+      }
+    }
+  ],
+  "summary": {
+    "median_of_run_medians_seconds": {
+      "cold_native_fva": 0.2510914354998022,
+      "fast_native_fva_workers_1": 0.09969395949997306,
+      "fast_native_fva_workers_2": 0.5980905105000147
+    },
+    "median_reported_speedup": {
+      "fast_serial_over_cold": 2.5186258706297933,
+      "fast_parallel_over_cold": 0.41981681062072573
+    },
+    "serial_speedup_range": [
+      2.4985931151963037,
+      2.538658626063283
+    ],
+    "material_serial_speedup_reference": 2.0,
+    "all_serial_runs_exceed_reference": true,
+    "parallel_process_overhead_dominated_on_this_model": true
   }
 }

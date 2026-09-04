@@ -76,10 +76,24 @@ checks every returned primal.
 Production `run_highs_vffva` and `run_prepared_highs_vffva` create at most one
 reusable HiGHS model per worker. Endpoint jobs change only the active reaction
 objective and its sense, allowing HiGHS to reuse its simplex state. HiGHS uses
-one internal thread per worker. Multiprocess execution uses a dynamic,
-one-endpoint task queue and restores results to exact canonical reaction order
-regardless of completion order. Failures name the reaction and min/max
-direction.
+one internal thread per worker. Omitting `workers` or passing `workers=None`
+selects the serial, portable default. An explicit integer greater than one opts
+into spawned multiprocess execution, which uses a dynamic one-endpoint task
+queue and restores results to exact canonical reaction order regardless of
+completion order. Failures name the reaction and min/max direction.
+
+Because Python's spawn start method imports the calling module in each child,
+scripts that explicitly request multiple workers must put that call behind the
+normal entry-point guard:
+
+```python
+if __name__ == "__main__":
+    fva = run_highs_vffva(model, workers=2)
+```
+
+The composed deterministic path is serial. The ensemble path also defaults to
+serial and exposes explicit opt-in through `fva_workers>1`. Callers of the
+lower-level FVA APIs opt into spawned workers with `workers>1`.
 
 The composed deterministic and ensemble APIs prepare the LP and solve the
 biological objective once. The ensemble then uses one FastFVA result for both
@@ -286,20 +300,24 @@ PYTHONPATH=src python benchmarks/benchmark_highs_fva_reference.py \
 
 The tracked result is
 [`benchmarks/results/stage1_native_fva_linux_x86_64.json`](../benchmarks/results/stage1_native_fva_linux_x86_64.json).
-It records Python 3.12.13, HiGHS 1.12.0, one warm-up, and five timed repetitions
-on the bundled 95-reaction E. coli core model:
+It records source commit `d1056facd9d41a1bebeb2bc21eeede727766c843`,
+Python 3.12.13, and HiGHS 1.12.0. Two independent invocations each used one
+warm-up and five timed repetitions on the bundled 95-reaction E. coli core
+model:
 
-| Path | Median seconds | Cold / path |
-| --- | ---: | ---: |
-| Cold native reference | `0.375747` | `1.000x` |
-| Reusable native, one worker | `0.149127` | `2.520x` |
-| Reusable native, two workers | `0.900107` | `0.417x` |
+| Path | Run 1 median (s) | Run 2 median (s) | Median of run medians (s) |
+| --- | ---: | ---: | ---: |
+| Cold native reference | `0.253045` | `0.249138` | `0.251091` |
+| Reusable native, one worker | `0.099676` | `0.099711` | `0.099694` |
+| Reusable native, two workers | `0.599340` | `0.596841` | `0.598091` |
 
-Serial FastFVA differed from the cold oracle by at most `3.66e-12`; the
-two-worker result differed by at most `1.71e-12`. The small model did not amortize
-process-spawn and IPC overhead, so the parallel measurement is correctness
-evidence rather than a speed claim. Timings are diagnostic and are not CI
-thresholds.
+The per-run reusable-serial speedups were `2.538659x` and `2.498593x`, with a
+median of `2.518626x`. The corresponding two-worker ratios were `0.422205x` and
+`0.417428x`, with a median of `0.419817x`. Serial FastFVA differed from the cold
+oracle by at most `3.652189662e-12`; the two-worker result differed by at most
+`2.903455254e-12`. The small model did not amortize process-spawn and IPC
+overhead, so the parallel measurement is correctness evidence rather than a
+speed claim. Timings are diagnostic and are not CI thresholds.
 
 Stage 1 ends at forward flux-to-MID ensembles. It does not implement inverse
 MFA, fitting, confidence intervals, Monte-Carlo MFA uncertainty, information

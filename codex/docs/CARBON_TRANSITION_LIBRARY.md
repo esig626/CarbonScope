@@ -1,10 +1,12 @@
 # Carbon transition library
 
-FluxEMU separates a stoichiometric COBRA model from a carbon-transition model.
-Stoichiometry says which metabolites react and carries flux constraints; a
-transition says exactly where every tracked carbon goes. The reusable library
-in `src/fluxemu/carbon_transitions/` supplies the latter without tying it to a
-single COBRA model.
+FluxEMU separates its canonical stoichiometric `FluxModel` from its
+carbon-transition model. Stoichiometry says which metabolites react and carries
+flux constraints; a transition says exactly where every tracked carbon goes.
+The reusable library in `src/fluxemu/carbon_transitions/` supplies the latter
+without tying it to a single physical model representation. Native Stage 1
+builds the canonical model without COBRApy; a COBRA model may instead be used
+only through the optional compatibility/projection path.
 
 Canonical library maps use explicit references such as
 `pyruvate.C1 -> carbon_dioxide.C1` and
@@ -52,9 +54,13 @@ Library resolution can generate SBML-compatible metadata, so users do not
 hand-write ABC labels for a supported reaction. Carbon-source/excretion model
 roles remain model-specific metadata.
 
-Each pipeline output now contains `mapping_provenance.json`; its per-reaction
-records identify the model reaction, canonical transition, source identifier,
-status, SBML/library origin, symmetry treatment, and warnings.
+The legacy compatibility output writer can emit `mapping_provenance.json`; its
+per-reaction records identify the model reaction, canonical transition, source
+identifier, status, SBML/library origin, symmetry treatment, and warnings. The
+current deterministic native CLI instead emits its five-file bundle:
+`fba_fluxes.csv`, `fva_ranges.csv`, `predicted_mids.json`,
+`emu_diagnostics.json`, and `manifest.json`. It does not emit a separate
+per-reaction mapping-provenance file.
 
 ## Adding a reaction safely
 

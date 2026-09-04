@@ -37,10 +37,22 @@ Each of the `2N` endpoint jobs changes only one column cost and objective sense.
 Repeated `Highs.run()` calls on the same simplex model retain HiGHS' incumbent
 basis and reoptimize it; explicit `getBasis`/`setBasis` round trips are deliberately
 avoided because the basis never leaves its owning solver. HiGHS internal threads
-are fixed at one. A single worker uses the same reusable worker object. Multiple
-spawned processes consume `imap_unordered(..., chunksize=1)`, which dynamically
-assigns the next endpoint to the next available process, and results are restored
-to canonical reaction order.
+are fixed at one. Omitting `workers` or passing `workers=None` uses one reusable
+worker in the calling process; this is the portable default. An explicit
+`workers>1` opts into spawned processes consuming
+`imap_unordered(..., chunksize=1)`, which dynamically assigns the next endpoint
+to the next available process, and results are restored to canonical reaction
+order. The composed deterministic path is serial. The ensemble path defaults
+to serial and exposes explicit opt-in through `fva_workers>1`, while callers
+of the lower-level FVA APIs use `workers>1`.
+
+Python scripts that request multiple workers must guard the call so spawned
+children can import the module safely:
+
+```python
+if __name__ == "__main__":
+    fva = run_highs_vffva(model, workers=2)
+```
 
 The architecture is inspired by M. Ben Guebila, *VFFVA: dynamic load balancing
 enables large-scale flux variability analysis*, BMC Bioinformatics 21, 519 (2020),
@@ -69,13 +81,16 @@ PYTHONPATH=src python benchmarks/benchmark_highs_fva_reference.py \
   > /tmp/stage1_native_fva.json
 ```
 
-On the bundled 95-reaction E. coli core problem, Python 3.12.13 and HiGHS
-1.12.0, five repetitions after one warm-up produced a cold median of `0.375747`
-seconds and a reusable one-worker median of `0.149127` seconds: a `2.520x`
-speedup, with maximum absolute endpoint difference `3.66e-12`. Two process
-workers remained correct (maximum difference `1.71e-12`) but were slower on
-this small model because spawn and IPC overhead dominated. The machine-readable
-record is
+On the bundled 95-reaction E. coli core problem at source commit
+`d1056facd9d41a1bebeb2bc21eeede727766c843`, Python 3.12.13 and HiGHS
+1.12.0, two independent invocations with one warm-up and five measured
+repetitions per path produced cold medians of `0.253045` and `0.249138` seconds
+and reusable one-worker medians of `0.099676` and `0.099711` seconds. The
+per-run serial speedups were `2.538659x` and `2.498593x`, with a median of
+`2.518626x`; maximum absolute serial endpoint difference was
+`3.652189662e-12`. Two process workers remained correct (maximum difference
+`2.903455254e-12`) but were slower on this small model because spawn and IPC
+overhead dominated. The machine-readable record is
 [`benchmarks/results/stage1_native_fva_linux_x86_64.json`](../benchmarks/results/stage1_native_fva_linux_x86_64.json);
 timing ratios are diagnostic and are not CI gates.
 
