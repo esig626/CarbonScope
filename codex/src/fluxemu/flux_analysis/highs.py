@@ -2132,14 +2132,15 @@ def run_prepared_highs_vffva(
 
     Each worker creates one LP and repeatedly changes only column costs and the
     objective sense. Repeated ``Highs.run`` calls naturally retain the current
-    simplex basis; no basis export/import is needed.
+    simplex basis; no basis export/import is needed. Omitted or ``None``
+    ``workers`` selects the portable serial path; process spawning is explicit.
     """
     _validate_prepared_flux_region(prepared)
     lp = prepared.lp
     retention = prepared.retention
     tasks = [(j, direction) for j in range(len(lp.reaction_ids)) for direction in ("min", "max")]
     if workers is None:
-        workers = min(4, os.cpu_count() or 1, len(tasks))
+        workers = 1
     if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
         raise AnalysisError("workers must be a positive integer")
     workers = min(workers, len(tasks))
@@ -2199,7 +2200,7 @@ def run_prepared_highs_vffva(
 def run_highs_vffva(model: FluxModel, fraction_of_optimum: float = 1.0, *,
                      workers: int | None = None,
                      instrumentation: dict[str, int] | None = None) -> FVAResult:
-    """Prepare and run VFFVA-style dynamically scheduled native HiGHS FVA."""
+    """Run reusable native FVA; use explicit ``workers > 1`` for spawning."""
 
     prepared = prepare_highs_flux_region(model, fraction_of_optimum)
     return run_prepared_highs_vffva(

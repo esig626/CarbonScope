@@ -353,6 +353,35 @@ def test_parallel_path_uses_unordered_unit_chunk_dynamic_queue(monkeypatch):
     )
 
 
+@pytest.mark.parametrize(
+    "worker_arguments",
+    [pytest.param({}, id="omitted"), pytest.param({"workers": None}, id="none")],
+)
+def test_default_worker_mode_is_portable_serial(monkeypatch, worker_arguments):
+    def forbidden_process_context(*args, **kwargs):
+        raise AssertionError("default FastFVA unexpectedly attempted to spawn")
+
+    monkeypatch.setattr(
+        highs.multiprocessing, "get_context", forbidden_process_context
+    )
+    metrics = {}
+    actual = run_highs_vffva(
+        _model(), 0.9, instrumentation=metrics, **worker_arguments
+    )
+
+    assert metrics["solver_instances"] == 1
+    assert metrics["matrix_builds"] == 1
+    assert tuple(actual.ranges.index) == (
+        "source", "reversible", "export", "fixed", "blocked"
+    )
+    pd.testing.assert_frame_equal(
+        actual.ranges,
+        run_highs_fva_reference(_model(), 0.9).ranges,
+        atol=1e-8,
+        rtol=1e-8,
+    )
+
+
 def test_parallel_queue_propagates_contextual_endpoint_failure(monkeypatch):
     original_run = highs._ReusableFVAWorker.solve
 

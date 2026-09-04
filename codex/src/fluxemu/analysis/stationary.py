@@ -136,7 +136,11 @@ def run_native_fba(model: CanonicalModel) -> FBAResult:
 def run_native_fva(
     model: CanonicalModel, fraction_of_optimum: float = 1.0, *, workers: int | None = None
 ) -> FVAResult:
-    """Validate ``model`` and delegate to reusable, dynamically scheduled FVA."""
+    """Validate ``model`` and delegate to reusable native FVA.
+
+    Omitted or ``None`` ``workers`` is serial and spawn-safe. An explicit value
+    greater than one enables the dynamically scheduled process pool.
+    """
 
     validate_canonical_model(model)
     return run_highs_vffva(model.flux_model, fraction_of_optimum, workers=workers)
