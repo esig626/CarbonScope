@@ -1,4 +1,4 @@
-# Phase 2 native transient EMU shadow engine
+# Phase 2 native transient EMU engine
 
 ## V1 scientific contract
 
@@ -66,4 +66,6 @@ remain unchanged.
 
 V1 does not support time-varying fluxes or pool sizes, pulse-chase schedules, tracer switches after zero, arbitrary prelabelled internal pools, abundance dynamics, growth dilution not represented by turnover, or non-steady metabolite concentrations. It does not perform inverse MFA.
 
-mfapy remains only a temporary historical and differential-validation shadow. It performs no native ODE construction, graph construction, source evaluation, atom propagation, condensation, integration, or target extraction.
+mfapy is only an optional historical and differential-validation oracle. It
+performs no native ODE construction, graph construction, source evaluation,
+atom propagation, condensation, integration, or target extraction.

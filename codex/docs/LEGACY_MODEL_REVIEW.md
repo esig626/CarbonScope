@@ -2,7 +2,7 @@
 
 This review was performed only after the official mfapy Example 0 regression
 and complete annotated COBRA toy pipeline passed. Everything under
-`/workspace/references` remains unverified secondary material. The notebooks
+`references/` remains unverified secondary material. The notebooks
 were inspected statically; no notebook or legacy model was executed, repaired,
 adopted, or certified.
 
@@ -118,7 +118,7 @@ directional role, participants, and atom mapping must all match.
 - Aggregate zero-carbon Biomass versus Model A's separate carbon sinks is a
   material modeling decision. No variant should be selected automatically.
 
-## Future migration work
+## Migration requirements for any future adoption
 
 1. Establish an authoritative SBML network, objective, reaction semantics, and
    boundaries independently of these files.
@@ -129,8 +129,10 @@ directional role, participants, and atom mapping must all match.
 4. Recreate normalized tracer mixtures and requested targets in experiment
    YAML. The non-unit notebook mixtures must be rejected until a user supplies
    corrected intent.
-5. Replace the flux CSV handoff with complete feasible COBRApy samples in
-   memory, preserve real sample IDs, and emit mapping only as diagnostics.
+5. Replace the flux CSV handoff with native, complete, jointly feasible
+   `CanonicalFluxState` samples in memory, preserve real sample IDs, and emit
+   mapping only as diagnostics. COBRApy may be used only as an optional parity
+   oracle, not the production sampler.
 6. Validate mappings, complete reaction order, finite values, bounds, `S v =
    0`, objective floor, fragment presence, and MID distributions before any
    numerical comparison.

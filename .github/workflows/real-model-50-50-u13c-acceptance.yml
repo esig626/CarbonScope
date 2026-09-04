@@ -18,6 +18,11 @@ jobs:
         run: python -m pip install -e './codex' pytest matplotlib
       - name: Verify frozen handoff, native flux parity, FVA, and extension gate
         run: pytest -q codex/tests/test_real_model_acceptance.py
+      - name: Execute sampled Stage B2 flux-to-MID ensemble gate
+        run: >-
+          pytest -q
+          codex/tests/test_native_stage1_ensemble_integration.py
+          -k stage_b2_sampled_batch_produces_twelve_mids_per_state
       - name: Execute final native HiGHS acceptance
         run: python codex/tools/run_real_model_acceptance.py
       - name: Verify generated positive programme plots

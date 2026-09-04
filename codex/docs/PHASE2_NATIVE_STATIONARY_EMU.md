@@ -1,4 +1,9 @@
-# Phase 2 native stationary EMU shadow engine
+# Phase 2 native stationary EMU engine
+
+> **Historical delivery notes.** Native stationary EMU began as a parity engine
+> in this milestone. It is now the public forward engine used by deterministic
+> and sampled Stage 1 orchestration; see
+> [Stage 1 native workflow](STAGE1_NATIVE_WORKFLOW.md).
 
 ## Execution boundary and identity
 
@@ -47,10 +52,14 @@ remain internal.
 
 ## Supported V1 semantics
 
-Flux reactions must be directionally unambiguous from their canonical bounds:
-nonnegative bounds mean forward and nonpositive bounds mean reverse. The
-corresponding `IsotopeReaction.direction` must agree. Bounds spanning negative
-and positive flux are rejected rather than interpreted as net/exchange flux.
+For a direct isotope mapping without a `FluxProjectionRule`, the physical flux
+reaction must be directionally unambiguous from its canonical bounds:
+nonnegative bounds mean forward and nonpositive bounds mean reverse, and the
+corresponding `IsotopeReaction.direction` must agree. The final native model can
+also express directional isotope components of signed or sign-spanning physical
+fluxes through explicit `positive_part` projection rules, covered-direction
+metadata, and direction-activity certificates. No direction or gross flux is
+inferred from a signed net value.
 
 Declared tracers are fixed isotope sources. Balanced metabolites are solved
 unknown pools. Unbalanced non-tracers are allowed only as requested terminal
@@ -58,17 +67,18 @@ products; encountering one as a precursor is invalid. Any physical flux that
 produces a planned pool without an explicit isotope mapping is rejected.
 Only `correction: no` is supported in this milestone.
 
-## Shadow status and benchmark inventory
+## Current public status and benchmark inventory
 
-The public `run_stationary_forward` route remains mfapy-backed. Native
-execution is a parallel internal shadow and imports neither mfapy, COBRApy,
-nor Matplotlib. The repository contains the independent Antoniewicz full-
-isotopomer solver, the independent glucose-to-TCA solver, and the official
-mfapy Example 0 frozen expected Glue MID. Example 0 maps to the same checked
-authoritative Antoniewicz chemistry, with the native boundary-target rule
-replacing mfapy's artificial export workaround.
+`compile_emu_plan` and `evaluate_stationary` are public native APIs, and
+`run_native_stationary_analysis` plus `run_native_stationary_ensemble` compose
+them with native HiGHS flux analysis. Native execution imports neither mfapy
+nor COBRApy; SciPy is not required for stationary EMU. The older
+`run_stationary_forward` function remains a separate compatibility path rather
+than the primary Stage 1 route.
 
-No frozen seven-target E. coli stationary forward fixture or frozen complete
-E. coli flux vectors are present. Curated E. coli-related transition-library
-entries and vendor samples are not a shadow fixture, so Gate E is unavailable
-and was not reconstructed.
+The repository retains independent Antoniewicz full-isotopomer and
+glucose-to-TCA oracles plus the official mfapy Example 0 frozen Glue MID.
+Example 0 maps to the same checked authoritative Antoniewicz chemistry, with
+the native boundary-target rule replacing mfapy's artificial export workaround.
+It also now includes a persisted 95-reaction E. coli Stage B2 canonical model
+and ordered 12-target native experiment used for sampled end-to-end acceptance.

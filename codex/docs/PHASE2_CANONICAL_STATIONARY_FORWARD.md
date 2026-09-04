@@ -1,5 +1,10 @@
 # Phase 2: canonical stationary forward execution
 
+> **Historical milestone.** This document records the temporary compatibility
+> backend behind the canonical boundary delivered in Phase 2. Native stationary
+> EMU and the complete sampled Stage 1 path are now public and supported; see
+> [Stage 1 native workflow](STAGE1_NATIVE_WORKFLOW.md).
+
 ## Phase 1 foundation
 
 Phase 1 introduced immutable `CanonicalModel` and
@@ -42,11 +47,11 @@ create branches or weights; mfapy symmetry generation is disabled for this
 route. Tracers define carbon sources, canonical flux balance semantics define
 boundary metabolites, and targets retain their experiment order.
 
-mfapy remains responsible only for compiling and numerically evaluating the
-stationary EMU equations. It no longer owns the model chemistry, tracer
-semantics, target semantics, complete flux-state contract, or result contract.
-Backend imports are lazy, so importing `fluxemu.model` or the public execution
-records does not import mfapy or SciPy.
+At this milestone, mfapy was responsible only for compiling and numerically
+evaluating the stationary EMU equations. It did not own the model chemistry,
+tracer semantics, target semantics, complete flux-state contract, or result
+contract. Backend imports were lazy, so importing `fluxemu.model` or the public
+execution records did not import mfapy or SciPy.
 
 ## Dependency contract
 
@@ -54,7 +59,8 @@ The audited mfapy source imports NumPy and SciPy for stationary execution.
 FluxEMU already requires NumPy 2.x. SciPy 1.13 is the first SciPy release line
 supporting NumPy 2.0, so the `mfapy` optional dependency group declares
 `scipy>=1.13`. The dependency is backend-scoped because canonical model use
-does not require an execution engine.
+does not require an execution engine. That optional group supplies SciPy; it
+does not distribute mfapy itself.
 
 ## Scientific parity gate
 
@@ -66,15 +72,19 @@ at an absolute tolerance of `1e-12`, matching the existing forward regression
 tolerance. It also checks deterministic repeated execution and exact compiled
 branch order, IDs, weights, and transitions for v5, v6, and v7.
 
-Codex Cloud lacks SciPy and therefore cannot execute mfapy. The GitHub Actions
-workflow **Canonical stationary forward parity** installs the `mfapy` extra on
-Python 3.11 and is the authoritative Control 0 and Control 1 execution gate.
-The milestone is complete only after that workflow passes.
+The historical **Canonical stationary forward parity** workflow installed the
+`mfapy` dependency group on Python 3.11 and expected mfapy source to be supplied
+separately by its parity environment. It served as the Control 0 and Control 1
+gate for this milestone. That compatibility parity is not the native Stage 1
+runtime or its clean-install gate.
 
-## Remaining work before a native backend
+## Subsequent native completion
 
-FluxEMU still depends on mfapy and SciPy for numerical stationary EMU
-execution. A future native backend would replace that numerical compiler and
-solver behind the same canonical boundary. Native EMU execution, inverse MFA,
-optimization, time-course simulation, and inference are outside this
-milestone.
+At this historical milestone, numerical stationary execution still used mfapy
+and SciPy behind the canonical boundary. The later native engine replaced that
+temporary implementation for public stationary execution and now accepts both
+one deterministic FBA state and validated native sampled batches. Native Stage
+1 imports neither mfapy nor SciPy.
+
+Inverse MFA, fitting, confidence intervals, and inference remain outside Stage
+1; they were not introduced by the native completion.

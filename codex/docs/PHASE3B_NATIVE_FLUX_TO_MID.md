@@ -1,14 +1,18 @@
-# Phase 3B: one-model native flux to stationary MID
+# Phase 3B: deterministic one-model native flux to stationary MID
+
+This document records the preserved deterministic API delivered before the
+sampled Stage 1 path. It remains supported alongside the complete
+[Stage 1 native workflow](STAGE1_NATIVE_WORKFLOW.md).
 
 ## Supported public path
 
-FluxEMU now supports a deterministic, native, forward analysis from one
+FluxEMU supports a deterministic, native, forward analysis from one
 scientific model definition:
 
 ```text
 CanonicalModel
     |-- FluxModel ----> native HiGHS FBA
-    |              `--> native cold-reference HiGHS FVA
+    |              `--> reusable native FastFVA
     `-- IsotopeModel --\
                          exact complete FBA optimum flux state
                                       |
@@ -43,6 +47,8 @@ does not construct COBRApy or mfapy models.
 For flux-only use, `run_native_fba(model)` and
 `run_native_fva(model, fraction_of_optimum=...)` validate the complete
 canonical model and delegate to the established native HiGHS routines.
+`run_highs_fva_reference` remains the cold correctness oracle, but production
+orchestration uses the reusable FastFVA path.
 
 ## FVA is not a flux state
 
@@ -63,14 +69,18 @@ different MIDs. FVA can reveal reaction-level underdetermination, but it does
 not describe a joint flux distribution and does not quantify the resulting
 MID distribution.
 
-## Scope and next milestone
+## Relationship to the sampled Stage 1 path
 
-This milestone adds orchestration, not a solver or a new scientific engine. It
-uses the existing cold-reference HiGHS FBA/FVA implementation and the existing
-native stationary EMU compiler/evaluator unchanged. It does not perform inverse
-MFA, fit isotope measurements, or propagate uncertainty.
+This deterministic result deliberately contains `fba`, `fva`, `flux_state`, and
+`mids`. The FBA primal is one complete solver-selected optimum, and its MIDs are
+conditional on that state.
 
-Native feasible-flux sampling is the next milestone. It will sample complete
-jointly feasible states so that flux-space uncertainty can later be propagated
-into MID ensembles; independently sampling or combining FVA intervals will not
-be used.
+The completed sampled API, `run_native_stationary_ensemble`, instead returns
+`fba`, reaction-wise `fva`, `flux_sampling`, and `mid_ensemble` as structurally
+separate products. It samples complete jointly feasible states and evaluates
+them with one compiled native EMU plan; it never independently samples or
+combines FVA intervals. See [Stage 1 native workflow](STAGE1_NATIVE_WORKFLOW.md)
+for its algorithm, provenance, validation, limitations, and example.
+
+Neither path performs inverse MFA, fits isotope measurements, or reports
+confidence intervals or biological probabilities.

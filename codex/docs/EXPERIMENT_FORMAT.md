@@ -1,14 +1,23 @@
-# FluxEMU isotope metadata and experiment format
+# Historical COBRA/mfapy compatibility experiment format
 
-FluxEMU separates network topology from experiment settings:
+> **Compatibility schema.** This document describes the original annotated
+> COBRA SBML and mfapy-oriented YAML route. Its `sampler: achr|optgp` fields do
+> not configure the native Stage 1 sampler. The native deterministic CLI loads
+> its flux model from SBML through libSBML and uses a separate native experiment
+> YAML schema, while native sampled execution is currently a Python API. See
+> [Standalone native workflow](STANDALONE_NATIVE_WORKFLOW.md) and
+> [Stage 1 native workflow](STAGE1_NATIVE_WORKFLOW.md).
 
-- the runtime metabolic network is a COBRA SBML file;
+The compatibility route separates network topology from experiment settings:
+
+- its compatibility input network is a COBRA SBML model;
 - atom transitions and metabolite carbon properties are versioned JSON values
   in SBML notes; and
 - tracer mixtures, requested fragments, sampling settings, tolerances, and
   output settings are YAML.
 
-No mfapy text model or reaction-map input file is used.
+This compatibility schema does not use an mfapy text model or reaction-map input
+file. Native Stage 1 requires neither COBRApy nor mfapy.
 
 ## SBML notes
 
@@ -69,7 +78,8 @@ reaction ID, and `directional_id` must be unique.
 }
 ```
 
-Carbon sources enter mfapy's source template. Excreted metabolites do not
+On the compatibility route, carbon sources enter mfapy's source template.
+Excreted metabolites do not
 participate in mfapy's internal steady-state equations. Symmetric metabolites
 enable mfapy's carbon-order symmetry handling. Carbon-source and excreted
 metabolites must be included in the isotope model.
@@ -78,10 +88,10 @@ Stable COBRApy round-trip tests cover reaction and metabolite metadata with
 quotes, `<`, and `&`, and require both the escaped note string and decoded
 objects to remain exact.
 
-## Experiment YAML
+## Compatibility experiment YAML
 
 The checked-in example is
-`/workspace/codex/examples/toy_experiment.yaml`. The complete schema is:
+`codex/examples/toy_experiment.yaml`. The compatibility schema is:
 
 ```yaml
 schema_version: 1
@@ -121,7 +131,8 @@ output:
 
 ### Tracers
 
-Each carbon-source metabolite must appear exactly once. Isotopomer keys begin
+For this compatibility parser, each carbon-source metabolite must appear exactly
+once. Isotopomer keys begin
 with `#` and contain one `0`/`1` per tracked carbon in metabolic atom order.
 Fractions must be finite, nonnegative, no greater than one, and sum to exactly
 one within `tolerances.tracer_normalization`. `correction` is `yes` or `no` and
@@ -130,19 +141,25 @@ booleans; FluxEMU normalizes those values safely.
 
 ### Targets
 
-`fragment_id` is the public result ID. `metabolite_id` must identify an
+For this compatibility parser, `fragment_id` is the public result ID.
+`metabolite_id` must identify an
 included isotope metabolite. `atom_positions` are unique one-based carbon
 positions. The prototype accepts mfapy `intermediate` and `gcms` analytical
 methods for one metabolite fragment. `formula` is retained for mfapy's isotope
 correction matrices. Target-level natural-isotope addition is not enabled in
 this forward-only prototype, so target `correction` must currently be `no`.
 
-### Analysis and output
+### Compatibility analysis and output
 
 `fraction_of_optimum` is applied identically by FVA and by the persistent
 sampling objective constraint. `sample_count` is a positive integer. `sampler`
 is explicitly `achr` or `optgp`; OptGP runs with one process for an exact,
 reproducible batch size. `seed` is a nonnegative 32-bit integer.
+
+These fields belong only to the COBRApy compatibility sampler. They are not read
+by `run_native_stationary_ensemble`, whose count, seed, fraction, burn-in,
+thinning, and worker controls are explicit Python arguments. The native sampler
+is random-direction hit-and-run and does not expose an ACHR/OptGP selector.
 
 All tolerances must be finite and positive. Output precision is 1 through 17
 decimal digits. `overwrite: false` refuses a nonempty destination. Setting it

@@ -1,12 +1,13 @@
 # Phase 3B: native HiGHS flux analysis
 
-This milestone provides a correctness-first LP reference engine. `compile_flux_lp`
-translates `FluxModel` directly to immutable CSR-style row arrays. Reaction and
-balanced-metabolite orders are their declared tuple orders; only metabolites whose
-`steady_state_balanced` value is literally true produce `S v = 0` rows. Reaction
-bounds are copied unchanged. Duplicate terms are summed without creating a dense
-matrix. A SHA-256 fingerprint covers ordering, sparse values, bounds, objective,
-and direction.
+This milestone provides native FBA, a correctness-first cold FVA oracle, and a
+reusable dynamically scheduled FastFVA engine. `compile_flux_lp` translates
+`FluxModel` directly to immutable CSR-style row arrays. Reaction and
+balanced-metabolite orders are their declared tuple orders; only metabolites
+whose `steady_state_balanced` value is literally true produce `S v = 0` rows.
+Reaction bounds are copied unchanged. Duplicate terms are summed without
+creating a dense matrix. A SHA-256 fingerprint covers ordering, sparse values,
+bounds, objective, and direction.
 
 COBRA flux balance and isotope source/terminal roles are separate concepts.
 `project_cobra_flux_model` faithfully preserves every COBRA metabolite balance row;
@@ -25,7 +26,7 @@ FBA independently checks vector length, finiteness, bounds, balanced mass residu
 and the recomputed objective at fixed `1e-7` tolerances. It never clips fluxes.
 
 Reference FVA first solves the biological objective. For fraction `f`, it retains
-`c v >= f z*` for maximisation and `c v <= f z*` for minimisation. It then constructs
+`c^T v >= f z*` for maximisation and `c^T v <= f z*` for minimisation. It then constructs
 a cold independent LP for each reaction minimum and maximum, in canonical order,
 with exactly one endpoint cost. Endpoint feasibility and objective retention are
 independently checked. Thus it performs two endpoint solves per reaction plus FBA.
@@ -52,22 +53,33 @@ CPLEX, GLPK, external VFFVA executable, or MPI runtime is used.
 ## FastFVA acceptance evidence
 
 The non-gating benchmark at
-`benchmarks/benchmark_highs_fva_reference.py` measures cold native FVA, reusable
+`codex/benchmarks/benchmark_highs_fva_reference.py` measures cold native FVA, reusable
 native FVA with one worker, reusable native FVA with multiple workers when
 available, and an explicitly requested optional COBRApy comparator. It records
 raw repetitions, medians, model dimensions, worker counts, software versions,
 correctness differences, and speedup ratios as JSON. It fails before reporting
 timings if fast and cold results differ in order or beyond solver tolerance.
 
-On the bundled 95-reaction E. coli core problem, Python 3.12.13 and HiGHS 1.12.0,
-five repetitions after one warm-up produced a cold median of 0.253030 seconds and
-a reusable one-worker median of 0.066404 seconds: a 3.810x speedup, with maximum
-absolute endpoint difference 8.38e-12. Two process workers remained correct but
-were slower on this small model because spawn and IPC overhead dominated. The
-machine-readable record is
-`benchmarks/results/stage1_native_fva_linux_x86_64.json`; timing ratios are not CI
-gates.
+From the repository root, reproduce the tracked run with:
+
+```bash
+cd codex
+PYTHONPATH=src python benchmarks/benchmark_highs_fva_reference.py \
+  ecoli-core --fraction 0.9 --repeats 5 --parallel-workers 2 \
+  > /tmp/stage1_native_fva.json
+```
+
+On the bundled 95-reaction E. coli core problem, Python 3.12.13 and HiGHS
+1.12.0, five repetitions after one warm-up produced a cold median of `0.375747`
+seconds and a reusable one-worker median of `0.149127` seconds: a `2.520x`
+speedup, with maximum absolute endpoint difference `3.66e-12`. Two process
+workers remained correct (maximum difference `1.71e-12`) but were slower on
+this small model because spawn and IPC overhead dominated. The machine-readable
+record is
+[`benchmarks/results/stage1_native_fva_linux_x86_64.json`](../benchmarks/results/stage1_native_fva_linux_x86_64.json);
+timing ratios are diagnostic and are not CI gates.
 
 Native feasible-state sampling and sampled stationary-MID integration are
-documented in the final Stage 1 workflow. FVA endpoints remain independent
-diagnostics and are never treated as complete flux states.
+documented in the [Stage 1 native workflow](STAGE1_NATIVE_WORKFLOW.md). FVA
+endpoints remain independent diagnostics and are never treated as complete
+flux states.

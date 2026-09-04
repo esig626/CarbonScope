@@ -1,23 +1,29 @@
 # Known limitations
 
-## Explicit directional reactions
+The native Stage 1 limitations are described first. Later mfapy and COBRApy
+notes apply only to historical compatibility/parity paths and are not native
+runtime requirements. See [Stage 1 native workflow](STAGE1_NATIVE_WORKFLOW.md)
+for the supported public pipeline.
 
-The prototype accepts isotope reactions only when the COBRA lower bound is
-nonnegative. Forward and reverse gross fluxes must be represented by separate
-reactions, each with its own directionally correct atom map. A signed net flux
-is never split into simultaneous forward and reverse values. The runtime mfapy
-reversible-reaction dictionary is intentionally empty for the toy; the trusted
-official regression separately covers mfapy's nonempty reversible dictionary.
+## Explicit directional isotope semantics
+
+A direct isotope mapping without a `FluxProjectionRule` requires its physical
+reaction to be directionally unambiguous from canonical bounds: nonnegative
+bounds support `forward`, nonpositive bounds support `reverse`, and the declared
+isotope direction must agree. Native canonical models may instead represent an
+isotope-active directional component of signed or sign-spanning physical fluxes
+with an explicit `positive_part` projection, explicit covered physical
+directions, and (where supplied) a direction-activity certificate. FluxEMU does
+not infer a projection or invent simultaneous forward and reverse gross fluxes.
 
 ## Supplied atom mappings
 
 Every included reaction must provide ordered substrate/product participants
-and explicit atom-label correspondence in SBML notes. FluxEMU does not infer
-carbon transitions from stoichiometry, names, formulas, or external databases.
-mfapy 0.6.3 treats mapping labels as single characters, so this prototype
-rejects multi-character labels. It also limits included isotope reactions to
-unit stoichiometric coefficients; molecule-level expansion for coefficients
-greater than one is future work.
+and explicit atom correspondence. FluxEMU does not infer carbon transitions
+from stoichiometry, names, formulas, or external databases. The legacy
+mfapy/SBML-note compatibility encoding uses single-character mapping labels and
+unit isotope stoichiometry; those encoding restrictions are not reasons to
+infer or repair a native mapping.
 
 ## Prototype SBML extension
 
@@ -33,36 +39,50 @@ exclusion but adds annotation work.
 
 ## Target and isotope correction scope
 
-The prototype supports a single-metabolite `intermediate` or `gcms` target with
-unique one-based atom positions. mfapy can express more complicated compound
-fragments, MS/MS, and INST-MFA, but those forms are not exposed here. Tracer
-natural-isotope correction is passed through to mfapy. Target-level natural
-isotope addition is currently required to be `no`, because enabling it after
-mfapy construction would regenerate the forward function and violate the
-one-generation-per-run invariant.
+Native Stage 1 supports declared stationary targets and observation targets
+over explicit one-based atom positions. Natural-abundance correction is not
+implemented by the native stationary engine, so native experiments require
+`correction: no`. More elaborate mfapy compound-fragment, MS/MS, correction,
+and INST-MFA forms are compatibility capabilities and are not exposed by the
+native Stage 1 path.
 
 ## Sampling and scalability
 
-ACHR and one-process OptGP are supported. One-process OptGP preserves exact
-sample count and deterministic chain seeding but does not exploit parallel
-sampling. The package creates a dense stoichiometric matrix for independent
-sample validation and mfapy generates/executes dense layer-solvers; neither
-choice has been profiled on a genome-scale isotope network. The complete
-prototype must be validated on progressively larger trusted networks before
-biological-scale use.
+Native Stage 1 uses random-direction hit-and-run in an orthonormal basis of the
+numerically reduced affine hull, starting from a HiGHS Chebyshev centre. It uses
+FVA for collapsed-coordinate facial reduction, numerical-degeneracy and
+unboundedness checks, and provenance digest binding; reaction-wise FVA intervals
+are never independently sampled or combined. At fraction one—or any case where
+the represented retained bound exactly equals the optimum—the chain runs on the
+optimal face. Other smaller fractions retain the declared maximization or
+minimization inequality. Zero-dimensional regions return the same unique vector
+under distinct sample IDs.
 
-COBRApy's sampler validator does not check general inequality constraints, so
-FluxEMU evaluates the objective floor independently. Numerical acceptance is
-controlled by the experiment tolerances; this is validation, not proof of
-mixing quality or representative sampling.
+The transition kernel has relative-volume uniform stationary target on the
+numerically reduced retained affine polytope. A finite burn-in/thinned output
+remains a correlated Markov chain: FluxEMU does not claim proven convergence,
+adequate mixing, independence, representativeness, or biological probability.
+Fixed-seed replay is scoped to the same algorithm and numerical environment.
 
-## mfapy constraints
+Every returned state is independently checked for exact reaction order and
+membership, finite values, bounds, `S v = 0`, and retained-objective feasibility.
+Unbounded or numerically ambiguous geometry fails explicitly. States are not
+clipped or repaired. A state that later makes stationary EMU singular or
+undefined stops the batch with its sample ID; it is not dropped or resampled.
+
+The sampler and native stationary EMU have acceptance coverage on the bundled
+95-reaction model, but this is software evidence rather than proof of mixing or
+biological validity at genome scale.
+
+## Legacy mfapy compatibility constraints
 
 mfapy 0.6.3 generates Python source containing reaction IDs as local variable
 names and mutates metabolite IDs. FluxEMU isolates it behind deterministic hash
 IDs and rejects collisions. The upstream editable-package metadata does not
 correctly expose its nested `mfapy` package, so this workspace prototype falls
-back to `/workspace/vendor/mfapy` (or `FLUXEMU_MFAPY_SOURCE`).
+back to the repository's `vendor/mfapy` tree (or `FLUXEMU_MFAPY_SOURCE`) in the
+audited compatibility workspace. The `mfapy` optional dependency group supplies
+SciPy compatibility but does not distribute mfapy itself.
 
 `nlopt` is absent and unnecessary for forward EMU. The local patch makes its
 import optional and raises only when nlopt fitting is called. Fitting,
@@ -70,7 +90,7 @@ parameter estimation, confidence intervals, and INST-MFA are outside scope.
 mfapy reports some construction failures by printing and returning a partial
 object; FluxEMU prevalidates its input and checks for a usable `calmdv` function.
 
-## Toy validation and scientific scope
+## Legacy toy validation and scientific scope
 
 The toy network derives its isotope topology and exact trusted MID regression
 from mfapy's official Example 0, but its COBRA boundary reactions, objective,
@@ -81,7 +101,7 @@ or scientific interpretation.
 
 ## Legacy models
 
-Files under `/workspace/references` are unverified secondary material. They are
+Files under `references/` are unverified secondary material. They are
 not runtime inputs, are not certified, and were inspected only after the
 official prototype passed. Known structural doubts and required migration work
 are separated in `LEGACY_MODEL_REVIEW.md`; no legacy model is silently repaired
