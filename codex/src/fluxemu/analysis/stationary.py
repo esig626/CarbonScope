@@ -10,8 +10,10 @@ from fluxemu.exceptions import AnalysisError
 from fluxemu.flux_analysis import (
     FBAResult,
     FVAResult,
+    prepare_highs_flux_region,
     run_highs_fba,
     run_highs_vffva,
+    run_prepared_highs_vffva,
 )
 from fluxemu.model import (
     CanonicalModel,
@@ -78,8 +80,9 @@ def run_native_stationary_analysis(
     """
 
     validate_stationary_experiment(model, experiment)
-    fba = run_native_fba(model)
-    fva = run_native_fva(model, fva_fraction_of_optimum)
+    prepared = prepare_highs_flux_region(model.flux_model, fva_fraction_of_optimum)
+    fba = prepared.fba
+    fva = run_prepared_highs_vffva(prepared)
     flux_state = _fba_flux_state(model, fba)
     plan = compile_emu_plan(model, experiment)
     mids = evaluate_stationary(plan, (flux_state,))

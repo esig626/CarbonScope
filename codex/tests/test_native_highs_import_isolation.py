@@ -12,7 +12,7 @@ def test_native_module_does_not_load_external_solver_stacks():
     code = "import sys; import fluxemu.flux_analysis.highs; assert not any(x in sys.modules for x in ('cobra','optlang','mfapy','scipy.optimize','highspy'))"
     subprocess.run([sys.executable, "-c", code], check=True, env=os.environ.copy())
 
-def test_missing_highspy_error_names_extra(monkeypatch):
+def test_missing_highspy_error_names_default_dependency(monkeypatch):
     monkeypatch.setitem(sys.modules, "highspy", None)
-    with pytest.raises(AnalysisError, match="optional 'highs' extra"):
+    with pytest.raises(AnalysisError, match="default 'highspy' dependency"):
         _highspy()

@@ -45,6 +45,26 @@ class CompiledFluxLP:
         return len(self.coefficients)
 
 
+@dataclass(frozen=True, slots=True)
+class RetainedObjectiveConstraint:
+    """The biological-objective constraint shared by FVA and sampling."""
+
+    fraction_of_optimum: float
+    biological_optimum: float
+    bound: float
+    sense: str
+    objective_direction: str
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedFluxRegion:
+    """One compiled LP and its single independently validated FBA optimum."""
+
+    lp: CompiledFluxLP
+    fba: FBAResult
+    retention: RetainedObjectiveConstraint
+
+
 def compile_flux_lp(model: FluxModel) -> CompiledFluxLP:
     """Validate and compile a canonical model into deterministic sparse CSR data."""
     try:
@@ -90,7 +110,7 @@ def _highspy():
     try:
         import highspy
     except ImportError as error:
-        raise AnalysisError("native HiGHS analysis requires the optional 'highs' extra") from error
+        raise AnalysisError("native HiGHS analysis requires the default 'highspy' dependency") from error
     return highspy
 
 
@@ -140,12 +160,17 @@ def _validate(lp: CompiledFluxLP, fluxes: Sequence[float], reported: float,
     return diagnostics
 
 
-def run_highs_fba(model: FluxModel) -> FBAResult:
-    lp = compile_flux_lp(model)
+def _run_compiled_fba(lp: CompiledFluxLP) -> FBAResult:
+    """Solve and independently validate the biological objective on ``lp``."""
+
     fluxes, objective, status = _solve(lp, lp.objective_coefficients, lp.objective_direction, "FBA")
     diagnostics = _validate(lp, fluxes, objective, lp.objective_coefficients)
     return FBAResult(objective, "optimal", lp.objective_direction,
                      pd.Series(fluxes, index=lp.reaction_ids, dtype=float), diagnostics)
+
+
+def run_highs_fba(model: FluxModel) -> FBAResult:
+    return _run_compiled_fba(compile_flux_lp(model))
 
 
 def _fraction(value: float) -> float:
@@ -159,8 +184,81 @@ def _fraction(value: float) -> float:
     return result
 
 
+def prepare_highs_flux_region(
+    model: FluxModel, fraction_of_optimum: float = 1.0
+) -> PreparedFluxRegion:
+    """Compile once and solve the retained biological objective exactly once."""
+
+    fraction = _fraction(fraction_of_optimum)
+    lp = compile_flux_lp(model)
+    fba = _run_compiled_fba(lp)
+    sense = ">=" if lp.objective_direction == "max" else "<="
+    retention = RetainedObjectiveConstraint(
+        fraction,
+        fba.objective_value,
+        fba.objective_value * fraction,
+        sense,
+        lp.objective_direction,
+    )
+    return PreparedFluxRegion(lp, fba, retention)
+
+
+def _validate_prepared_flux_region(prepared: PreparedFluxRegion) -> None:
+    """Reject forged or internally inconsistent prepared-region records."""
+
+    if not isinstance(prepared, PreparedFluxRegion):
+        raise AnalysisError("prepared analysis requires a PreparedFluxRegion")
+    lp, fba, retention = prepared.lp, prepared.fba, prepared.retention
+    if (
+        not isinstance(lp, CompiledFluxLP)
+        or not isinstance(fba, FBAResult)
+        or not isinstance(retention, RetainedObjectiveConstraint)
+    ):
+        raise AnalysisError("prepared flux region contains malformed records")
+    if tuple(fba.fluxes.index) != lp.reaction_ids:
+        raise AnalysisError("prepared FBA reaction order does not match its compiled LP")
+    if fba.status != "optimal" or fba.objective_direction != lp.objective_direction:
+        raise AnalysisError("prepared FBA status or objective direction is inconsistent")
+    if len(fba.fluxes) != len(lp.reaction_ids):
+        raise AnalysisError("prepared FBA primal has the wrong vector length")
+    try:
+        if isinstance(fba.objective_value, bool):
+            raise TypeError
+        optimum = float(fba.objective_value)
+        fluxes = tuple(float(value) for value in fba.fluxes)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise AnalysisError("prepared FBA contains malformed numeric values") from error
+    if not math.isfinite(optimum):
+        raise AnalysisError("prepared FBA objective is non-finite")
+    try:
+        _validate(lp, fluxes, optimum, lp.objective_coefficients)
+    except (IndexError, TypeError, ValueError, OverflowError) as error:
+        raise AnalysisError("prepared FBA primal is malformed") from error
+    fraction = _fraction(retention.fraction_of_optimum)
+    try:
+        if isinstance(retention.biological_optimum, bool) or isinstance(
+            retention.bound, bool
+        ):
+            raise TypeError
+        recorded_optimum = float(retention.biological_optimum)
+        recorded_bound = float(retention.bound)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise AnalysisError("prepared retained-objective values are malformed") from error
+    if not math.isfinite(recorded_optimum) or not math.isfinite(recorded_bound):
+        raise AnalysisError("prepared retained-objective values must be finite")
+    expected_sense = ">=" if lp.objective_direction == "max" else "<="
+    expected_bound = optimum * fraction
+    if (
+        retention.objective_direction != lp.objective_direction
+        or retention.sense != expected_sense
+        or recorded_optimum != optimum
+        or recorded_bound != expected_bound
+    ):
+        raise AnalysisError("prepared retained-objective metadata is inconsistent")
+
+
 def run_highs_fva_reference(model: FluxModel, fraction_of_optimum: float = 1.0) -> FVAResult:
-    fraction = _fraction(fraction_of_optimum); lp = compile_flux_lp(model); fba = run_highs_fba(model)
+    fraction = _fraction(fraction_of_optimum); lp = compile_flux_lp(model); fba = _run_compiled_fba(lp)
     retention = (">=" if lp.objective_direction == "max" else "<=", fba.objective_value * fraction)
     minima: list[float] = []; maxima: list[float] = []
     for j, reaction_id in enumerate(lp.reaction_ids):
@@ -267,20 +365,21 @@ def _solve_process_endpoint(task: tuple[int, str]) -> _EndpointResult:
     return _PROCESS_WORKER.solve(task)
 
 
-def run_highs_vffva(model: FluxModel, fraction_of_optimum: float = 1.0, *,
-                     workers: int | None = None,
-                     instrumentation: dict[str, int] | None = None) -> FVAResult:
-    """Run VFFVA-style dynamically scheduled native HiGHS FVA.
+def run_prepared_highs_vffva(
+    prepared: PreparedFluxRegion,
+    *,
+    workers: int | None = None,
+    instrumentation: dict[str, int] | None = None,
+) -> FVAResult:
+    """Run reusable FVA over an already compiled and optimized flux region.
 
     Each worker creates one LP and repeatedly changes only column costs and the
     objective sense. Repeated ``Highs.run`` calls naturally retain the current
     simplex basis; no basis export/import is needed.
     """
-    fraction = _fraction(fraction_of_optimum)
-    lp = compile_flux_lp(model)
-    fluxes, optimum, _ = _solve(lp, lp.objective_coefficients, lp.objective_direction, "FBA")
-    _validate(lp, fluxes, optimum, lp.objective_coefficients)
-    retention = (">=" if lp.objective_direction == "max" else "<=", optimum * fraction)
+    _validate_prepared_flux_region(prepared)
+    lp = prepared.lp
+    retention = (prepared.retention.sense, prepared.retention.bound)
     tasks = [(j, direction) for j in range(len(lp.reaction_ids)) for direction in ("min", "max")]
     if workers is None:
         workers = min(4, os.cpu_count() or 1, len(tasks))
@@ -297,9 +396,23 @@ def run_highs_vffva(model: FluxModel, fraction_of_optimum: float = 1.0, *,
         with context.Pool(workers, _initialize_fva_process, (lp, retention)) as pool:
             results = list(pool.imap_unordered(_solve_process_endpoint, tasks, chunksize=1))
     minima = [math.nan] * len(lp.reaction_ids); maxima = [math.nan] * len(lp.reaction_ids)
+    seen: set[tuple[int, str]] = set()
     for result in results:
+        if (
+            not isinstance(result, _EndpointResult)
+            or not 0 <= result.reaction_index < len(lp.reaction_ids)
+            or result.direction not in {"min", "max"}
+        ):
+            raise AnalysisError("FVA worker returned a malformed endpoint result")
+        key = (result.reaction_index, result.direction)
+        if key in seen:
+            raise AnalysisError(
+                f"FVA worker returned duplicate {result.direction}imum for reaction "
+                f"{lp.reaction_ids[result.reaction_index]!r}"
+            )
+        seen.add(key)
         (minima if result.direction == "min" else maxima)[result.reaction_index] = result.value
-    if not all(math.isfinite(v) for v in minima + maxima):
+    if seen != set(tasks) or not all(math.isfinite(v) for v in minima + maxima):
         raise AnalysisError("FVA failed to return every endpoint")
     if instrumentation is not None:
         process_ids = {result.worker_pid for result in results}
@@ -307,4 +420,20 @@ def run_highs_vffva(model: FluxModel, fraction_of_optimum: float = 1.0, *,
                                retention_rows=len(process_ids), endpoint_solves=len(results),
                                objective_changes=len(results))
     ranges = pd.DataFrame({"minimum": minima, "maximum": maxima}, index=lp.reaction_ids)
-    return FVAResult(ranges, fraction, optimum, lp.objective_direction)
+    return FVAResult(
+        ranges,
+        prepared.retention.fraction_of_optimum,
+        prepared.retention.biological_optimum,
+        lp.objective_direction,
+    )
+
+
+def run_highs_vffva(model: FluxModel, fraction_of_optimum: float = 1.0, *,
+                     workers: int | None = None,
+                     instrumentation: dict[str, int] | None = None) -> FVAResult:
+    """Prepare and run VFFVA-style dynamically scheduled native HiGHS FVA."""
+
+    prepared = prepare_highs_flux_region(model, fraction_of_optimum)
+    return run_prepared_highs_vffva(
+        prepared, workers=workers, instrumentation=instrumentation
+    )

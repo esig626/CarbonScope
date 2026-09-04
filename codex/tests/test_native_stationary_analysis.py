@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 
 import fluxemu.analysis.stationary as analysis_module
+import fluxemu.flux_analysis.highs as highs_module
 from fluxemu.analysis import run_native_fba, run_native_fva, run_native_stationary_analysis
 from fluxemu.emu import compile_emu_plan, evaluate_stationary
 from fluxemu.exceptions import AnalysisError
@@ -41,7 +42,7 @@ from fluxemu.model import (
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("highspy") is None,
-    reason="highspy optional extra is unavailable",
+    reason="highspy is unavailable",
 )
 
 
@@ -118,30 +119,32 @@ def test_manual_composition_parity_same_model_and_declared_order(monkeypatch):
     )
 
     seen: dict[str, object] = {}
-    original_fba = analysis_module.run_highs_fba
-    original_fva = analysis_module.run_highs_vffva
+    original_prepare = analysis_module.prepare_highs_flux_region
+    original_fva = analysis_module.run_prepared_highs_vffva
     original_compile = analysis_module.compile_emu_plan
 
-    def recording_fba(flux_model):
+    def recording_prepare(flux_model, fraction):
         seen["fba_model"] = flux_model
-        return original_fba(flux_model)
+        return original_prepare(flux_model, fraction)
 
-    def recording_fva(flux_model, fraction, *, workers=None):
-        seen["fva_model"] = flux_model
-        return original_fva(flux_model, fraction, workers=1)
+    def recording_fva(prepared, *, workers=None):
+        seen["fva_lp"] = prepared.lp
+        return original_fva(prepared, workers=1)
 
     def recording_compile(canonical_model, stationary_experiment):
         seen["emu_model"] = canonical_model
         seen["experiment"] = stationary_experiment
         return original_compile(canonical_model, stationary_experiment)
 
-    monkeypatch.setattr(analysis_module, "run_highs_fba", recording_fba)
-    monkeypatch.setattr(analysis_module, "run_highs_vffva", recording_fva)
+    monkeypatch.setattr(analysis_module, "prepare_highs_flux_region", recording_prepare)
+    monkeypatch.setattr(analysis_module, "run_prepared_highs_vffva", recording_fva)
     monkeypatch.setattr(analysis_module, "compile_emu_plan", recording_compile)
     result = run_native_stationary_analysis(model, experiment)
 
     assert seen["fba_model"] is model.flux_model
-    assert seen["fva_model"] is model.flux_model
+    assert seen["fva_lp"].reaction_ids == tuple(
+        reaction.reaction_id for reaction in model.flux_model.reactions
+    )
     assert seen["emu_model"] is model
     assert seen["experiment"] is experiment
     assert result.fba.objective_value == direct_fba.objective_value
@@ -199,6 +202,28 @@ def test_convenience_wrappers_delegate_without_reconstructing_model(monkeypatch)
     run_native_fba(model)
     run_native_fva(model, 0.75)
     assert calls == [("fba", model.flux_model), ("fva", model.flux_model, 0.75)]
+
+
+def test_composed_deterministic_path_compiles_and_solves_biological_objective_once(
+    monkeypatch,
+):
+    model, experiment = _alternate_optimum_science()
+    calls = {"compile": 0, "fba": 0}
+    original_compile = highs_module.compile_flux_lp
+    original_fba = highs_module._run_compiled_fba
+
+    def recording_compile(flux_model):
+        calls["compile"] += 1
+        return original_compile(flux_model)
+
+    def recording_fba(lp):
+        calls["fba"] += 1
+        return original_fba(lp)
+
+    monkeypatch.setattr(highs_module, "compile_flux_lp", recording_compile)
+    monkeypatch.setattr(highs_module, "_run_compiled_fba", recording_fba)
+    run_native_stationary_analysis(model, experiment)
+    assert calls == {"compile": 1, "fba": 1}
 
 
 @pytest.mark.parametrize("fraction", [0, -1, 1.01, math.nan, True])

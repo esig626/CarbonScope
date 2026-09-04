@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import importlib.util
 
 import pandas as pd
@@ -9,9 +10,15 @@ import pytest
 
 import fluxemu.flux_analysis.highs as highs
 from fluxemu.exceptions import AnalysisError
-from fluxemu.flux_analysis import run_highs_fva_reference, run_highs_vffva
+from fluxemu.flux_analysis import (
+    prepare_highs_flux_region,
+    run_highs_fva_reference,
+    run_highs_vffva,
+    run_prepared_highs_vffva,
+)
 from fluxemu.model import (FluxMetabolite, FluxModel, FluxReaction, LinearObjective,
                            ObjectiveTerm, StoichiometricTerm)
+from fluxemu.real_model import load_ecoli_core_flux_model
 
 pytestmark = pytest.mark.skipif(importlib.util.find_spec("highspy") is None,
                                 reason="highspy is unavailable")
@@ -52,6 +59,25 @@ def test_minimisation_and_multiterm_objectives_match_reference():
     pd.testing.assert_frame_equal(actual.ranges, expected.ranges, atol=1e-8, rtol=1e-8)
 
 
+def test_nonzero_minimisation_fraction_and_negative_signed_endpoint():
+    signed = FluxModel(
+        (),
+        (
+            FluxReaction("signed", (), -10, 2),
+            FluxReaction("fixed", (), 3, 3),
+            FluxReaction("blocked", (), 0, 0),
+        ),
+        LinearObjective("minimise", (ObjectiveTerm("signed", 1.0),)),
+    )
+    expected = run_highs_fva_reference(signed, 0.9)
+    actual = run_highs_vffva(signed, 0.9, workers=1)
+    pd.testing.assert_frame_equal(actual.ranges, expected.ranges, atol=1e-8, rtol=1e-8)
+    assert actual.objective_value == pytest.approx(-10.0)
+    assert actual.ranges.loc["signed"].tolist() == pytest.approx([-10.0, -9.0])
+    assert actual.ranges.loc["fixed"].tolist() == pytest.approx([3.0, 3.0])
+    assert actual.ranges.loc["blocked"].tolist() == pytest.approx([0.0, 0.0])
+
+
 def test_one_compile_one_solver_and_one_matrix_handles_all_endpoints(monkeypatch):
     compile_calls = 0
     worker_builds = 0
@@ -77,6 +103,131 @@ def test_one_compile_one_solver_and_one_matrix_handles_all_endpoints(monkeypatch
                        "endpoint_solves": 10, "objective_changes": 10}
 
 
+def test_prepared_fva_does_not_recompile_or_resolve_biological_objective(monkeypatch):
+    prepared = prepare_highs_flux_region(_model(), 0.9)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("prepared FVA repeated model preparation")
+
+    monkeypatch.setattr(highs, "compile_flux_lp", forbidden)
+    monkeypatch.setattr(highs, "_run_compiled_fba", forbidden)
+    actual = run_prepared_highs_vffva(prepared, workers=1)
+    assert actual.objective_value == prepared.fba.objective_value
+    assert actual.fraction_of_optimum == 0.9
+
+
+def test_prepared_fva_rejects_inconsistent_retained_metadata():
+    prepared = prepare_highs_flux_region(_model(), 0.9)
+    forged = replace(
+        prepared,
+        retention=replace(prepared.retention, bound=prepared.retention.bound - 1.0),
+    )
+    with pytest.raises(AnalysisError, match="retained-objective metadata"):
+        run_prepared_highs_vffva(forged, workers=1)
+
+
+def test_prepared_fva_rejects_mismatched_fba_records():
+    prepared = prepare_highs_flux_region(_model(), 0.9)
+    reordered = prepared.fba.fluxes.iloc[::-1]
+    bad_primal = prepared.fba.fluxes.copy()
+    bad_primal.iloc[0] += 1.0
+    forged_records = (
+        replace(prepared, fba=replace(prepared.fba, fluxes=reordered)),
+        replace(prepared, fba=replace(prepared.fba, status="infeasible")),
+        replace(prepared, fba=replace(prepared.fba, objective_direction="min")),
+        replace(prepared, fba=replace(prepared.fba, fluxes=bad_primal)),
+    )
+    for forged in forged_records:
+        with pytest.raises(AnalysisError, match="prepared FBA|primal validation"):
+            run_prepared_highs_vffva(forged, workers=1)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("fraction_of_optimum", 0.0),
+        ("fraction_of_optimum", "bad"),
+        ("sense", "<="),
+        ("objective_direction", "min"),
+        ("biological_optimum", 9.0),
+        ("bound", 8.0),
+    ],
+)
+def test_prepared_fva_rejects_forged_retention_fields(field, value):
+    prepared = prepare_highs_flux_region(_model(), 0.9)
+    forged = replace(
+        prepared, retention=replace(prepared.retention, **{field: value})
+    )
+    with pytest.raises(AnalysisError, match="fraction_of_optimum|retained-objective"):
+        run_prepared_highs_vffva(forged, workers=1)
+
+
+def test_parallel_path_uses_unordered_unit_chunk_dynamic_queue(monkeypatch):
+    observed = {}
+
+    class RecordingPool:
+        def __init__(self, workers, initializer, initargs):
+            observed["workers"] = workers
+            initializer(*initargs)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def imap_unordered(self, function, tasks, chunksize):
+            observed["chunksize"] = chunksize
+            observed["tasks"] = tuple(tasks)
+            return iter(reversed([function(task) for task in tasks]))
+
+    class RecordingContext:
+        Pool = RecordingPool
+
+    monkeypatch.setattr(highs.multiprocessing, "get_context", lambda method: RecordingContext())
+    result = run_highs_vffva(_model(), 0.9, workers=2)
+    assert observed["workers"] == 2
+    assert observed["chunksize"] == 1
+    assert observed["tasks"] == tuple(
+        (index, direction)
+        for index in range(5)
+        for direction in ("min", "max")
+    )
+    assert tuple(result.ranges.index) == (
+        "source", "reversible", "export", "fixed", "blocked"
+    )
+
+
+def test_parallel_queue_propagates_contextual_endpoint_failure(monkeypatch):
+    original_run = highs._ReusableFVAWorker.solve
+
+    def fail(self, task):
+        if task == (1, "max"):
+            self.solver.setOptionValue("time_limit", 0.0)
+        return original_run(self, task)
+
+    class ImmediatePool:
+        def __init__(self, workers, initializer, initargs):
+            initializer(*initargs)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def imap_unordered(self, function, tasks, chunksize):
+            return map(function, tasks)
+
+    class ImmediateContext:
+        Pool = ImmediatePool
+
+    monkeypatch.setattr(highs._ReusableFVAWorker, "solve", fail)
+    monkeypatch.setattr(highs.multiprocessing, "get_context", lambda method: ImmediateContext())
+    with pytest.raises(AnalysisError, match="FVA maximum for reaction 'reversible'.*solver status"):
+        run_highs_vffva(_model(), workers=2)
+
+
 def test_endpoint_solver_failure_identifies_reaction_direction_and_status(monkeypatch):
     original_run = highs._ReusableFVAWorker.solve
 
@@ -88,3 +239,24 @@ def test_endpoint_solver_failure_identifies_reaction_direction_and_status(monkey
     monkeypatch.setattr(highs._ReusableFVAWorker, "solve", fail)
     with pytest.raises(AnalysisError, match="FVA maximum for reaction 'reversible'.*solver status"):
         run_highs_vffva(_model(), workers=1)
+
+
+@pytest.mark.parametrize("workers", [0, -1, 1.5, True])
+def test_invalid_worker_count_is_rejected(workers):
+    with pytest.raises(AnalysisError, match="workers must be a positive integer"):
+        run_highs_vffva(_model(), workers=workers)
+
+
+@pytest.mark.parametrize("objective", ["biomass", "acetate"])
+def test_bundled_ecoli_fast_serial_matches_cold_reference(objective):
+    model = load_ecoli_core_flux_model(objective)
+    reference = run_highs_fva_reference(model, 0.9)
+    fast = run_highs_vffva(model, 0.9, workers=1)
+    pd.testing.assert_frame_equal(fast.ranges, reference.ranges, atol=1e-7, rtol=1e-7)
+
+
+def test_bundled_ecoli_parallel_matches_cold_reference():
+    model = load_ecoli_core_flux_model("biomass")
+    reference = run_highs_fva_reference(model, 1.0)
+    fast = run_highs_vffva(model, 1.0, workers=2)
+    pd.testing.assert_frame_equal(fast.ranges, reference.ranges, atol=1e-7, rtol=1e-7)

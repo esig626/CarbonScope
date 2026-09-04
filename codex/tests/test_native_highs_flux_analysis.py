@@ -15,7 +15,7 @@ from fluxemu.model import (FluxMetabolite, FluxModel, FluxReaction, LinearObject
                            ObjectiveTerm, StoichiometricTerm)
 
 pytestmark = pytest.mark.skipif(importlib.util.find_spec("highspy") is None,
-                                reason="highspy optional extra is unavailable")
+                                reason="highspy is unavailable")
 
 
 def model(*, direction="maximise", objective=(("out", 1.0),), out_bounds=(0, 10),

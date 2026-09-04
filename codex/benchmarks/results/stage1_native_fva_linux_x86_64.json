@@ -1,0 +1,79 @@
+{
+  "command": "PYTHONPATH=src python benchmarks/benchmark_highs_fva_reference.py ecoli-core --repeats 5 --parallel-workers 2",
+  "correctness": {
+    "fast_parallel_vs_cold": {
+      "max_absolute_range_difference": 2.5350809776601227e-12,
+      "order_matches": true,
+      "passed": true,
+      "tolerance": 1e-07
+    },
+    "fast_serial_vs_cold": {
+      "max_absolute_range_difference": 8.37019342725398e-12,
+      "order_matches": true,
+      "passed": true,
+      "tolerance": 1e-07
+    }
+  },
+  "diagnostic_only": true,
+  "environment": {
+    "cobra": null,
+    "cpu_count": 9,
+    "highs": "1.12.0",
+    "implementation": "CPython",
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "platform": "Linux-6.18.35-x86_64-with-glibc2.39",
+    "python": "3.12.13"
+  },
+  "fraction_of_optimum": 1.0,
+  "measurements": {
+    "cold_native_fva": {
+      "median_seconds": 0.2530300509997687,
+      "seconds": [
+        0.2530300509997687,
+        0.26225542399970436,
+        0.24509281199971156,
+        0.247948412000369,
+        0.2572329129998252
+      ]
+    },
+    "fast_native_fva_workers_1": {
+      "median_seconds": 0.06640395599970361,
+      "seconds": [
+        0.06892616400000406,
+        0.06640395599970361,
+        0.07242441099970165,
+        0.06590823199985607,
+        0.06637588499961566
+      ]
+    },
+    "fast_native_fva_workers_2": {
+      "median_seconds": 0.5320995830006723,
+      "seconds": [
+        0.5461009959999501,
+        0.5437041820005106,
+        0.5320995830006723,
+        0.4163826589992823,
+        0.38519983399964985
+      ]
+    }
+  },
+  "model": {
+    "balanced_metabolites": 72,
+    "fingerprint": "3b21e47c4d9ae5cad5256f124ef2e1e22e12052afa55f95be42a733ce213011c",
+    "name": "bundled-e-coli-core-biomass",
+    "nonzeros": 360,
+    "reactions": 95
+  },
+  "repeats": 5,
+  "schema_version": 1,
+  "speedups": {
+    "fast_parallel_over_cold": 0.47553138375500104,
+    "fast_serial_over_cold": 3.8104665180023023
+  },
+  "warmup_runs_per_path": 1,
+  "workers": {
+    "parallel": 2,
+    "serial": 1
+  }
+}

@@ -164,7 +164,7 @@ def test_frozen_optimum_projection_parity_is_exact():
     assert max(float(row["absolute_residual"]) for row in rows) <= 1e-9
 
 
-@pytest.mark.skipif(importlib.util.find_spec("highspy") is None, reason="highspy optional extra is unavailable")
+@pytest.mark.skipif(importlib.util.find_spec("highspy") is None, reason="highspy is unavailable")
 def test_native_fba_parity_and_fva_completion_without_cobra_or_mfapy_imports():
     before = set(sys.modules)
     biomass_model = load_ecoli_core_flux_model("biomass")
