@@ -231,9 +231,18 @@ def evaluate_stationary(
     diagnostics: list[LayerDiagnostics] = []
     normalization = 0.0
     for state in states:
-        state_predictions, state_diagnostics, state_normalization = _evaluate_state(
-            plan, state, tolerance
-        )
+        try:
+            state_predictions, state_diagnostics, state_normalization = _evaluate_state(
+                plan, state, tolerance
+            )
+        except np.linalg.LinAlgError as error:
+            raise ForwardEMUError(
+                f"flux state {state.sample_id!r}: stationary EMU linear solve failed: "
+                f"{error}"
+            ) from error
+        except (ForwardEMUError, ValidationError, MappingError) as error:
+            exception_type = type(error)
+            raise exception_type(f"flux state {state.sample_id!r}: {error}") from error
         predictions.extend(state_predictions)
         diagnostics.extend(state_diagnostics)
         normalization = max(normalization, state_normalization)

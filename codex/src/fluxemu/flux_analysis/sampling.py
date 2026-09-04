@@ -280,6 +280,25 @@ class _ObjectiveValidationMetrics:
     stable_violation: float
 
 
+@dataclass(frozen=True, slots=True)
+class _MassBalanceValidationMetrics:
+    max_raw_residual: float
+    max_normalized_residual: float
+    conditioned_residual: float
+    closest_metabolite_id: str | None
+
+    @property
+    def finite(self) -> bool:
+        return all(
+            math.isfinite(value)
+            for value in (
+                self.max_raw_residual,
+                self.max_normalized_residual,
+                self.conditioned_residual,
+            )
+        )
+
+
 def _positive_integer(value: object, description: str) -> int:
     if isinstance(value, bool) or not isinstance(value, Integral):
         raise AnalysisError(f"{description} must be a positive integer")
@@ -459,6 +478,70 @@ def _objective_validation_metrics(
     )
 
 
+def _mass_balance_validation_metrics(
+    lp: CompiledFluxLP, values: Sequence[float]
+) -> _MassBalanceValidationMetrics:
+    """Evaluate canonical and conditioned mass balance without repair."""
+
+    raw_residuals: list[float] = []
+    normalized_residuals: list[float] = []
+    for row in range(len(lp.balanced_metabolite_ids)):
+        offsets = range(lp.row_starts[row], lp.row_starts[row + 1])
+        coefficients = tuple(lp.coefficients[offset] for offset in offsets)
+        try:
+            raw = math.fsum(
+                coefficient * float(values[lp.column_indices[offset]])
+                for coefficient, offset in zip(
+                    coefficients,
+                    range(lp.row_starts[row], lp.row_starts[row + 1]),
+                )
+            )
+        except (OverflowError, ValueError):
+            raw = math.inf
+        row_norm = math.hypot(*coefficients)
+        raw_residual = abs(raw) if math.isfinite(raw) else math.inf
+        raw_residuals.append(raw_residual)
+        if not math.isfinite(row_norm):
+            normalized_residuals.append(math.inf)
+        elif row_norm > 0.0:
+            normalized = raw_residual / row_norm
+            normalized_residuals.append(
+                normalized if math.isfinite(normalized) else math.inf
+            )
+        else:
+            normalized_residuals.append(raw_residual)
+    if normalized_residuals:
+        mass_index = max(
+            range(len(normalized_residuals)),
+            key=normalized_residuals.__getitem__,
+        )
+        max_raw_mass = max(raw_residuals)
+        mass_id: str | None = lp.balanced_metabolite_ids[mass_index]
+    else:
+        max_raw_mass = 0.0
+        mass_id = None
+    max_mass = max(normalized_residuals, default=0.0)
+    row_space = _balance_row_space(lp)
+    if lp.balance_rank:
+        try:
+            with np.errstate(over="ignore", invalid="ignore"):
+                conditioned_mass = float(
+                    np.linalg.norm(row_space @ np.asarray(values, dtype=float))
+                )
+        except (FloatingPointError, OverflowError, ValueError):
+            conditioned_mass = math.inf
+        if not math.isfinite(conditioned_mass):
+            conditioned_mass = math.inf
+    else:
+        conditioned_mass = 0.0
+    return _MassBalanceValidationMetrics(
+        max_raw_mass,
+        max_mass,
+        conditioned_mass,
+        mass_id,
+    )
+
+
 def validate_flux_states(
     prepared: PreparedFluxRegion,
     states: Sequence[CanonicalFluxState],
@@ -576,63 +659,27 @@ def validate_flux_states(
                 f"{lp.reaction_ids[upper_index]!r} by {max_upper:g}"
             )
 
-        raw_residuals: list[float] = []
-        normalized_residuals: list[float] = []
-        for row in range(len(lp.balanced_metabolite_ids)):
-            offsets = range(lp.row_starts[row], lp.row_starts[row + 1])
-            coefficients = tuple(lp.coefficients[offset] for offset in offsets)
-            try:
-                raw = math.fsum(
-                    coefficient * values[lp.column_indices[offset]]
-                    for coefficient, offset in zip(
-                        coefficients,
-                        range(lp.row_starts[row], lp.row_starts[row + 1]),
-                    )
-                )
-            except (OverflowError, ValueError):
-                raw = math.inf
-            row_norm = math.hypot(*coefficients)
-            raw_residual = abs(raw) if math.isfinite(raw) else math.inf
-            raw_residuals.append(raw_residual)
-            if not math.isfinite(row_norm):
-                normalized_residuals.append(math.inf)
-            elif row_norm > 0.0:
-                normalized = raw_residual / row_norm
-                normalized_residuals.append(
-                    normalized if math.isfinite(normalized) else math.inf
-                )
-            else:
-                normalized_residuals.append(raw_residual)
-        if normalized_residuals:
-            mass_index = max(
-                range(len(normalized_residuals)),
-                key=normalized_residuals.__getitem__,
+        mass_metrics = _mass_balance_validation_metrics(lp, values)
+        max_raw_mass = mass_metrics.max_raw_residual
+        max_mass = mass_metrics.max_normalized_residual
+        conditioned_mass = mass_metrics.conditioned_residual
+        mass_id = mass_metrics.closest_metabolite_id
+        if not mass_metrics.finite:
+            mass_balance_valid = False
+            state_errors.append(
+                f"flux state {state.sample_id!r} produced non-finite independent "
+                "mass-balance arithmetic: "
+                f"conditioned_residual={conditioned_mass:g}, closest_original_"
+                f"metabolite={mass_id!r}, normalized_residual={max_mass:g}, "
+                f"maximum_raw_residual={max_raw_mass:g}"
             )
-            max_raw_mass = max(raw_residuals)
-            mass_id: str | None = lp.balanced_metabolite_ids[mass_index]
-        else:
-            max_raw_mass = 0.0
-            mass_id = None
-        max_mass = max(normalized_residuals, default=0.0)
-        row_space = _balance_row_space(lp)
-        if lp.balance_rank:
-            try:
-                with np.errstate(over="ignore", invalid="ignore"):
-                    conditioned_mass = float(
-                        np.linalg.norm(row_space @ np.asarray(values, dtype=float))
-                    )
-            except (FloatingPointError, OverflowError, ValueError):
-                conditioned_mass = math.inf
-            if not math.isfinite(conditioned_mass):
-                conditioned_mass = math.inf
-        else:
-            conditioned_mass = 0.0
-        if conditioned_mass > MASS_BALANCE_TOLERANCE:
+        elif max(max_mass, conditioned_mass) > MASS_BALANCE_TOLERANCE:
             mass_balance_valid = False
             state_errors.append(
                 f"flux state {state.sample_id!r} violates steady-state mass balance for "
-                f"the conditioned row space: residual={conditioned_mass:g}; closest "
-                f"original metabolite={mass_id!r}, normalized_residual={max_mass:g}, "
+                "the original normalized rows or conditioned row space: "
+                f"conditioned_residual={conditioned_mass:g}; closest original "
+                f"metabolite={mass_id!r}, normalized_residual={max_mass:g}, "
                 f"maximum_raw_residual={max_raw_mass:g}"
             )
 
@@ -1261,20 +1308,16 @@ def _validate_chain_candidate(
         (max(value - upper, 0.0) for upper, value in zip(lp.upper_bounds, values)),
         default=0.0,
     )
-    with np.errstate(over="ignore", invalid="ignore"):
-        row_space_residuals = _balance_row_space(lp) @ values
-    try:
-        conditioned_mass = math.hypot(
-            *(float(value) for value in row_space_residuals)
-        )
-    except (OverflowError, ValueError):
-        conditioned_mass = math.inf
-    if not math.isfinite(conditioned_mass):
-        conditioned_mass = math.inf
+    mass_metrics = _mass_balance_validation_metrics(lp, values)
     objective = _objective_validation_metrics(prepared, values)
     if (
         max(lower_violation, upper_violation) > BOUND_TOLERANCE
-        or conditioned_mass > MASS_BALANCE_TOLERANCE
+        or not mass_metrics.finite
+        or max(
+            mass_metrics.max_normalized_residual,
+            mass_metrics.conditioned_residual,
+        )
+        > MASS_BALANCE_TOLERANCE
         or objective.normalized_discrepancy > RETAINED_OBJECTIVE_TOLERANCE
         or objective.normalized_direct_violation
         > RETAINED_OBJECTIVE_TOLERANCE
@@ -1285,7 +1328,11 @@ def _validate_chain_candidate(
             f"validation at accepted step {accepted_step}: "
             f"lower_violation={lower_violation:g}, "
             f"upper_violation={upper_violation:g}, "
-            f"conditioned_mass_residual={conditioned_mass:g}, "
+            f"raw_mass_residual={mass_metrics.max_raw_residual:g}, "
+            "normalized_mass_residual="
+            f"{mass_metrics.max_normalized_residual:g}, "
+            "conditioned_mass_residual="
+            f"{mass_metrics.conditioned_residual:g}, "
             f"declared_objective={objective.declared_value:g}, "
             f"stable_quotient={objective.stable_value:g}, "
             f"objective_discrepancy={objective.discrepancy:g}, "

@@ -797,7 +797,18 @@ def _compile_validated_flux_lp(model: FluxModel) -> CompiledFluxLP:
                 float(term.coefficient)
             )
         for mid, coefficients in accumulated.items():
-            value = math.fsum(coefficients)
+            try:
+                value = math.fsum(coefficients)
+            except (OverflowError, ValueError) as error:
+                raise AnalysisError(
+                    "aggregated stoichiometric coefficient is non-finite for "
+                    f"reaction {reaction.reaction_id!r}, metabolite {mid!r}"
+                ) from error
+            if not math.isfinite(value):
+                raise AnalysisError(
+                    "aggregated stoichiometric coefficient is non-finite for "
+                    f"reaction {reaction.reaction_id!r}, metabolite {mid!r}"
+                )
             if mid in terms_by_metabolite and value != 0.0:
                 terms_by_metabolite[mid].append((column, value))
     starts = [0]; indices: list[int] = []; values: list[float] = []
@@ -844,7 +855,21 @@ def _compile_validated_flux_lp(model: FluxModel) -> CompiledFluxLP:
         objective_terms[reaction_index[term.reaction_id]].append(
             float(term.coefficient)
         )
-    objective = [math.fsum(coefficients) for coefficients in objective_terms]
+    objective: list[float] = []
+    for reaction_id, coefficients in zip(reaction_ids, objective_terms):
+        try:
+            value = math.fsum(coefficients)
+        except (OverflowError, ValueError) as error:
+            raise AnalysisError(
+                "aggregated objective coefficient is non-finite for reaction "
+                f"{reaction_id!r}"
+            ) from error
+        if not math.isfinite(value):
+            raise AnalysisError(
+                "aggregated objective coefficient is non-finite for reaction "
+                f"{reaction_id!r}"
+            )
+        objective.append(value)
     objective_array = np.asarray(objective, dtype=float)
     effective_objective, objective_constant = _condition_objective(
         objective_array,
@@ -1248,10 +1273,43 @@ def _primal_validation_matrices(
 
 def _validate(lp: CompiledFluxLP, fluxes: Sequence[float], reported: float,
               costs: Sequence[float]) -> PrimalDiagnostics:
-    lower = max((max(lb - v, 0.0) for lb, v in zip(lp.lower_bounds, fluxes)), default=0.0)
-    upper = max((max(v - ub, 0.0) for ub, v in zip(lp.upper_bounds, fluxes)), default=0.0)
+    reaction_count = len(lp.reaction_ids)
+    try:
+        vector = np.asarray(fluxes, dtype=float)
+        cost_vector = np.asarray(costs, dtype=float)
+        reported_value = float(reported)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise AnalysisError(
+            "independent primal validation received malformed numeric values"
+        ) from error
+    if vector.shape != (reaction_count,) or cost_vector.shape != (reaction_count,):
+        raise AnalysisError(
+            "independent primal validation received a malformed vector length"
+        )
+    if not np.isfinite(vector).all():
+        raise AnalysisError(
+            "independent primal validation received a non-finite flux vector"
+        )
+    if not np.isfinite(cost_vector).all() or not math.isfinite(reported_value):
+        raise AnalysisError(
+            "independent primal validation received a non-finite objective value"
+        )
+
+    lower_bounds = np.asarray(lp.lower_bounds, dtype=float)
+    upper_bounds = np.asarray(lp.upper_bounds, dtype=float)
+    with np.errstate(over="ignore", invalid="ignore"):
+        lower_violations = np.maximum(lower_bounds - vector, 0.0)
+        upper_violations = np.maximum(vector - upper_bounds, 0.0)
+    if not np.isfinite(lower_violations).all() or not np.isfinite(
+        upper_violations
+    ).all():
+        raise AnalysisError(
+            "independent primal validation produced non-finite bound arithmetic"
+        )
+    lower = float(np.max(lower_violations, initial=0.0))
+    upper = float(np.max(upper_violations, initial=0.0))
     raw_matrix, normalized_matrix, row_space = _primal_validation_matrices(
-        len(lp.reaction_ids),
+        reaction_count,
         len(lp.balanced_metabolite_ids),
         lp.row_starts,
         lp.column_indices,
@@ -1259,19 +1317,61 @@ def _validate(lp: CompiledFluxLP, fluxes: Sequence[float], reported: float,
         lp.balance_rank,
         lp.balance_row_space_basis,
     )
-    vector = np.asarray(fluxes, dtype=float)
-    raw_residual = float(
-        np.max(np.abs(raw_matrix @ vector), initial=0.0)
-    )
+    with np.errstate(over="ignore", invalid="ignore"):
+        raw_products = raw_matrix @ vector
+        normalized_products = normalized_matrix @ vector
+        conditioned_products = row_space @ vector
+    if not np.isfinite(raw_products).all():
+        raise AnalysisError(
+            "independent primal validation produced non-finite raw mass-balance "
+            "arithmetic"
+        )
+    if not np.isfinite(normalized_products).all():
+        raise AnalysisError(
+            "independent primal validation produced non-finite normalized "
+            "mass-balance arithmetic"
+        )
+    if not np.isfinite(conditioned_products).all():
+        raise AnalysisError(
+            "independent primal validation produced non-finite conditioned "
+            "mass-balance arithmetic"
+        )
+    raw_residual = float(np.max(np.abs(raw_products), initial=0.0))
     max_row_residual = float(
-        np.max(np.abs(normalized_matrix @ vector), initial=0.0)
+        np.max(np.abs(normalized_products), initial=0.0)
     )
-    conditioned_residual = (
-        float(np.linalg.norm(row_space @ vector))
-        if lp.balance_rank
-        else 0.0
+    conditioned_residual = math.hypot(
+        *(float(value) for value in conditioned_products)
     )
-    recalculated = math.fsum(c * v for c, v in zip(costs, fluxes)); error = abs(recalculated - reported)
+    if not all(
+        math.isfinite(value)
+        for value in (raw_residual, max_row_residual, conditioned_residual)
+    ):
+        raise AnalysisError(
+            "independent primal validation produced a non-finite mass-balance "
+            "residual"
+        )
+    try:
+        recalculated = math.fsum(
+            float(cost) * float(value)
+            for cost, value in zip(cost_vector, vector)
+        )
+    except (OverflowError, ValueError) as error:
+        raise AnalysisError(
+            "independent primal validation produced non-finite objective "
+            "arithmetic"
+        ) from error
+    if not math.isfinite(recalculated):
+        raise AnalysisError(
+            "independent primal validation produced non-finite objective "
+            "arithmetic"
+        )
+    error = abs(recalculated - reported_value)
+    if not math.isfinite(error):
+        raise AnalysisError(
+            "independent primal validation produced a non-finite objective "
+            "recalculation error"
+        )
     diagnostics = PrimalDiagnostics(
         max_lower_bound_violation=lower,
         max_upper_bound_violation=upper,
@@ -1281,7 +1381,8 @@ def _validate(lp: CompiledFluxLP, fluxes: Sequence[float], reported: float,
         conditioned_row_space_residual=conditioned_residual,
     )
     if (
-        max(lower, upper, conditioned_residual) > FEASIBILITY_TOLERANCE
+        max(lower, upper, max_row_residual, conditioned_residual)
+        > FEASIBILITY_TOLERANCE
         or error > OBJECTIVE_TOLERANCE
     ):
         raise AnalysisError(f"independent primal validation failed: {diagnostics}")
@@ -1609,6 +1710,8 @@ def _validate_prepared_flux_region(prepared: PreparedFluxRegion) -> None:
     ):
         raise AnalysisError("prepared flux region contains malformed records")
     _validate_compiled_lp_integrity(lp)
+    if not isinstance(fba.fluxes, pd.Series):
+        raise AnalysisError("prepared FBA fluxes must be a pandas Series")
     if tuple(fba.fluxes.index) != lp.reaction_ids:
         raise AnalysisError("prepared FBA reaction order does not match its compiled LP")
     if fba.status != "optimal" or fba.objective_direction != lp.objective_direction:
@@ -1616,14 +1719,19 @@ def _validate_prepared_flux_region(prepared: PreparedFluxRegion) -> None:
     if len(fba.fluxes) != len(lp.reaction_ids):
         raise AnalysisError("prepared FBA primal has the wrong vector length")
     try:
-        if isinstance(fba.objective_value, bool):
+        raw_fluxes = tuple(fba.fluxes)
+        if isinstance(fba.objective_value, (bool, np.bool_)) or any(
+            isinstance(value, (bool, np.bool_)) for value in raw_fluxes
+        ):
             raise TypeError
         optimum = float(fba.objective_value)
-        fluxes = tuple(float(value) for value in fba.fluxes)
+        fluxes = tuple(float(value) for value in raw_fluxes)
     except (TypeError, ValueError, OverflowError) as error:
         raise AnalysisError("prepared FBA contains malformed numeric values") from error
     if not math.isfinite(optimum):
         raise AnalysisError("prepared FBA objective is non-finite")
+    if not all(math.isfinite(value) for value in fluxes):
+        raise AnalysisError("prepared FBA primal contains non-finite flux values")
     try:
         effective_optimum_from_fluxes = _effective_objective_value(lp, fluxes)
         stable_optimum = math.fsum(

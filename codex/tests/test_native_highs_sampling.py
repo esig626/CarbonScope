@@ -28,6 +28,7 @@ from fluxemu.flux_analysis import (
     sample_prepared_flux_states,
     validate_flux_states,
 )
+from fluxemu.flux_analysis import highs as highs_module
 from fluxemu.flux_analysis import sampling as sampling_module
 from fluxemu.model import (
     FluxMetabolite,
@@ -460,6 +461,39 @@ def test_fraction_below_one_explores_retained_region_beyond_optimal_face() -> No
     assert any(value < 10.0 - 1e-5 for value in objectives)
 
 
+def test_reactionwise_fva_minima_are_not_treated_as_a_correlated_flux_state() -> None:
+    prepared = prepare_highs_flux_region(_split_path_model(), 0.8)
+    fva = run_prepared_highs_vffva(prepared, workers=1)
+    minima = CanonicalFluxState(
+        "reactionwise-minima",
+        tuple(
+            (reaction_id, float(fva.ranges.loc[reaction_id, "minimum"]))
+            for reaction_id in prepared.lp.reaction_ids
+        ),
+    )
+
+    report = validate_flux_states(prepared, (minima,))
+
+    assert not report.valid
+    assert not report.mass_balance_valid
+    assert report.max_raw_mass_balance_residual == pytest.approx(8.0)
+
+
+def test_reduced_geometry_retains_the_full_mass_balance_nullspace() -> None:
+    prepared = prepare_highs_flux_region(_split_path_model(), 0.8)
+    fva = run_prepared_highs_vffva(prepared, workers=1)
+    ranges = sampling_module._validate_fva_result(prepared, fva)
+    geometry = sampling_module._build_reduced_geometry(prepared, ranges)
+
+    assert geometry.basis.shape == (4, 2)
+    assert geometry.equality_rank == 2
+    np.testing.assert_allclose(
+        sampling_module._canonical_balance_matrix(prepared.lp) @ geometry.basis,
+        0.0,
+        atol=1e-12,
+    )
+
+
 def test_fractional_minimisation_uses_nonzero_negative_objective_ceiling() -> None:
     model = _minimum_model()
     prepared = prepare_highs_flux_region(model, 0.8)
@@ -525,6 +559,45 @@ def test_sign_incompatible_fraction_arithmetic_fails_before_fva(
             seed=35,
             fraction_of_optimum=0.8,
         )
+
+
+@pytest.mark.parametrize(
+    ("direction", "bounds", "optimum"),
+    [
+        ("maximise", (-10.0, -2.0), -2.0),
+        ("minimise", (2.0, 10.0), 2.0),
+    ],
+)
+def test_wrong_sign_objective_is_a_valid_optimal_face_at_fraction_one(
+    direction: str,
+    bounds: tuple[float, float],
+    optimum: float,
+) -> None:
+    model = FluxModel(
+        (),
+        (
+            FluxReaction("OBJECTIVE", (), *bounds),
+            FluxReaction("FREE", (), -1.0, 1.0),
+        ),
+        LinearObjective(direction, (ObjectiveTerm("OBJECTIVE", 1.0),)),
+    )
+
+    result = sample_highs_flux_states(
+        model,
+        5,
+        seed=351,
+        fraction_of_optimum=1.0,
+        burn_in=8,
+        thinning=2,
+    )
+
+    prepared = prepare_highs_flux_region(model, 1.0)
+    _assert_valid_samples(prepared, result)
+    assert all(
+        _values(state)["OBJECTIVE"] == pytest.approx(optimum)
+        for state in result.states
+    )
+    assert len({_values(state)["FREE"] for state in result.states}) > 1
 
 
 @pytest.mark.parametrize(
@@ -676,10 +749,16 @@ def test_same_seed_replays_states_and_order_exactly() -> None:
         "thinning": 2,
         "max_direction_attempts": 100,
     }
+    np.random.seed(884)
+    expected_global_draws = np.random.random(4)
+    np.random.seed(884)
     first = sample_highs_flux_states(model, 7, **kwargs)
+    observed_global_draws = np.random.random(4)
     second = sample_highs_flux_states(model, 7, **kwargs)
 
+    np.testing.assert_array_equal(observed_global_draws, expected_global_draws)
     assert first.states == second.states
+    assert first.provenance == second.provenance
     pd.testing.assert_frame_equal(first.to_frame(), second.to_frame(), check_exact=True)
 
 
@@ -1557,14 +1636,69 @@ def test_validator_returns_infinite_overflow_diagnostics_without_raising() -> No
     assert any("residual=inf" in error for error in diagnostic.errors)
 
 
+def test_validator_rejects_finite_state_when_objective_arithmetic_overflows() -> None:
+    model = FluxModel(
+        (),
+        (FluxReaction("X", (), -1.0, 1.0),),
+        LinearObjective("maximise", (ObjectiveTerm("X", 2.0),)),
+    )
+    prepared = prepare_highs_flux_region(model, 1.0)
+    state = CanonicalFluxState("objective-overflow", (("X", 1e308),))
+
+    report = validate_flux_states(prepared, (state,))
+
+    assert not report.valid
+    assert report.finite_values_valid
+    assert not report.bounds_valid
+    assert not report.retained_objective_valid
+    assert math.isinf(report.diagnostics[0].objective_value)
+    assert math.isinf(report.max_retained_objective_violation)
+
+
+def test_validator_fails_closed_on_nonfinite_raw_mass_arithmetic() -> None:
+    model = FluxModel(
+        (FluxMetabolite("A", True),),
+        (
+            FluxReaction(
+                "X", (StoichiometricTerm("A", 1e308),), 0.0, 2.0
+            ),
+            FluxReaction(
+                "Y", (StoichiometricTerm("A", -1e308),), 0.0, 2.0
+            ),
+            FluxReaction("Q", (), 1.0, 1.0),
+        ),
+        LinearObjective("maximise", (ObjectiveTerm("Q", 1.0),)),
+    )
+    prepared = prepare_highs_flux_region(model, 1.0)
+    state = CanonicalFluxState(
+        "mass-overflow",
+        (("X", 2.0), ("Y", 2.0), ("Q", 1.0)),
+    )
+
+    report = validate_flux_states(prepared, (state,))
+
+    assert not report.valid
+    assert report.bounds_valid
+    assert not report.mass_balance_valid
+    assert math.isinf(report.max_raw_mass_balance_residual)
+    assert math.isinf(report.max_mass_balance_residual)
+    assert any("non-finite" in error.lower() for error in report.errors)
+
+
 def test_supplied_fva_is_used_without_running_fva_again(monkeypatch: pytest.MonkeyPatch) -> None:
     prepared = prepare_highs_flux_region(_split_path_model(), 0.8)
     supplied = run_prepared_highs_vffva(prepared, workers=1)
+    expected_ranges = supplied.ranges.copy(deep=True)
 
-    def unexpected_fva(*args: Any, **kwargs: Any) -> Any:
-        raise AssertionError("sampling reran FVA despite receiving a supplied result")
+    def unexpected_preparation(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("prepared sampling repeated model preparation")
 
-    monkeypatch.setattr(sampling_module, "run_prepared_highs_vffva", unexpected_fva)
+    monkeypatch.setattr(
+        sampling_module, "prepare_highs_flux_region", unexpected_preparation
+    )
+    monkeypatch.setattr(
+        sampling_module, "run_prepared_highs_vffva", unexpected_preparation
+    )
     result = sample_prepared_flux_states(
         prepared,
         3,
@@ -1576,6 +1710,7 @@ def test_supplied_fva_is_used_without_running_fva_again(monkeypatch: pytest.Monk
     )
 
     _assert_valid_samples(prepared, result)
+    pd.testing.assert_frame_equal(supplied.ranges, expected_ranges, check_exact=True)
 
 
 def test_supplied_fva_with_mismatched_retained_region_is_rejected() -> None:
@@ -1812,6 +1947,41 @@ def test_stale_compiled_lp_fingerprint_is_rejected_at_sampler_entry() -> None:
         sample_prepared_flux_states(forged, 2, seed=1)
 
 
+@pytest.mark.parametrize(
+    ("case", "changes"),
+    [
+        ("row-count", {"row_starts": (0,)}),
+        ("row-origin", {"row_starts": (1, 4, 6)}),
+        ("column-index", {"column_indices": (4, 1, 1, 2, 2, 3)}),
+        ("coefficient-count", {"coefficients": (1.0, -1.0, -1.0, 1.0, -1.0)}),
+    ],
+)
+def test_malformed_compiled_csr_is_rejected_even_with_a_recomputed_fingerprint(
+    case: str,
+    changes: dict[str, tuple[object, ...]],
+) -> None:
+    prepared = prepare_highs_flux_region(_split_path_model(), 0.8)
+    malformed_lp = replace(prepared.lp, **changes)
+    malformed_lp = replace(
+        malformed_lp,
+        fingerprint=highs_module._compiled_lp_fingerprint(
+            malformed_lp.reaction_ids,
+            malformed_lp.balanced_metabolite_ids,
+            malformed_lp.row_starts,
+            malformed_lp.column_indices,
+            malformed_lp.coefficients,
+            malformed_lp.lower_bounds,
+            malformed_lp.upper_bounds,
+            malformed_lp.objective_coefficients,
+            malformed_lp.objective_direction,
+        ),
+    )
+    forged = replace(prepared, lp=malformed_lp)
+
+    with pytest.raises(AnalysisError, match="prepared compiled LP|CSR|row"):
+        sample_prepared_flux_states(forged, 2, seed=1)
+
+
 def test_line_interval_rejects_an_unbounded_sampling_direction() -> None:
     with pytest.raises(AnalysisError, match="unbounded sampling direction"):
         sampling_module._line_interval(
@@ -1980,6 +2150,35 @@ def test_chain_candidate_rejects_nonfinite_or_overflow_without_repair(
         assert "conditioned_mass_residual=inf" in message
 
 
+def test_chain_candidate_rejects_raw_mass_overflow_hidden_by_row_space() -> None:
+    model = FluxModel(
+        (FluxMetabolite("A", True),),
+        (
+            FluxReaction(
+                "X", (StoichiometricTerm("A", 1e308),), 0.0, 2.0
+            ),
+            FluxReaction(
+                "Y", (StoichiometricTerm("A", -1e308),), 0.0, 2.0
+            ),
+            FluxReaction("Q", (), 1.0, 1.0),
+        ),
+        LinearObjective("maximise", (ObjectiveTerm("Q", 1.0),)),
+    )
+    prepared = prepare_highs_flux_region(model, 1.0)
+
+    with pytest.raises(AnalysisError) as caught:
+        sampling_module._validate_chain_candidate(
+            prepared, np.asarray((2.0, 2.0, 1.0)), 11
+        )
+
+    message = str(caught.value).lower()
+    assert "accepted step 11" in message
+    assert "raw_mass_residual=inf" in message
+    assert "normalized_mass_residual=inf" in message
+    assert "conditioned_mass_residual=0" in message
+    assert "no repair or replacement" in message
+
+
 def test_sampler_rejects_bad_burn_in_candidate_without_repair(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2074,6 +2273,24 @@ def test_nonfinite_bound_is_rejected_instead_of_truncating_unbounded_region() ->
     )
     with pytest.raises(AnalysisError, match="upper bound.*finite|invalid canonical"):
         sample_highs_flux_states(model, 2, seed=1, fva_workers=1)
+
+
+def test_unrepresentable_finite_bound_span_fails_closed_without_numpy_warning() -> None:
+    model = FluxModel(
+        (),
+        (
+            FluxReaction("FIXED", (), 1.0, 1.0),
+            FluxReaction("WIDE", (), -1e308, 1e308),
+        ),
+        LinearObjective("maximise", (ObjectiveTerm("FIXED", 1.0),)),
+    )
+
+    with np.errstate(over="raise", invalid="raise"):
+        with pytest.raises(
+            AnalysisError,
+            match="floating-point range|unrepresentable|unbounded",
+        ):
+            sample_highs_flux_states(model, 1, seed=1, fva_workers=1)
 
 
 def test_native_sampling_import_and_execution_firewall() -> None:

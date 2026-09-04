@@ -11,6 +11,9 @@ import pytest
 import fluxemu.flux_analysis.highs as highs
 from fluxemu.exceptions import AnalysisError
 from fluxemu.flux_analysis import (
+    FBAResult,
+    RetainedObjectiveConstraint,
+    compile_flux_lp,
     prepare_highs_flux_region,
     run_highs_fva_reference,
     run_highs_vffva,
@@ -45,6 +48,20 @@ def _constant_objective_model(direction, coefficient):
             FluxReaction("free", (), -1.0, 1.0),
         ),
         LinearObjective(direction, (ObjectiveTerm("Q", coefficient),)),
+    )
+
+
+def _overflow_declared_objective_model():
+    return FluxModel(
+        (),
+        (
+            FluxReaction("X", (), 2.0, 2.0),
+            FluxReaction("Y", (), 2.0, 2.0),
+        ),
+        LinearObjective(
+            "maximise",
+            (ObjectiveTerm("X", 1e308), ObjectiveTerm("Y", -1e308)),
+        ),
     )
 
 
@@ -258,6 +275,28 @@ def test_prepared_fva_rejects_mismatched_fba_records():
             run_prepared_highs_vffva(forged, workers=1)
 
 
+def test_prepared_fva_rejects_non_series_fba_primal_contextually():
+    prepared = prepare_highs_flux_region(_model(), 0.9)
+    forged = replace(
+        prepared,
+        fba=replace(prepared.fba, fluxes=tuple(prepared.fba.fluxes)),
+    )
+
+    with pytest.raises(AnalysisError, match="FBA fluxes.*pandas Series"):
+        run_prepared_highs_vffva(forged, workers=1)
+
+
+@pytest.mark.parametrize("nonfinite", [float("nan"), float("inf"), -float("inf")])
+def test_prepared_fva_rejects_nonfinite_fba_primal_contextually(nonfinite):
+    prepared = prepare_highs_flux_region(_model(), 0.9)
+    fluxes = prepared.fba.fluxes.copy()
+    fluxes.iloc[0] = nonfinite
+    forged = replace(prepared, fba=replace(prepared.fba, fluxes=fluxes))
+
+    with pytest.raises(AnalysisError, match="FBA primal.*non-finite|non-finite.*FBA primal"):
+        run_prepared_highs_vffva(forged, workers=1)
+
+
 @pytest.mark.parametrize(
     "field,value",
     [
@@ -355,6 +394,93 @@ def test_endpoint_solver_failure_identifies_reaction_direction_and_status(monkey
     monkeypatch.setattr(highs._ReusableFVAWorker, "solve", fail)
     with pytest.raises(AnalysisError, match="FVA maximum for reaction 'reversible'.*solver status"):
         run_highs_vffva(_model(), workers=1)
+
+
+def test_cold_fva_rejects_nonfinite_declared_retained_objective(monkeypatch):
+    def synthetic_fba(lp):
+        return FBAResult(
+            0.0,
+            "optimal",
+            "max",
+            pd.Series((2.0, 2.0), index=lp.reaction_ids, dtype=float),
+        )
+
+    monkeypatch.setattr(highs, "_run_compiled_fba", synthetic_fba)
+    monkeypatch.setattr(
+        highs,
+        "_solve",
+        lambda lp, costs, direction, operation, retention=None: (
+            [2.0, 2.0],
+            2.0,
+            "Optimal",
+        ),
+    )
+    monkeypatch.setattr(highs, "_validate", lambda *args, **kwargs: None)
+
+    with pytest.raises(
+        AnalysisError,
+        match="FVA endpoint.*declared biological objective.*not finite",
+    ):
+        run_highs_fva_reference(_overflow_declared_objective_model())
+
+
+def test_reusable_fva_endpoint_rejects_nonfinite_declared_retained_objective():
+    lp = compile_flux_lp(_overflow_declared_objective_model())
+
+    class Solution:
+        col_value = (2.0, 2.0)
+
+    class Solver:
+        def changeColCost(self, *args):
+            return None
+
+        def setMinimize(self):
+            return None
+
+        def setMaximize(self):
+            return None
+
+        def getOptionValue(self, name):
+            return None, float("inf")
+
+        def run(self):
+            return None
+
+        def clearSolver(self):
+            return None
+
+        def getModelStatus(self):
+            return highs._highspy().HighsModelStatus.kOptimal
+
+        def modelStatusToString(self, status):
+            return "Optimal"
+
+        def getSolution(self):
+            return Solution()
+
+        def getObjectiveValue(self):
+            return 2.0
+
+    worker = object.__new__(highs._ReusableFVAWorker)
+    worker.lp = lp
+    worker.retention = RetainedObjectiveConstraint(
+        1.0,
+        0.0,
+        0.0,
+        ">=",
+        "max",
+        0.0,
+        0.0,
+    )
+    worker.reference_fluxes = (2.0, 2.0)
+    worker.endpoint_count = 0
+    worker.solver = Solver()
+
+    with pytest.raises(
+        AnalysisError,
+        match="FVA minimum for reaction 'X'.*declared biological objective.*not finite",
+    ):
+        worker.solve((0, "min"))
 
 
 @pytest.mark.parametrize("workers", [0, -1, 1.5, True])

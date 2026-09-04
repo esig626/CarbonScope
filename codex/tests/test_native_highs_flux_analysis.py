@@ -6,6 +6,7 @@ import importlib.util
 import math
 import sys
 
+import numpy as np
 import pytest
 import fluxemu.flux_analysis.highs as highs_module
 
@@ -572,6 +573,82 @@ def test_reduced_objective_helper_preserves_ulp_anchor_but_rejects_bad_bounds():
                 (index,),
                 (value,),
             )
+
+
+@pytest.mark.parametrize("kind", ["stoichiometry", "objective"])
+def test_compiler_wraps_nonfinite_duplicate_term_aggregation(kind):
+    if kind == "stoichiometry":
+        aggregate = FluxModel(
+            (FluxMetabolite("A", True),),
+            (
+                FluxReaction(
+                    "R",
+                    (
+                        StoichiometricTerm("A", 1e308),
+                        StoichiometricTerm("A", 1e308),
+                    ),
+                    0.0,
+                    1.0,
+                ),
+            ),
+            LinearObjective("maximise", (ObjectiveTerm("R", 1.0),)),
+        )
+        message = "aggregated stoichiometric.*non-finite.*reaction 'R'.*metabolite 'A'"
+    else:
+        aggregate = FluxModel(
+            (),
+            (FluxReaction("R", (), 0.0, 1.0),),
+            LinearObjective(
+                "maximise",
+                (ObjectiveTerm("R", 1e308), ObjectiveTerm("R", 1e308)),
+            ),
+        )
+        message = "aggregated objective coefficient.*non-finite.*reaction 'R'"
+
+    with pytest.raises(AnalysisError, match=message):
+        compile_flux_lp(aggregate)
+
+
+def test_primal_validator_fails_closed_on_nonfinite_mass_arithmetic():
+    overflow = FluxModel(
+        (FluxMetabolite("A", True),),
+        (
+            FluxReaction(
+                "X", (StoichiometricTerm("A", 1e308),), 0.0, 2.0
+            ),
+            FluxReaction(
+                "Y", (StoichiometricTerm("A", -1e308),), 0.0, 2.0
+            ),
+            FluxReaction("Q", (), 1.0, 1.0),
+        ),
+        LinearObjective("maximise", (ObjectiveTerm("Q", 1.0),)),
+    )
+    lp = compile_flux_lp(overflow)
+
+    with np.errstate(over="raise", invalid="raise"):
+        with pytest.raises(AnalysisError, match="non-finite.*mass|mass.*non-finite"):
+            highs_module._validate(lp, (2.0, 2.0, 1.0), 1.0, (0.0, 0.0, 1.0))
+
+
+def test_primal_validator_wraps_nonfinite_objective_arithmetic():
+    overflow = FluxModel(
+        (),
+        (
+            FluxReaction("X", (), 0.0, 2.0),
+            FluxReaction("Y", (), 0.0, 2.0),
+            FluxReaction("Q", (), 1.0, 1.0),
+        ),
+        LinearObjective("maximise", (ObjectiveTerm("Q", 1.0),)),
+    )
+    lp = compile_flux_lp(overflow)
+
+    with pytest.raises(AnalysisError, match="non-finite.*objective|objective.*non-finite"):
+        highs_module._validate(
+            lp,
+            (2.0, 2.0, 1.0),
+            0.0,
+            (1e308, -1e308, 0.0),
+        )
 
 
 def test_native_import_firewall_and_lazy_highspy_import():
