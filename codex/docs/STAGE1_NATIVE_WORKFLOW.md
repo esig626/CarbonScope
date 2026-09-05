@@ -74,26 +74,41 @@ fresh HiGHS problem for every reaction minimum and maximum and independently
 checks every returned primal.
 
 Production `run_highs_vffva` and `run_prepared_highs_vffva` create at most one
-reusable HiGHS model per worker. Endpoint jobs change only the active reaction
-objective and its sense, allowing HiGHS to reuse its simplex state. HiGHS uses
-one internal thread per worker. Omitting `workers` or passing `workers=None`
-selects the serial, portable default. An explicit integer greater than one opts
-into spawned multiprocess execution, which uses a dynamic one-endpoint task
-queue and restores results to exact canonical reaction order regardless of
-completion order. Failures name the reaction and min/max direction.
+reusable HiGHS model per explicit shared-memory worker thread. Each owning
+thread constructs its LP and retained-objective row once, verifies HiGHS
+internal `threads=1`, and keeps the same solver alive for a dynamically
+scheduled maximum pass followed by a minimum pass. Each successful endpoint
+changes one column cost, calls `Highs.run()`, reads the objective, and clears
+the cost; it does not rebuild the LP. The default scheduling baseline is
+dynamic reaction chunks of 50. Results are restored to exact canonical
+reaction order regardless of completion order.
 
-Because Python's spawn start method imports the calling module in each child,
-scripts that explicitly request multiple workers must put that call behind the
-normal entry-point guard:
+Omitting `workers` or passing `workers=None` selects one solver-owning thread.
+An explicit integer greater than one selects that many worker threads, capped
+by the reaction count; no multiprocessing spawn guard is needed. A failure
+names the reaction and min/max direction, cancels further solves, drains the
+queues, releases solvers in their owning threads, and joins all started
+workers. The composed deterministic path is serial by default. The ensemble
+path also defaults to serial and exposes explicit opt-in through
+`fva_workers>1`.
 
-```python
-if __name__ == "__main__":
-    fva = run_highs_vffva(model, workers=2)
-```
+The lower-level FVA APIs also expose `chunk_size=50` and the strict-Boolean
+`audit_endpoints=False` default. Production keeps solver status, finite result,
+validated-FBA-witness, completeness, and canonical range checks in the hot
+path. `audit_endpoints=True` additionally retrieves and independently validates
+every endpoint primal, including bounds, balanced mass residuals, and the
+retained objective. The cold oracle always performs full endpoint validation.
 
-The composed deterministic path is serial. The ensemble path also defaults to
-serial and exposes explicit opt-in through `fva_workers>1`. Callers of the
-lower-level FVA APIs opt into spawned workers with `workers>1`.
+This is a HiGHS-native port/adaptation of Marouen Ben Guebila's
+[VFFVA computational architecture](https://github.com/marouenbg/VFFVA/tree/7cf7b82505bf99aed38a2073e3ed308f79e95802),
+audited at pinned upstream commit
+`7cf7b82505bf99aed38a2073e3ed308f79e95802`, not a claim that FluxEMU invented
+dynamic FastFVA. FluxEMU preserves its stronger arbitrary multi-term,
+maximisation/minimisation retained-objective row and does not use VFFVA's
+single-objective-reaction bound or rounding shortcuts. Production calls only
+HiGHS; it does not call or require multiprocessing, the original VFFVA binary,
+CPLEX, GLPK, or MPI. The detailed operation mapping and attribution are in
+[Phase 3B: native HiGHS flux analysis](PHASE3B_NATIVE_HIGHS_FLUX_ANALYSIS.md).
 
 The composed deterministic and ensemble APIs prepare the LP and solve the
 biological objective once. The ensemble then uses one FastFVA result for both
@@ -289,35 +304,49 @@ of those optional stacks participates in native Stage 1.
 
 ## Reproducible FastFVA evidence
 
-From the repository root, reproduce the tracked native benchmark with:
+The current diagnostic driver and tracked result are
+[`benchmark_vffva_highs_scaling.py`](../benchmarks/benchmark_vffva_highs_scaling.py)
+and
+[`vffva_highs_scaling_linux_x86_64.json`](../benchmarks/results/vffva_highs_scaling_linux_x86_64.json).
+They record cold-reference parity, worker lifecycle, warm reusable scaling, the
+separate first-preparation cost, exact environment/model provenance, and the
+attempt to execute original VFFVA. From the repository root, inspect the
+available controls with:
 
 ```bash
-cd codex
-PYTHONPATH=src python benchmarks/benchmark_highs_fva_reference.py \
-  ecoli-core --fraction 0.9 --repeats 5 --parallel-workers 2 \
-  > /tmp/stage1_native_fva.json
+PYTHONPATH=codex/src python codex/benchmarks/benchmark_vffva_highs_scaling.py \
+  --help
 ```
 
-The tracked result is
-[`benchmarks/results/stage1_native_fva_linux_x86_64.json`](../benchmarks/results/stage1_native_fva_linux_x86_64.json).
-It records source commit `d1056facd9d41a1bebeb2bc21eeede727766c843`,
-Python 3.12.13, and HiGHS 1.12.0. Two independent invocations each used one
-warm-up and five timed repetitions on the bundled 95-reaction E. coli core
-model:
+Keep the evidence classes distinct:
 
-| Path | Run 1 median (s) | Run 2 median (s) | Median of run medians (s) |
-| --- | ---: | ---: | ---: |
-| Cold native reference | `0.253045` | `0.249138` | `0.251091` |
-| Reusable native, one worker | `0.099676` | `0.099711` | `0.099694` |
-| Reusable native, two workers | `0.599340` | `0.596841` | `0.598091` |
+- **Internal cold-reference ratio:** cold endpoint rebuilds divided by reusable
+  one-worker time. The tracked ratios were `5.922x` for the bundled 95-reaction
+  E. coli core and `8.235x` for the iLJ478 benchmark-only algebraically
+  equivalent independent equality-row basis. The latter used only one measured
+  cold sample and is descriptive.
+- **Shared-memory scaling (`T1/Tp`):** the 652-reaction, 1,304-endpoint iLJ478
+  benchmark-only basis recorded medians of `1.894390`, `1.110843`, `0.637523`,
+  and `0.484070` seconds at 1, 2, 4, and 8 workers, respectively: `1.000x`,
+  `1.705x`, `2.971x`, and `3.913x`. The small E. coli model is retained to show
+  overhead, not to generalize scaling.
+- **Direct original-VFFVA comparison:** upstream CPLEX `make` followed by GLPK
+  `make SOLVER=glpk` was attempted at the pinned commit. Both stopped because
+  `mpicc` was unavailable; the required MPI/runtime and CPLEX/GLPK components
+  were also absent. No upstream binary ran, so no direct parity, timing, or
+  speedup result is claimed.
 
-The per-run reusable-serial speedups were `2.538659x` and `2.498593x`, with a
-median of `2.518626x`. The corresponding two-worker ratios were `0.422205x` and
-`0.417428x`, with a median of `0.419817x`. Serial FastFVA differed from the cold
-oracle by at most `3.652189662e-12`; the two-worker result differed by at most
-`2.903455254e-12`. The small model did not amortize process-spawn and IPC
-overhead, so the parallel measurement is correctness evidence rather than a
-speed claim. Timings are diagnostic and are not CI thresholds.
+The earlier
+[`stage1_native_fva_linux_x86_64.json`](../benchmarks/results/stage1_native_fva_linux_x86_64.json)
+recorded about `0.598091` seconds for two process workers; the current artifact
+records `0.029710` seconds for two threads on the same-family E. coli workload.
+That historical contrast is not a controlled estimate of IPC cost: hot-loop
+validation and other source details changed too. The full difference must not
+be attributed solely to replacing processes. Exact scaling tables, cold-sample
+limitations, benchmark-only row-basis certification, environment metadata,
+source binding, and original-VFFVA build logs are documented in
+[Phase 3B: native HiGHS flux analysis](PHASE3B_NATIVE_HIGHS_FLUX_ANALYSIS.md).
+No timing ratio is a CI gate.
 
 Stage 1 ends at forward flux-to-MID ensembles. It does not implement inverse
 MFA, fitting, confidence intervals, Monte-Carlo MFA uncertainty, information

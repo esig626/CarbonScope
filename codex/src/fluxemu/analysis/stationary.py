@@ -138,8 +138,9 @@ def run_native_fva(
 ) -> FVAResult:
     """Validate ``model`` and delegate to reusable native FVA.
 
-    Omitted or ``None`` ``workers`` is serial and spawn-safe. An explicit value
-    greater than one enables the dynamically scheduled process pool.
+    Omitted or ``None`` ``workers`` selects one solver-owning thread. An
+    explicit value greater than one enables dynamically scheduled shared-memory
+    worker threads.
     """
 
     validate_canonical_model(model)
