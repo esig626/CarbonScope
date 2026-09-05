@@ -194,6 +194,8 @@ class MFAStartDiagnostic:
     divergent objective. ``validated`` records original-model feasibility,
     independently of the backend success flag. ``trial_failures`` preserves
     contextual infeasible, undefined-forward, and support-failing trials.
+    ``accepted`` additionally requires finite numerical convergence and a
+    finite re-evaluated loss; it identifies eligible fit candidates directly.
     """
 
     start_index: int
@@ -208,6 +210,7 @@ class MFAStartDiagnostic:
     iterations: int
     evaluations: int
     trial_failures: tuple[str, ...] = ()
+    accepted: bool = False
 
 
 @dataclass(frozen=True, slots=True)

@@ -187,18 +187,18 @@ class FluxSamplingProvenance:
     random_bit_generator: str
     seed: int
     sample_count: int
-    fraction_of_optimum: float
+    fraction_of_optimum: float | None
     biological_optimum: float
-    retained_objective_bound: float
-    retained_objective_sense: str
+    retained_objective_bound: float | None
+    retained_objective_sense: str | None
     objective_direction: str
     declared_objective_scale: float
     effective_objective_scale: float
     objective_constant: float
-    effective_objective_bound: float
+    effective_objective_bound: float | None
     reduced_objective_scale: float
     reduced_objective_constant: float
-    reduced_effective_objective_bound: float
+    reduced_effective_objective_bound: float | None
     model_fingerprint: str
     fva_ranges_sha256: str
     reaction_order: tuple[str, ...]
@@ -265,7 +265,19 @@ class _ReducedFluxGeometry:
     optimal_face: bool
     objective_scale: float
     objective_constant: float
-    effective_objective_bound: float
+    effective_objective_bound: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedSamplingGeometry:
+    """Shared, once-prepared affine geometry for native sampling and MFA."""
+
+    prepared: PreparedFluxRegion
+    fva: FVAResult
+    geometry: _ReducedFluxGeometry
+    center: np.ndarray
+    center_radius: float
+    center_method: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -444,6 +456,13 @@ def _objective_validation_metrics(
             math.inf,
         )
     discrepancy = abs(declared - stable)
+    if prepared.retention is None:
+        scale = _objective_activity_scale(lp)
+        return _ObjectiveValidationMetrics(
+            declared, stable, effective, discrepancy,
+            discrepancy / scale if scale > 0.0 else discrepancy,
+            0.0, 0.0, 0.0,
+        )
     scale = max(
         _objective_activity_scale(lp),
         abs(prepared.retention.effective_optimum),
@@ -565,8 +584,8 @@ def validate_flux_states(
     diagnostics: list[FluxStateValidationDiagnostics] = []
     errors: list[str] = []
     lp = prepared.lp
-    sense = prepared.retention.sense
-    retained_bound = prepared.retention.bound
+    sense = prepared.retention.sense if prepared.retention is not None else None
+    retained_bound = prepared.retention.bound if prepared.retention is not None else None
     sample_ids_valid = True
     membership_valid = True
     order_valid = True
@@ -685,7 +704,8 @@ def validate_flux_states(
 
         objective_metrics = _objective_validation_metrics(prepared, values)
         if (
-            objective_metrics.normalized_discrepancy
+            prepared.retention is not None
+            and objective_metrics.normalized_discrepancy
             > RETAINED_OBJECTIVE_TOLERANCE
         ):
             retained_valid = False
@@ -699,7 +719,8 @@ def validate_flux_states(
                 f"{objective_metrics.normalized_discrepancy:g}"
             )
         if (
-            objective_metrics.normalized_direct_violation
+            prepared.retention is not None
+            and objective_metrics.normalized_direct_violation
             > RETAINED_OBJECTIVE_TOLERANCE
         ):
             retained_valid = False
@@ -711,7 +732,7 @@ def validate_flux_states(
                 "normalized_violation="
                 f"{objective_metrics.normalized_direct_violation:g}"
             )
-        if objective_metrics.stable_violation > RETAINED_OBJECTIVE_TOLERANCE:
+        if prepared.retention is not None and objective_metrics.stable_violation > RETAINED_OBJECTIVE_TOLERANCE:
             retained_valid = False
             state_errors.append(
                 f"flux state {state.sample_id!r} violates the conditioned "
@@ -832,9 +853,11 @@ def _validate_fva_result(prepared: PreparedFluxRegion, fva: FVAResult) -> np.nda
             "FVA model fingerprint does not match the prepared flux region"
         )
     if (
-        fva.fraction_of_optimum != prepared.retention.fraction_of_optimum
-        or fva.objective_value != prepared.retention.biological_optimum
-        or fva.objective_direction != prepared.retention.objective_direction
+        fva.fraction_of_optimum != (
+            prepared.retention.fraction_of_optimum if prepared.retention is not None else None
+        )
+        or fva.objective_value != prepared.fba.objective_value
+        or fva.objective_direction != lp.objective_direction
     ):
         raise AnalysisError("FVA retained-objective metadata does not match the prepared region")
     try:
@@ -985,7 +1008,7 @@ def _build_reduced_geometry(
             )
     fixed_indices.update(collapsed_indices)
     retention = prepared.retention
-    optimal_face = (
+    optimal_face = retention is not None and (
         retention.fraction_of_optimum == 1.0
         or retention.bound == retention.biological_optimum
     )
@@ -996,69 +1019,71 @@ def _build_reduced_geometry(
     normalized_objective = (
         objective / objective_scale if objective_scale > 0.0 else objective
     )
-    reduced_effective_at_particular = math.fsum(
-        float(coefficient) * float(value)
-        for coefficient, value in zip(objective, particular)
-    )
-    objective_value_scale = max(
-        _objective_activity_scale(lp),
-        abs(retention.effective_optimum),
-        abs(retention.effective_bound),
-    )
-    expected_reduced_effective_at_particular = math.fsum(
-        (
-            retention.effective_optimum,
-            lp.objective_constant,
-            -reduced_objective_constant,
+    reduced_effective_bound = None
+    if retention is not None:
+        reduced_effective_at_particular = math.fsum(
+            float(coefficient) * float(value)
+            for coefficient, value in zip(objective, particular)
         )
-    )
-    reduced_objective_discrepancy = abs(
-        reduced_effective_at_particular
-        - expected_reduced_effective_at_particular
-    )
-    objective_value_tolerance = (
-        RETAINED_OBJECTIVE_TOLERANCE * objective_value_scale
-        if objective_value_scale > 0.0
-        else RETAINED_OBJECTIVE_TOLERANCE
-    )
-    if reduced_objective_discrepancy > objective_value_tolerance:
-        raise AnalysisError(
-            "reduced sampling objective differs from the prepared biological "
-            "optimum at its FBA anchor: "
-            f"reduced_effective={reduced_effective_at_particular:g}, "
-            f"prepared_effective={expected_reduced_effective_at_particular:g}, "
-            f"discrepancy={reduced_objective_discrepancy:g}"
+        objective_value_scale = max(
+            _objective_activity_scale(lp),
+            abs(retention.effective_optimum),
+            abs(retention.effective_bound),
         )
-    reduced_effective_bound = math.fsum(
-        (
-            reduced_effective_at_particular,
-            retention.effective_bound,
-            -retention.effective_optimum,
-        )
-    )
-    effective_at_particular = (
-        reduced_effective_at_particular / objective_scale
-        if objective_scale > 0.0
-        else reduced_effective_at_particular
-    )
-    normalized_retained_bound = (
-        reduced_effective_bound / objective_scale
-        if objective_scale > 0.0
-        else reduced_effective_bound
-    )
-    if optimal_face:
-        if np.linalg.norm(normalized_objective) > 0.0:
-            if (
-                abs(effective_at_particular - normalized_retained_bound)
-                > RETAINED_OBJECTIVE_TOLERANCE
-            ):
-                raise AnalysisError(
-                    "prepared FBA state does not anchor its effective optimal face"
-                )
-        elif abs(normalized_retained_bound) > RETAINED_OBJECTIVE_TOLERANCE:
-            raise AnalysisError(
-                "constant biological objective has an inconsistent retained face"
+        expected_reduced_effective_at_particular = math.fsum(
+            (
+                retention.effective_optimum,
+                lp.objective_constant,
+                -reduced_objective_constant,
             )
+        )
+        reduced_objective_discrepancy = abs(
+            reduced_effective_at_particular
+            - expected_reduced_effective_at_particular
+        )
+        objective_value_tolerance = (
+            RETAINED_OBJECTIVE_TOLERANCE * objective_value_scale
+            if objective_value_scale > 0.0
+            else RETAINED_OBJECTIVE_TOLERANCE
+        )
+        if reduced_objective_discrepancy > objective_value_tolerance:
+            raise AnalysisError(
+                "reduced sampling objective differs from the prepared biological "
+                "optimum at its FBA anchor: "
+                f"reduced_effective={reduced_effective_at_particular:g}, "
+                f"prepared_effective={expected_reduced_effective_at_particular:g}, "
+                f"discrepancy={reduced_objective_discrepancy:g}"
+            )
+        reduced_effective_bound = math.fsum(
+            (
+                reduced_effective_at_particular,
+                retention.effective_bound,
+                -retention.effective_optimum,
+            )
+        )
+        effective_at_particular = (
+            reduced_effective_at_particular / objective_scale
+            if objective_scale > 0.0
+            else reduced_effective_at_particular
+        )
+        normalized_retained_bound = (
+            reduced_effective_bound / objective_scale
+            if objective_scale > 0.0
+            else reduced_effective_bound
+        )
+        if optimal_face:
+            if np.linalg.norm(normalized_objective) > 0.0:
+                if (
+                    abs(effective_at_particular - normalized_retained_bound)
+                    > RETAINED_OBJECTIVE_TOLERANCE
+                ):
+                    raise AnalysisError(
+                        "prepared FBA state does not anchor its effective optimal face"
+                    )
+            elif abs(normalized_retained_bound) > RETAINED_OBJECTIVE_TOLERANCE:
+                raise AnalysisError(
+                    "constant biological objective has an inconsistent retained face"
+                )
 
     basis, equality_rank = _sampling_affine_nullspace(
         lp,
@@ -1078,7 +1103,7 @@ def _build_reduced_geometry(
         inequality_rows.append(-basis[index, :].copy())
         inequality_bounds.append(particular[index] - lower)
 
-    if not optimal_face:
+    if retention is not None and not optimal_face:
         projected_objective = normalized_objective @ basis
         if retention.sense == ">=":
             inequality_rows.append(-projected_objective)
@@ -1318,10 +1343,11 @@ def _validate_chain_candidate(
             mass_metrics.conditioned_residual,
         )
         > MASS_BALANCE_TOLERANCE
-        or objective.normalized_discrepancy > RETAINED_OBJECTIVE_TOLERANCE
-        or objective.normalized_direct_violation
-        > RETAINED_OBJECTIVE_TOLERANCE
-        or objective.stable_violation > RETAINED_OBJECTIVE_TOLERANCE
+        or (prepared.retention is not None and (
+            objective.normalized_discrepancy > RETAINED_OBJECTIVE_TOLERANCE
+            or objective.normalized_direct_violation > RETAINED_OBJECTIVE_TOLERANCE
+            or objective.stable_violation > RETAINED_OBJECTIVE_TOLERANCE
+        ))
     ):
         raise AnalysisError(
             "native hit-and-run candidate failed independent ambient-space "
@@ -1368,6 +1394,8 @@ def _highs_version() -> str:
 def _validate_retained_region_at_fba(prepared: PreparedFluxRegion) -> None:
     """Reject sign-incompatible fractional arithmetic before any endpoint work."""
 
+    if prepared.retention is None:
+        return
     if prepared.retention.fraction_of_optimum < 1.0 and (
         (
             prepared.retention.objective_direction == "max"
@@ -1404,6 +1432,30 @@ def _validate_retained_region_at_fba(prepared: PreparedFluxRegion) -> None:
         )
 
 
+def _prepare_sampling_geometry(
+    prepared: PreparedFluxRegion,
+    *,
+    fva: FVAResult | None = None,
+    fva_workers: int | None = None,
+) -> _PreparedSamplingGeometry:
+    """Prepare the existing native hull and center once for all consumers."""
+
+    _validate_prepared_flux_region(prepared)
+    _validate_retained_region_at_fba(prepared)
+    if fva is not None and fva_workers is not None:
+        raise AnalysisError(
+            "fva_workers must be omitted when a precomputed FVAResult is supplied"
+        )
+    if fva is None:
+        fva = run_prepared_highs_vffva(
+            prepared, workers=1 if fva_workers is None else fva_workers
+        )
+    ranges = _validate_fva_result(prepared, fva)
+    geometry = _build_reduced_geometry(prepared, ranges)
+    center, radius, method = _chebyshev_center(geometry)
+    return _PreparedSamplingGeometry(prepared, fva, geometry, center, radius, method)
+
+
 def sample_prepared_flux_states(
     prepared: PreparedFluxRegion,
     count: int,
@@ -1425,20 +1477,28 @@ def sample_prepared_flux_states(
     attempts_value = _positive_integer(
         max_direction_attempts, "maximum direction attempts"
     )
-    _validate_retained_region_at_fba(prepared)
+    shared = _prepare_sampling_geometry(prepared, fva=fva, fva_workers=fva_workers)
+    return _sample_flux_states_from_geometry(
+        shared, sample_count, seed=seed_value, burn_in=burn_in_value,
+        thinning=thinning_value, max_direction_attempts=attempts_value,
+    )
 
-    if fva is not None and fva_workers is not None:
-        raise AnalysisError(
-            "fva_workers must be omitted when a precomputed FVAResult is supplied"
-        )
-    if fva is None:
-        fva = run_prepared_highs_vffva(
-            prepared, workers=1 if fva_workers is None else fva_workers
-        )
-    ranges = _validate_fva_result(prepared, fva)
 
-    geometry = _build_reduced_geometry(prepared, ranges)
-    center, center_radius, center_method = _chebyshev_center(geometry)
+def _sample_flux_states_from_geometry(
+    shared: _PreparedSamplingGeometry,
+    sample_count: int,
+    *,
+    seed: int,
+    burn_in: int,
+    thinning: int,
+    max_direction_attempts: int,
+) -> NativeFluxSamplingResult:
+    """Run the native kernel against an already prepared, shared geometry."""
+
+    prepared, fva, geometry = shared.prepared, shared.fva, shared.geometry
+    center, center_radius, center_method = shared.center, shared.center_radius, shared.center_method
+    seed_value, burn_in_value = seed, burn_in
+    thinning_value, attempts_value = thinning, max_direction_attempts
     active_rows, active_bounds, _ = _active_reduced_inequalities(geometry)
     affine_dimension = geometry.basis.shape[1]
     rejected_directions = 0
@@ -1529,18 +1589,22 @@ def sample_prepared_flux_states(
         random_bit_generator=RANDOM_BIT_GENERATOR,
         seed=seed_value,
         sample_count=sample_count,
-        fraction_of_optimum=prepared.retention.fraction_of_optimum,
-        biological_optimum=prepared.retention.biological_optimum,
-        retained_objective_bound=prepared.retention.bound,
-        retained_objective_sense=prepared.retention.sense,
-        objective_direction=prepared.retention.objective_direction,
+        fraction_of_optimum=(
+            prepared.retention.fraction_of_optimum if prepared.retention is not None else None
+        ),
+        biological_optimum=prepared.fba.objective_value,
+        retained_objective_bound=prepared.retention.bound if prepared.retention is not None else None,
+        retained_objective_sense=prepared.retention.sense if prepared.retention is not None else None,
+        objective_direction=prepared.lp.objective_direction,
         declared_objective_scale=max(
             (abs(value) for value in prepared.lp.objective_coefficients),
             default=0.0,
         ),
         effective_objective_scale=_objective_scale(prepared.lp),
         objective_constant=prepared.lp.objective_constant,
-        effective_objective_bound=prepared.retention.effective_bound,
+        effective_objective_bound=(
+            prepared.retention.effective_bound if prepared.retention is not None else None
+        ),
         reduced_objective_scale=geometry.objective_scale,
         reduced_objective_constant=geometry.objective_constant,
         reduced_effective_objective_bound=geometry.effective_objective_bound,
@@ -1573,7 +1637,7 @@ def sample_prepared_flux_states(
         highs_version=_highs_version(),
         stationary_target=(
             "relative-volume uniform stationary target on the numerically reduced "
-            "retained affine polytope"
+            + ("retained affine polytope" if prepared.retention is not None else "affine polytope")
         ),
         finite_chain_claim=(
             "finite correlated Markov-chain states; no mixing or independence guarantee"
@@ -1587,7 +1651,7 @@ def sample_highs_flux_states(
     count: int,
     *,
     seed: int,
-    fraction_of_optimum: float = 1.0,
+    fraction_of_optimum: float | None = 1.0,
     fva_workers: int | None = 1,
     burn_in: int = 100,
     thinning: int = 10,

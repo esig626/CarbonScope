@@ -51,7 +51,7 @@ class FBAResult:
 @dataclass(frozen=True)
 class FVAResult:
     ranges: pd.DataFrame
-    fraction_of_optimum: float
+    fraction_of_optimum: float | None
     objective_value: float
     objective_direction: str
     model_fingerprint: str | None = None
