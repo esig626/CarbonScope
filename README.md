@@ -13,6 +13,14 @@ canonical model -> FBA -> FastFVA -> complete feasible flux states
                 -> stationary EMU -> sample-indexed MID ensemble
 ```
 
+Its production FastFVA engine is a HiGHS-native port/adaptation of the
+shared-memory computational architecture in Marouen Ben Guebila's
+[VFFVA](https://github.com/marouenbg/VFFVA/tree/7cf7b82505bf99aed38a2073e3ed308f79e95802),
+audited at pinned commit `7cf7b82505bf99aed38a2073e3ed308f79e95802`.
+FluxEMU retains its own more general linear-objective and objective-retention
+semantics; it does not require the original VFFVA binary or its CPLEX, GLPK, or
+MPI dependencies.
+
 Install the standard native package from the repository root with:
 
 ```bash
