@@ -6,14 +6,14 @@ worker-local reusable HiGHS models and dynamically scheduled endpoint jobs.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 from functools import lru_cache
 import hashlib
 import json
 import math
-import multiprocessing
-import os
+from queue import Empty, Queue
+import threading
 from typing import Sequence
 
 import numpy as np
@@ -1880,8 +1880,35 @@ class _EndpointResult:
     reaction_index: int
     direction: str
     value: float
-    worker_pid: int
+    worker_id: int
     basis_refreshes: int
+
+
+@dataclass(slots=True)
+class _VFFVAWorkerTrace:
+    """Actual lifecycle events recorded by one solver-owning worker thread."""
+
+    worker_id: int
+    thread_id: int | None = None
+    solver_id: int | None = None
+    configured_solver_threads: int | None = None
+    matrix_builds: int = 0
+    retention_rows: int = 0
+    pass_directions: list[str] = field(default_factory=list)
+    chunks_claimed: int = 0
+    max_chunks_claimed: int = 0
+    min_chunks_claimed: int = 0
+    endpoint_attempts: int = 0
+    endpoint_solves: int = 0
+    max_endpoint_solves: int = 0
+    min_endpoint_solves: int = 0
+    objective_change_attempts: int = 0
+    objective_changes: int = 0
+    objective_clear_attempts: int = 0
+    objective_clears: int = 0
+    basis_refreshes: int = 0
+    solver_released: bool = False
+    exited: bool = False
 
 
 def _canonicalize_fva_endpoints(
@@ -1926,6 +1953,9 @@ class _ReusableFVAWorker:
     ):
         highspy = _highspy()
         self.lp, self.retention, self.endpoint_count = lp, retention, 0
+        self.worker_id = 0
+        self.lifecycle: _VFFVAWorkerTrace | None = None
+        self._pass_directions: list[str] = []
         self.reference_fluxes = tuple(float(value) for value in reference_fluxes)
         self.solver = highspy.Highs()
         self.solver.setOptionValue("output_flag", False)
@@ -1940,6 +1970,19 @@ class _ReusableFVAWorker:
         self.solver.setOptionValue(
             "small_matrix_value", HIGHS_SMALL_MATRIX_VALUE
         )
+        _, configured_threads = self.solver.getOptionValue("threads")
+        try:
+            configured_threads = int(configured_threads)
+        except (TypeError, ValueError, OverflowError) as error:
+            raise AnalysisError(
+                "FVA worker could not verify its HiGHS thread count"
+            ) from error
+        if configured_threads != 1:
+            raise AnalysisError(
+                "FVA worker requires exactly one HiGHS internal thread; "
+                f"configured={configured_threads}"
+            )
+        self.configured_solver_threads = configured_threads
         n = len(lp.reaction_ids)
         self.solver.addCols(n, [0.0] * n, list(lp.lower_bounds), list(lp.upper_bounds),
                             0, [0] * (n + 1), [], [])
@@ -1983,20 +2026,50 @@ class _ReusableFVAWorker:
         starts.append(len(indices))
         self.solver.addRows(len(lower), lower, upper, len(indices), starts, indices, values)
 
+    def begin_pass(self, direction: str) -> None:
+        """Set objective sense once for the next global VFFVA pass."""
+
+        expected = ("max", "min")
+        offset = len(self._pass_directions)
+        if offset >= len(expected) or direction != expected[offset]:
+            raise AnalysisError(
+                "FVA worker objective passes must be exactly max then min"
+            )
+        if direction == "max":
+            self.solver.setMaximize()
+        else:
+            self.solver.setMinimize()
+        self._pass_directions.append(direction)
+        if self.lifecycle is not None:
+            self.lifecycle.pass_directions.append(direction)
+
     def solve(self, task: tuple[int, str]) -> _EndpointResult:
         j, direction = task
         reaction_id = self.lp.reaction_ids[j]
         operation = f"FVA {direction}imum for reaction {reaction_id!r}"
+        if not hasattr(self, "_pass_directions"):
+            # Backward-compatible support for narrowly constructed private test
+            # doubles; production workers always enter through ``begin_pass``.
+            self._pass_directions = [direction]
+        if not self._pass_directions or direction != self._pass_directions[-1]:
+            raise AnalysisError(
+                f"{operation} failed: worker objective sense is not active"
+            )
+        lifecycle = getattr(self, "lifecycle", None)
+        if lifecycle is not None:
+            lifecycle.endpoint_attempts += 1
         basis_refreshes = 0
+        value: float | None = None
+        failure: BaseException | None = None
+        status_name = "not available"
         try:
             # changeColCost invalidates the objective but retains the model and the
             # incumbent simplex basis. HiGHS therefore reoptimizes on the next run.
-            if self.endpoint_count:
-                previous = getattr(self, "_previous_index")
-                self.solver.changeColCost(previous, 0.0)
+            if lifecycle is not None:
+                lifecycle.objective_change_attempts += 1
             self.solver.changeColCost(j, 1.0)
-            self._previous_index = j
-            self.solver.setMaximize() if direction == "max" else self.solver.setMinimize()
+            if lifecycle is not None:
+                lifecycle.objective_changes += 1
             _, time_limit = self.solver.getOptionValue("time_limit")
             if float(time_limit) <= 0.0:
                 status_name = "Time limit reached"
@@ -2009,6 +2082,8 @@ class _ReusableFVAWorker:
                 if attempt:
                     self.solver.clearSolver()
                     basis_refreshes += 1
+                    if lifecycle is not None:
+                        lifecycle.basis_refreshes += 1
                 try:
                     self.solver.run()
                     status = self.solver.getModelStatus()
@@ -2093,72 +2168,378 @@ class _ReusableFVAWorker:
                     last_error = error
             if last_error is not None:
                 raise last_error
-        except Exception as error:
-            if isinstance(error, AnalysisError) and str(error).startswith(operation):
-                raise
-            status_name = locals().get("status_name", "not available")
-            raise AnalysisError(f"{operation} failed: solver status {status_name}; {error}") from error
+        except BaseException as error:
+            failure = error
+        finally:
+            if lifecycle is not None:
+                lifecycle.objective_clear_attempts += 1
+            try:
+                # VFFVA clears the active endpoint objective after every solve.
+                # Keeping this in ``finally`` also restores the retained LP after
+                # a failed run or validation attempt.
+                self.solver.changeColCost(j, 0.0)
+                if lifecycle is not None:
+                    lifecycle.objective_clears += 1
+            except BaseException as clear_error:
+                if failure is None:
+                    failure = clear_error
+                else:
+                    failure = AnalysisError(
+                        f"{failure}; additionally could not clear endpoint "
+                        f"objective: {clear_error}"
+                    )
+        if failure is not None:
+            message = str(failure)
+            if isinstance(failure, AnalysisError) and message.startswith(operation):
+                raise AnalysisError(message) from None
+            raise AnalysisError(
+                f"{operation} failed: solver status {status_name}; {message}"
+            ) from None
+        if value is None:  # pragma: no cover - guarded by the solve checks above
+            raise AnalysisError(f"{operation} failed: missing endpoint objective")
         self.endpoint_count += 1
+        if lifecycle is not None:
+            lifecycle.endpoint_solves += 1
+            if direction == "max":
+                lifecycle.max_endpoint_solves += 1
+            else:
+                lifecycle.min_endpoint_solves += 1
         return _EndpointResult(
-            j, direction, value, os.getpid(), basis_refreshes
+            j, direction, value, getattr(self, "worker_id", 0), basis_refreshes
         )
 
 
-_PROCESS_WORKER: _ReusableFVAWorker | None = None
-
-
-def _initialize_fva_process(
-    lp: CompiledFluxLP,
-    retention: RetainedObjectiveConstraint,
-    reference_fluxes: Sequence[float],
+def _populate_vffva_instrumentation(
+    instrumentation: dict[str, object] | None,
+    traces: Sequence[_VFFVAWorkerTrace],
+    threads: Sequence[threading.Thread],
+    *,
+    configured_workers: int,
+    chunk_size: int,
+    max_queue_accounted: bool,
+    min_released_after_max: bool,
 ) -> None:
-    global _PROCESS_WORKER
-    _PROCESS_WORKER = _ReusableFVAWorker(lp, retention, reference_fluxes)
+    """Expose measurements tied to the real owning-thread lifecycle."""
 
-
-def _solve_process_endpoint(task: tuple[int, str]) -> _EndpointResult:
-    if _PROCESS_WORKER is None:  # pragma: no cover - defensive process contract
-        raise AnalysisError("FVA worker was not initialized")
-    return _PROCESS_WORKER.solve(task)
+    if instrumentation is None:
+        return
+    passes = tuple(tuple(trace.pass_directions) for trace in traces)
+    instrumentation.update(
+        configured_workers=configured_workers,
+        chunk_size=chunk_size,
+        worker_threads=sum(trace.thread_id is not None for trace in traces),
+        solver_instances=sum(trace.solver_id is not None for trace in traces),
+        matrix_builds=sum(trace.matrix_builds for trace in traces),
+        retention_rows=sum(trace.retention_rows for trace in traces),
+        highs_single_thread_workers=sum(
+            trace.configured_solver_threads == 1 for trace in traces
+        ),
+        max_pass_workers=sum("max" in directions for directions in passes),
+        min_pass_workers=sum("min" in directions for directions in passes),
+        workers_surviving_pass_transition=sum(
+            directions == ("max", "min") for directions in passes
+        ),
+        endpoint_attempts=sum(trace.endpoint_attempts for trace in traces),
+        endpoint_solves=sum(trace.endpoint_solves for trace in traces),
+        max_endpoint_solves=sum(trace.max_endpoint_solves for trace in traces),
+        min_endpoint_solves=sum(trace.min_endpoint_solves for trace in traces),
+        objective_change_attempts=sum(
+            trace.objective_change_attempts for trace in traces
+        ),
+        objective_changes=sum(trace.objective_changes for trace in traces),
+        objective_clear_attempts=sum(
+            trace.objective_clear_attempts for trace in traces
+        ),
+        objective_clears=sum(trace.objective_clears for trace in traces),
+        chunks_claimed=sum(trace.chunks_claimed for trace in traces),
+        workers_claiming_multiple_chunks=sum(
+            trace.max_chunks_claimed > 1 or trace.min_chunks_claimed > 1
+            for trace in traces
+        ),
+        basis_refreshes=sum(trace.basis_refreshes for trace in traces),
+        joined_workers=sum(not thread.is_alive() for thread in threads),
+        solver_releases=sum(trace.solver_released for trace in traces),
+        max_queue_accounted=int(max_queue_accounted),
+        min_released_after_max=int(min_released_after_max),
+        worker_thread_ids=tuple(
+            -1 if trace.thread_id is None else trace.thread_id for trace in traces
+        ),
+        worker_solver_ids=tuple(
+            -1 if trace.solver_id is None else trace.solver_id for trace in traces
+        ),
+        worker_passes=passes,
+        worker_chunk_counts=tuple(trace.chunks_claimed for trace in traces),
+        worker_max_chunk_counts=tuple(
+            trace.max_chunks_claimed for trace in traces
+        ),
+        worker_min_chunk_counts=tuple(
+            trace.min_chunks_claimed for trace in traces
+        ),
+        worker_endpoint_counts=tuple(trace.endpoint_solves for trace in traces),
+    )
 
 
 def run_prepared_highs_vffva(
     prepared: PreparedFluxRegion,
     *,
     workers: int | None = None,
-    instrumentation: dict[str, int] | None = None,
+    chunk_size: int = 50,
+    instrumentation: dict[str, object] | None = None,
 ) -> FVAResult:
-    """Run reusable FVA over an already compiled and optimized flux region.
+    """Run a shared-memory VFFVA-style pass over a prepared flux region.
 
-    Each worker creates one LP and repeatedly changes only column costs and the
-    objective sense. Repeated ``Highs.run`` calls naturally retain the current
-    simplex basis; no basis export/import is needed. Omitted or ``None``
-    ``workers`` selects the portable serial path; process spawning is explicit.
+    Every owning thread builds one HiGHS LP, reuses its simplex state across
+    dynamically claimed reaction chunks, and survives the completed maximum
+    pass before the minimum pass starts.  HiGHS itself uses one thread per
+    worker.  ``chunk_size=50`` preserves VFFVA's baseline dynamic schedule.
     """
     _validate_prepared_flux_region(prepared)
     lp = prepared.lp
     retention = prepared.retention
-    tasks = [(j, direction) for j in range(len(lp.reaction_ids)) for direction in ("min", "max")]
     if workers is None:
         workers = 1
     if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
         raise AnalysisError("workers must be a positive integer")
-    workers = min(workers, len(tasks))
+    if (
+        isinstance(chunk_size, bool)
+        or not isinstance(chunk_size, int)
+        or chunk_size < 1
+    ):
+        raise AnalysisError("chunk_size must be a positive integer")
+    reaction_count = len(lp.reaction_ids)
+    workers = min(workers, reaction_count)
     reference_fluxes = tuple(float(value) for value in prepared.fba.fluxes)
-    if workers == 1:
-        worker = _ReusableFVAWorker(lp, retention, reference_fluxes)
-        results = [worker.solve(task) for task in tasks]
-    else:
-        # imap_unordered(chunksize=1) is a shared dynamic task queue: a process
-        # receives its next independent endpoint only after completing one.
-        context = multiprocessing.get_context("spawn")
-        with context.Pool(
-            workers,
-            _initialize_fva_process,
-            (lp, retention, reference_fluxes),
-        ) as pool:
-            results = list(pool.imap_unordered(_solve_process_endpoint, tasks, chunksize=1))
-    minima = [math.nan] * len(lp.reaction_ids); maxima = [math.nan] * len(lp.reaction_ids)
+    if workers == 0:  # pragma: no cover - canonical models require reactions
+        raise AnalysisError("FVA requires at least one reaction")
+
+    def chunk_queue() -> Queue[tuple[int, ...]]:
+        work: Queue[tuple[int, ...]] = Queue()
+        for start in range(0, reaction_count, chunk_size):
+            work.put(tuple(range(start, min(start + chunk_size, reaction_count))))
+        return work
+
+    max_work = chunk_queue()
+    min_work = chunk_queue()
+    start_max = threading.Event()
+    start_min = threading.Event()
+    cancelled = threading.Event()
+    ready_reports: Queue[int] = Queue()
+    max_done_reports: Queue[int] = Queue()
+    min_done_reports: Queue[int] = Queue()
+    traces = tuple(_VFFVAWorkerTrace(worker_id) for worker_id in range(workers))
+    results: list[_EndpointResult] = []
+    results_lock = threading.Lock()
+    failure_lock = threading.Lock()
+    failures: list[AnalysisError] = []
+
+    def record_failure(error: BaseException, context: str) -> None:
+        raw_message = str(error)
+        if isinstance(error, AnalysisError) and raw_message.startswith("FVA "):
+            message = raw_message
+        else:
+            detail = raw_message or type(error).__name__
+            message = f"{context}: {detail}"
+        # Store no worker traceback: traceback frames can retain ``self.solver``
+        # and defer destruction beyond the owning thread's lifetime.
+        clean_error = AnalysisError(message).with_traceback(None)
+        with failure_lock:
+            if not failures:
+                failures.append(clean_error)
+        cancelled.set()
+
+    def consume_chunks(
+        direction: str,
+        work: Queue[tuple[int, ...]],
+        worker: _ReusableFVAWorker | None,
+        trace: _VFFVAWorkerTrace,
+    ) -> None:
+        if worker is not None and not cancelled.is_set():
+            try:
+                worker.begin_pass(direction)
+            except BaseException as error:
+                record_failure(
+                    error,
+                    f"FVA {direction} pass worker {trace.worker_id} failed",
+                )
+        while True:
+            try:
+                chunk = work.get_nowait()
+            except Empty:
+                return
+            trace.chunks_claimed += 1
+            if direction == "max":
+                trace.max_chunks_claimed += 1
+            else:
+                trace.min_chunks_claimed += 1
+            try:
+                if worker is None or cancelled.is_set():
+                    continue
+                for reaction_index in chunk:
+                    if cancelled.is_set():
+                        break
+                    try:
+                        result = worker.solve((reaction_index, direction))
+                    except BaseException as error:
+                        reaction_id = lp.reaction_ids[reaction_index]
+                        record_failure(
+                            error,
+                            f"FVA {direction}imum for reaction "
+                            f"{reaction_id!r} failed",
+                        )
+                        break
+                    with results_lock:
+                        results.append(result)
+            finally:
+                work.task_done()
+
+    def worker_target(trace: _VFFVAWorkerTrace) -> None:
+        worker: _ReusableFVAWorker | None = None
+        ready_reported = False
+        max_reported = False
+        min_reported = False
+        trace.thread_id = threading.get_ident()
+        try:
+            try:
+                # Construction happens here, never in the coordinating thread.
+                worker = _ReusableFVAWorker(
+                    lp,
+                    retention,
+                    reference_fluxes,
+                )
+                worker.worker_id = trace.worker_id
+                worker.lifecycle = trace
+                trace.solver_id = id(worker.solver)
+                trace.configured_solver_threads = (
+                    worker.configured_solver_threads
+                )
+                trace.matrix_builds += 1
+                trace.retention_rows += 1
+            except BaseException as error:
+                record_failure(
+                    error, f"FVA worker {trace.worker_id} initialization failed"
+                )
+            finally:
+                ready_reports.put(trace.worker_id)
+                ready_reported = True
+
+            # No endpoint may run until every started worker has reported either
+            # a fully configured threads=1 solver or an initialization failure.
+            start_max.wait()
+            consume_chunks("max", max_work, worker, trace)
+            max_done_reports.put(trace.worker_id)
+            max_reported = True
+
+            # The coordinator releases this only after every maximum chunk has
+            # been accounted.  Cancellation drains MIN without solving it.
+            start_min.wait()
+            consume_chunks("min", min_work, worker, trace)
+            min_done_reports.put(trace.worker_id)
+            min_reported = True
+        except BaseException as error:  # pragma: no cover - defensive lifecycle
+            record_failure(
+                error, f"FVA worker {trace.worker_id} terminated unexpectedly"
+            )
+        finally:
+            if not ready_reported:
+                ready_reports.put(trace.worker_id)
+            if not max_reported:
+                start_max.wait()
+                consume_chunks("max", max_work, None, trace)
+                max_done_reports.put(trace.worker_id)
+            if not min_reported:
+                start_min.wait()
+                consume_chunks("min", min_work, None, trace)
+                min_done_reports.put(trace.worker_id)
+            if worker is not None:
+                # Drop the final Python reference in the same thread that owns
+                # and used the Highs object.  Stored errors were sanitized above.
+                solver = worker.solver
+                del worker.solver
+                del worker
+                del solver
+                trace.solver_released = True
+            trace.exited = True
+
+    threads = tuple(
+        threading.Thread(
+            target=worker_target,
+            args=(trace,),
+            name=f"fluxemu-vffva-{trace.worker_id}",
+        )
+        for trace in traces
+    )
+    started_threads: list[threading.Thread] = []
+    max_queue_accounted = False
+    min_released_after_max = False
+    coordination_failed = False
+    try:
+        for thread in threads:
+            try:
+                thread.start()
+                started_threads.append(thread)
+            except BaseException as error:  # pragma: no cover - platform failure
+                record_failure(error, f"could not start FVA worker {thread.name}")
+        for _ in started_threads:
+            ready_reports.get()
+        start_max.set()
+        for _ in started_threads:
+            max_done_reports.get()
+        if not started_threads:
+            while True:
+                try:
+                    max_work.get_nowait()
+                except Empty:
+                    break
+                else:
+                    max_work.task_done()
+        max_work.join()
+        max_queue_accounted = True
+        start_min.set()
+        min_released_after_max = True
+        for _ in started_threads:
+            min_done_reports.get()
+        if not started_threads:
+            while True:
+                try:
+                    min_work.get_nowait()
+                except Empty:
+                    break
+                else:
+                    min_work.task_done()
+        min_work.join()
+    except BaseException as error:  # pragma: no cover - coordinating interruption
+        coordination_failed = True
+        record_failure(error, "FVA worker coordination failed")
+    finally:
+        if coordination_failed:
+            cancelled.set()
+        start_max.set()
+        start_min.set()
+        for thread in started_threads:
+            thread.join()
+        # Every taken chunk is balanced with task_done, including cancellation.
+        max_work.join()
+        min_work.join()
+        _populate_vffva_instrumentation(
+            instrumentation,
+            traces,
+            started_threads,
+            configured_workers=workers,
+            chunk_size=chunk_size,
+            max_queue_accounted=max_queue_accounted,
+            min_released_after_max=min_released_after_max,
+        )
+
+    if failures:
+        raise AnalysisError(str(failures[0])) from None
+
+    tasks = {
+        (reaction_index, direction)
+        for direction in ("max", "min")
+        for reaction_index in range(reaction_count)
+    }
+    minima = [math.nan] * reaction_count
+    maxima = [math.nan] * reaction_count
     seen: set[tuple[int, str]] = set()
     for result in results:
         if (
@@ -2177,12 +2558,6 @@ def run_prepared_highs_vffva(
         (minima if result.direction == "min" else maxima)[result.reaction_index] = result.value
     if seen != set(tasks) or not all(math.isfinite(v) for v in minima + maxima):
         raise AnalysisError("FVA failed to return every endpoint")
-    if instrumentation is not None:
-        process_ids = {result.worker_pid for result in results}
-        instrumentation.update(solver_instances=len(process_ids), matrix_builds=len(process_ids),
-                               retention_rows=len(process_ids), endpoint_solves=len(results),
-                               objective_changes=len(results),
-                               basis_refreshes=sum(result.basis_refreshes for result in results))
     _canonicalize_fva_endpoints(
         lp.reaction_ids, minima, maxima, tuple(prepared.fba.fluxes)
     )
@@ -2199,10 +2574,14 @@ def run_prepared_highs_vffva(
 
 def run_highs_vffva(model: FluxModel, fraction_of_optimum: float = 1.0, *,
                      workers: int | None = None,
-                     instrumentation: dict[str, int] | None = None) -> FVAResult:
-    """Run reusable native FVA; use explicit ``workers > 1`` for spawning."""
+                     chunk_size: int = 50,
+                     instrumentation: dict[str, object] | None = None) -> FVAResult:
+    """Run reusable native FVA with VFFVA-style shared-memory workers."""
 
     prepared = prepare_highs_flux_region(model, fraction_of_optimum)
     return run_prepared_highs_vffva(
-        prepared, workers=workers, instrumentation=instrumentation
+        prepared,
+        workers=workers,
+        chunk_size=chunk_size,
+        instrumentation=instrumentation,
     )

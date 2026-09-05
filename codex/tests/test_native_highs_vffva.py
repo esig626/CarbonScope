@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import importlib.util
+import threading
 
 import pandas as pd
 import pytest
@@ -38,6 +39,20 @@ def _model(*, direction="maximise", fraction_objective=(("export", 1.0),)):
     )
     return FluxModel(metabolites, reactions, LinearObjective(
         direction, tuple(ObjectiveTerm(*term) for term in fraction_objective)))
+
+
+def _dynamic_queue_model(reaction_count=8):
+    """Independent bounded reactions make endpoint order easy to perturb."""
+
+    reactions = tuple(
+        FluxReaction(f"R{index:02d}", (), -float(index + 1), float(index + 2))
+        for index in range(reaction_count)
+    )
+    return FluxModel(
+        (),
+        reactions,
+        LinearObjective("maximise", (ObjectiveTerm("R00", 1.0),)),
+    )
 
 
 def _constant_objective_model(direction, coefficient):
@@ -121,6 +136,26 @@ def test_reference_parity_order_and_serial_parallel(fraction, workers):
                                       atol=1e-8, rtol=1e-8)
 
 
+def test_analytical_fixture_has_expected_retained_region():
+    result = run_highs_vffva(_model(), 0.8, workers=2, chunk_size=1)
+
+    assert tuple(result.ranges.index) == (
+        "source", "reversible", "export", "fixed", "blocked"
+    )
+    pd.testing.assert_frame_equal(
+        result.ranges,
+        pd.DataFrame(
+            {
+                "minimum": [8.0, 8.0, 8.0, 2.0, 0.0],
+                "maximum": [10.0, 10.0, 10.0, 2.0, 0.0],
+            },
+            index=("source", "reversible", "export", "fixed", "blocked"),
+        ),
+        atol=1e-10,
+        rtol=1e-10,
+    )
+
+
 def test_minimisation_and_multiterm_objectives_match_reference():
     model = _model(direction="minimise", fraction_objective=(("export", 1), ("source", 0.5)))
     expected = run_highs_fva_reference(model, 0.9)
@@ -175,33 +210,41 @@ def test_nonzero_minimisation_fraction_and_negative_signed_endpoint():
 
 def test_one_compile_one_solver_and_one_matrix_handles_all_endpoints(monkeypatch):
     compile_calls = 0
+    fba_calls = 0
     worker_builds = 0
-    original_compile, original_worker = highs.compile_flux_lp, highs._ReusableFVAWorker
+    original_compile = highs.compile_flux_lp
+    original_fba = highs._run_compiled_fba
+    original_worker = highs._ReusableFVAWorker
 
     def compile_once(model):
         nonlocal compile_calls
         compile_calls += 1
         return original_compile(model)
 
+    def fba_once(lp):
+        nonlocal fba_calls
+        fba_calls += 1
+        return original_fba(lp)
+
     class RecordingWorker(original_worker):
-        def __init__(self, *args):
+        def __init__(self, *args, **kwargs):
             nonlocal worker_builds
             worker_builds += 1
-            super().__init__(*args)
+            super().__init__(*args, **kwargs)
 
     monkeypatch.setattr(highs, "compile_flux_lp", compile_once)
+    monkeypatch.setattr(highs, "_run_compiled_fba", fba_once)
     monkeypatch.setattr(highs, "_ReusableFVAWorker", RecordingWorker)
     metrics = {}
     run_highs_vffva(_model(), workers=1, instrumentation=metrics)
-    assert compile_calls == worker_builds == 1
-    assert metrics == {
-        "solver_instances": 1,
-        "matrix_builds": 1,
-        "retention_rows": 1,
-        "endpoint_solves": 10,
-        "objective_changes": 10,
-        "basis_refreshes": 0,
-    }
+    assert compile_calls == fba_calls == worker_builds == 1
+    assert metrics["solver_instances"] == 1
+    assert metrics["matrix_builds"] == 1
+    assert metrics["retention_rows"] == 1
+    assert metrics["endpoint_solves"] == 10
+    assert metrics["objective_changes"] == 10
+    assert metrics["objective_clears"] == 10
+    assert metrics["basis_refreshes"] == 0
 
 
 def test_endpoint_validation_ambiguity_refreshes_same_solver_once(monkeypatch):
@@ -317,60 +360,122 @@ def test_prepared_fva_rejects_forged_retention_fields(field, value):
         run_prepared_highs_vffva(forged, workers=1)
 
 
-def test_parallel_path_uses_unordered_unit_chunk_dynamic_queue(monkeypatch):
-    observed = {}
+def test_default_chunk_and_persistent_thread_lifecycle_are_real():
+    metrics = {}
+    result = run_highs_vffva(_model(), 0.9, workers=2, instrumentation=metrics)
 
-    class RecordingPool:
-        def __init__(self, workers, initializer, initargs):
-            observed["workers"] = workers
-            initializer(*initargs)
+    assert metrics["configured_workers"] == 2
+    assert metrics["chunk_size"] == 50
+    assert metrics["worker_threads"] == 2
+    assert metrics["solver_instances"] == 2
+    assert metrics["matrix_builds"] == 2
+    assert metrics["retention_rows"] == 2
+    assert metrics["highs_single_thread_workers"] == 2
+    assert metrics["max_pass_workers"] == 2
+    assert metrics["min_pass_workers"] == 2
+    assert metrics["workers_surviving_pass_transition"] == 2
+    assert metrics["worker_passes"] == (("max", "min"), ("max", "min"))
 
-        def __enter__(self):
-            return self
+    thread_ids = metrics["worker_thread_ids"]
+    solver_ids = metrics["worker_solver_ids"]
+    assert len(set(thread_ids)) == len(set(solver_ids)) == 2
+    assert threading.get_ident() not in thread_ids
+    assert -1 not in thread_ids
+    assert -1 not in solver_ids
 
-        def __exit__(self, *args):
-            return False
-
-        def imap_unordered(self, function, tasks, chunksize):
-            observed["chunksize"] = chunksize
-            observed["tasks"] = tuple(tasks)
-            return iter(reversed([function(task) for task in tasks]))
-
-    class RecordingContext:
-        Pool = RecordingPool
-
-    monkeypatch.setattr(highs.multiprocessing, "get_context", lambda method: RecordingContext())
-    result = run_highs_vffva(_model(), 0.9, workers=2)
-    assert observed["workers"] == 2
-    assert observed["chunksize"] == 1
-    assert observed["tasks"] == tuple(
-        (index, direction)
-        for index in range(5)
-        for direction in ("min", "max")
+    assert metrics["max_queue_accounted"] == 1
+    assert metrics["min_released_after_max"] == 1
+    assert sum(metrics["worker_max_chunk_counts"]) == 1
+    assert sum(metrics["worker_min_chunk_counts"]) == 1
+    assert metrics["endpoint_attempts"] == metrics["endpoint_solves"] == 10
+    assert metrics["max_endpoint_solves"] == 5
+    assert metrics["min_endpoint_solves"] == 5
+    assert metrics["objective_change_attempts"] == 10
+    assert metrics["objective_changes"] == 10
+    assert metrics["objective_clear_attempts"] == 10
+    assert metrics["objective_clears"] == 10
+    assert metrics["joined_workers"] == metrics["solver_releases"] == 2
+    assert metrics["endpoint_solves"] > sum(
+        len(pass_directions) for pass_directions in metrics["worker_passes"]
     )
     assert tuple(result.ranges.index) == (
         "source", "reversible", "export", "fixed", "blocked"
     )
 
 
+def test_dynamic_chunks_are_reacquired_and_completion_order_is_not_result_order(
+    monkeypatch,
+):
+    model = _dynamic_queue_model()
+    original_solve = highs._ReusableFVAWorker.solve
+    later_endpoint_finished = threading.Event()
+    completion_lock = threading.Lock()
+    completion_order = []
+
+    def force_out_of_order_completion(self, task):
+        if task == (0, "max") and not later_endpoint_finished.wait(timeout=10):
+            raise AssertionError("later maximum endpoint never ran concurrently")
+        result = original_solve(self, task)
+        with completion_lock:
+            completion_order.append(task)
+        if task == (1, "max"):
+            later_endpoint_finished.set()
+        return result
+
+    monkeypatch.setattr(
+        highs._ReusableFVAWorker, "solve", force_out_of_order_completion
+    )
+    metrics = {}
+    actual = run_highs_vffva(
+        model, 0.75, workers=2, chunk_size=1, instrumentation=metrics
+    )
+
+    assert completion_order.index((1, "max")) < completion_order.index((0, "max"))
+    assert metrics["chunk_size"] == 1
+    assert metrics["chunks_claimed"] == 2 * len(model.reactions)
+    assert metrics["workers_claiming_multiple_chunks"] >= 1
+    assert sum(metrics["worker_max_chunk_counts"]) == len(model.reactions)
+    assert sum(metrics["worker_min_chunk_counts"]) == len(model.reactions)
+    assert metrics["max_queue_accounted"] == 1
+    assert metrics["min_released_after_max"] == 1
+    assert tuple(actual.ranges.index) == tuple(
+        reaction.reaction_id for reaction in model.reactions
+    )
+    pd.testing.assert_frame_equal(
+        actual.ranges,
+        run_highs_fva_reference(model, 0.75).ranges,
+        atol=1e-8,
+        rtol=1e-8,
+    )
+
+
+def test_threaded_bounds_are_deterministic_across_repeated_runs():
+    model = _dynamic_queue_model()
+    expected = run_highs_vffva(model, 0.8, workers=2, chunk_size=1)
+
+    for _ in range(2):
+        actual = run_highs_vffva(model, 0.8, workers=2, chunk_size=1)
+        pd.testing.assert_frame_equal(actual.ranges, expected.ranges)
+        assert actual.ranges_sha256 == expected.ranges_sha256
+
+
 @pytest.mark.parametrize(
     "worker_arguments",
     [pytest.param({}, id="omitted"), pytest.param({"workers": None}, id="none")],
 )
-def test_default_worker_mode_is_portable_serial(monkeypatch, worker_arguments):
-    def forbidden_process_context(*args, **kwargs):
-        raise AssertionError("default FastFVA unexpectedly attempted to spawn")
-
-    monkeypatch.setattr(
-        highs.multiprocessing, "get_context", forbidden_process_context
-    )
+def test_default_worker_mode_uses_one_owning_thread(worker_arguments):
     metrics = {}
     actual = run_highs_vffva(
         _model(), 0.9, instrumentation=metrics, **worker_arguments
     )
 
+    assert metrics["configured_workers"] == 1
+    assert metrics["worker_threads"] == 1
     assert metrics["solver_instances"] == 1
     assert metrics["matrix_builds"] == 1
+    assert metrics["worker_passes"] == (("max", "min"),)
+    assert metrics["worker_thread_ids"] != (threading.get_ident(),)
+    assert metrics["joined_workers"] == metrics["solver_releases"] == 1
     assert tuple(actual.ranges.index) == (
         "source", "reversible", "export", "fixed", "blocked"
     )
@@ -382,34 +487,109 @@ def test_default_worker_mode_is_portable_serial(monkeypatch, worker_arguments):
     )
 
 
-def test_parallel_queue_propagates_contextual_endpoint_failure(monkeypatch):
+def test_threaded_failure_clears_objective_joins_workers_and_returns_no_partial_result(
+    monkeypatch,
+):
     original_run = highs._ReusableFVAWorker.solve
+    original_canonicalize = highs._canonicalize_fva_endpoints
+    canonicalized = False
+    preexisting_worker_threads = {
+        thread.ident
+        for thread in threading.enumerate()
+        if thread.name.startswith("fluxemu-vffva-")
+    }
 
     def fail(self, task):
         if task == (1, "max"):
             self.solver.setOptionValue("time_limit", 0.0)
         return original_run(self, task)
 
-    class ImmediatePool:
-        def __init__(self, workers, initializer, initargs):
-            initializer(*initargs)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def imap_unordered(self, function, tasks, chunksize):
-            return map(function, tasks)
-
-    class ImmediateContext:
-        Pool = ImmediatePool
+    def record_canonicalize(*args, **kwargs):
+        nonlocal canonicalized
+        canonicalized = True
+        return original_canonicalize(*args, **kwargs)
 
     monkeypatch.setattr(highs._ReusableFVAWorker, "solve", fail)
-    monkeypatch.setattr(highs.multiprocessing, "get_context", lambda method: ImmediateContext())
+    monkeypatch.setattr(highs, "_canonicalize_fva_endpoints", record_canonicalize)
+    metrics = {}
     with pytest.raises(AnalysisError, match="FVA maximum for reaction 'reversible'.*solver status"):
-        run_highs_vffva(_model(), workers=2)
+        run_highs_vffva(
+            _model(), workers=2, chunk_size=1, instrumentation=metrics
+        )
+
+    assert not canonicalized
+    assert metrics["endpoint_attempts"] > metrics["endpoint_solves"]
+    assert metrics["min_endpoint_solves"] == 0
+    assert metrics["objective_change_attempts"] == metrics["objective_changes"]
+    assert metrics["objective_change_attempts"] == metrics["objective_clear_attempts"]
+    assert metrics["objective_changes"] == metrics["objective_clears"]
+    assert metrics["joined_workers"] == metrics["configured_workers"] == 2
+    assert metrics["solver_releases"] == 2
+    remaining_worker_threads = {
+        thread.ident
+        for thread in threading.enumerate()
+        if thread.name.startswith("fluxemu-vffva-")
+    }
+    assert remaining_worker_threads == preexisting_worker_threads
+
+
+def test_partial_worker_initialization_failure_cancels_before_any_endpoint(
+    monkeypatch,
+):
+    original_worker = highs._ReusableFVAWorker
+    original_canonicalize = highs._canonicalize_fva_endpoints
+    construction_lock = threading.Lock()
+    construction_calls = 0
+    canonicalized = False
+    preexisting_worker_threads = {
+        thread.ident
+        for thread in threading.enumerate()
+        if thread.name.startswith("fluxemu-vffva-")
+    }
+
+    class OneInitializationFailure(original_worker):
+        def __init__(self, *args, **kwargs):
+            nonlocal construction_calls
+            with construction_lock:
+                construction_calls += 1
+                fail_this_worker = construction_calls == 1
+            if fail_this_worker:
+                raise AnalysisError("synthetic worker constructor failure")
+            super().__init__(*args, **kwargs)
+
+    def record_canonicalize(*args, **kwargs):
+        nonlocal canonicalized
+        canonicalized = True
+        return original_canonicalize(*args, **kwargs)
+
+    monkeypatch.setattr(highs, "_ReusableFVAWorker", OneInitializationFailure)
+    monkeypatch.setattr(highs, "_canonicalize_fva_endpoints", record_canonicalize)
+    metrics = {}
+    with pytest.raises(
+        AnalysisError,
+        match=r"FVA worker \d+ initialization failed: synthetic worker constructor failure",
+    ):
+        run_highs_vffva(
+            _model(), workers=2, chunk_size=1, instrumentation=metrics
+        )
+
+    assert construction_calls == 2
+    assert not canonicalized
+    assert metrics["solver_instances"] == 1
+    assert metrics["matrix_builds"] == metrics["retention_rows"] == 1
+    assert metrics["endpoint_attempts"] == metrics["endpoint_solves"] == 0
+    assert metrics["max_endpoint_solves"] == metrics["min_endpoint_solves"] == 0
+    assert metrics["objective_change_attempts"] == 0
+    assert metrics["objective_clear_attempts"] == 0
+    assert metrics["worker_passes"] == ((), ())
+    assert metrics["joined_workers"] == metrics["configured_workers"] == 2
+    assert metrics["solver_releases"] == metrics["solver_instances"] == 1
+    remaining_worker_threads = {
+        thread.ident
+        for thread in threading.enumerate()
+        if thread.name.startswith("fluxemu-vffva-")
+    }
+    assert remaining_worker_threads == preexisting_worker_threads
 
 
 def test_endpoint_solver_failure_identifies_reaction_direction_and_status(monkeypatch):
@@ -516,6 +696,12 @@ def test_reusable_fva_endpoint_rejects_nonfinite_declared_retained_objective():
 def test_invalid_worker_count_is_rejected(workers):
     with pytest.raises(AnalysisError, match="workers must be a positive integer"):
         run_highs_vffva(_model(), workers=workers)
+
+
+@pytest.mark.parametrize("chunk_size", [0, -1, 1.5, True])
+def test_invalid_dynamic_chunk_size_is_rejected(chunk_size):
+    with pytest.raises(AnalysisError, match="chunk_size must be a positive integer"):
+        run_highs_vffva(_model(), chunk_size=chunk_size)
 
 
 @pytest.mark.parametrize("objective", ["biomass", "acetate"])
