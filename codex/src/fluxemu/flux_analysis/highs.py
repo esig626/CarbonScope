@@ -1902,6 +1902,8 @@ class _VFFVAWorkerTrace:
     endpoint_solves: int = 0
     max_endpoint_solves: int = 0
     min_endpoint_solves: int = 0
+    audited_endpoint_attempts: int = 0
+    audited_endpoint_solves: int = 0
     objective_change_attempts: int = 0
     objective_changes: int = 0
     objective_clear_attempts: int = 0
@@ -1950,9 +1952,14 @@ class _ReusableFVAWorker:
         lp: CompiledFluxLP,
         retention: RetainedObjectiveConstraint,
         reference_fluxes: Sequence[float],
+        *,
+        audit_endpoints: bool = False,
     ):
+        if type(audit_endpoints) is not bool:
+            raise AnalysisError("audit_endpoints must be a boolean")
         highspy = _highspy()
         self.lp, self.retention, self.endpoint_count = lp, retention, 0
+        self.audit_endpoints = audit_endpoints
         self.worker_id = 0
         self.lifecycle: _VFFVAWorkerTrace | None = None
         self._pass_directions: list[str] = []
@@ -2075,8 +2082,10 @@ class _ReusableFVAWorker:
                 status_name = "Time limit reached"
                 raise AnalysisError(f"HiGHS status {status_name}")
             highspy = _highspy()
-            costs = [0.0] * len(self.lp.reaction_ids)
-            costs[j] = 1.0
+            costs: list[float] | None = None
+            if self.audit_endpoints:
+                costs = [0.0] * len(self.lp.reaction_ids)
+                costs[j] = 1.0
             last_error: AnalysisError | None = None
             for attempt in range(2):
                 if attempt:
@@ -2090,18 +2099,16 @@ class _ReusableFVAWorker:
                     status_name = self.solver.modelStatusToString(status)
                     if status != highspy.HighsModelStatus.kOptimal:
                         raise AnalysisError(f"HiGHS status {status_name}")
-                    fluxes = [
-                        float(value)
-                        for value in self.solver.getSolution().col_value
-                    ]
-                    value = float(self.solver.getObjectiveValue())
-                    if (
-                        len(fluxes) != len(self.lp.reaction_ids)
-                        or not all(map(math.isfinite, fluxes))
-                        or not math.isfinite(value)
-                    ):
-                        raise AnalysisError("malformed or non-finite complete primal")
-                    _validate(self.lp, fluxes, value, costs)
+                    try:
+                        value = float(self.solver.getObjectiveValue())
+                    except (TypeError, ValueError, OverflowError) as error:
+                        raise AnalysisError(
+                            "malformed or non-finite endpoint objective"
+                        ) from error
+                    if not math.isfinite(value):
+                        raise AnalysisError(
+                            "malformed or non-finite endpoint objective"
+                        )
                     reference = self.reference_fluxes[j]
                     excludes_reference = (
                         direction == "min"
@@ -2117,51 +2124,72 @@ class _ReusableFVAWorker:
                             "endpoint optimum excludes the independently validated "
                             f"FBA witness {reference:g}"
                         )
-                    biological = _biological_objective_value(self.lp, fluxes)
-                    declared = _validate_declared_objective_equivalence(
-                        self.lp,
-                        fluxes,
-                        biological,
-                        operation,
-                        self.retention.effective_optimum,
-                        self.retention.effective_bound,
-                    )
-                    direct_violation = (
-                        max(self.retention.bound - declared, 0.0)
-                        if self.retention.sense == ">="
-                        else max(declared - self.retention.bound, 0.0)
-                    )
-                    direct_scale = max(
-                        _objective_activity_scale(self.lp),
-                        abs(self.retention.effective_optimum),
-                        abs(self.retention.effective_bound),
-                    )
-                    direct_tolerance = (
-                        OBJECTIVE_TOLERANCE * direct_scale
-                        if direct_scale > 0.0
-                        else OBJECTIVE_TOLERANCE
-                    )
-                    if direct_violation > direct_tolerance:
-                        raise AnalysisError(
-                            "declared biological objective retention violation: "
-                            f"declared={declared:g}, "
-                            f"bound={self.retention.bound:g}, "
-                            f"violation={direct_violation:g}"
+                    if self.audit_endpoints:
+                        if lifecycle is not None:
+                            lifecycle.audited_endpoint_attempts += 1
+                        fluxes = [
+                            float(flux)
+                            for flux in self.solver.getSolution().col_value
+                        ]
+                        if (
+                            len(fluxes) != len(self.lp.reaction_ids)
+                            or not all(map(math.isfinite, fluxes))
+                        ):
+                            raise AnalysisError(
+                                "malformed or non-finite complete primal"
+                            )
+                        if costs is None:  # pragma: no cover - audit invariant
+                            raise AnalysisError("missing endpoint audit objective")
+                        _validate(self.lp, fluxes, value, costs)
+                        biological = _biological_objective_value(self.lp, fluxes)
+                        declared = _validate_declared_objective_equivalence(
+                            self.lp,
+                            fluxes,
+                            biological,
+                            operation,
+                            self.retention.effective_optimum,
+                            self.retention.effective_bound,
                         )
-                    effective = _effective_objective_value(self.lp, fluxes)
-                    violation, normalized_violation = _retained_objective_violation(
-                        self.lp,
-                        biological,
-                        self.retention.sense,
-                        self.retention.bound,
-                        effective_value=effective,
-                        effective_bound=self.retention.effective_bound,
-                    )
-                    if normalized_violation > OBJECTIVE_TOLERANCE:
-                        raise AnalysisError(
-                            "retained biological objective violation "
-                            f"{violation:g}"
+                        direct_violation = (
+                            max(self.retention.bound - declared, 0.0)
+                            if self.retention.sense == ">="
+                            else max(declared - self.retention.bound, 0.0)
                         )
+                        direct_scale = max(
+                            _objective_activity_scale(self.lp),
+                            abs(self.retention.effective_optimum),
+                            abs(self.retention.effective_bound),
+                        )
+                        direct_tolerance = (
+                            OBJECTIVE_TOLERANCE * direct_scale
+                            if direct_scale > 0.0
+                            else OBJECTIVE_TOLERANCE
+                        )
+                        if direct_violation > direct_tolerance:
+                            raise AnalysisError(
+                                "declared biological objective retention violation: "
+                                f"declared={declared:g}, "
+                                f"bound={self.retention.bound:g}, "
+                                f"violation={direct_violation:g}"
+                            )
+                        effective = _effective_objective_value(self.lp, fluxes)
+                        violation, normalized_violation = (
+                            _retained_objective_violation(
+                                self.lp,
+                                biological,
+                                self.retention.sense,
+                                self.retention.bound,
+                                effective_value=effective,
+                                effective_bound=self.retention.effective_bound,
+                            )
+                        )
+                        if normalized_violation > OBJECTIVE_TOLERANCE:
+                            raise AnalysisError(
+                                "retained biological objective violation "
+                                f"{violation:g}"
+                            )
+                        if lifecycle is not None:
+                            lifecycle.audited_endpoint_solves += 1
                     last_error = None
                     break
                 except AnalysisError as error:
@@ -2216,6 +2244,7 @@ def _populate_vffva_instrumentation(
     *,
     configured_workers: int,
     chunk_size: int,
+    audit_endpoints: bool,
     max_queue_accounted: bool,
     min_released_after_max: bool,
 ) -> None:
@@ -2227,6 +2256,7 @@ def _populate_vffva_instrumentation(
     instrumentation.update(
         configured_workers=configured_workers,
         chunk_size=chunk_size,
+        audit_endpoints=audit_endpoints,
         worker_threads=sum(trace.thread_id is not None for trace in traces),
         solver_instances=sum(trace.solver_id is not None for trace in traces),
         matrix_builds=sum(trace.matrix_builds for trace in traces),
@@ -2243,6 +2273,12 @@ def _populate_vffva_instrumentation(
         endpoint_solves=sum(trace.endpoint_solves for trace in traces),
         max_endpoint_solves=sum(trace.max_endpoint_solves for trace in traces),
         min_endpoint_solves=sum(trace.min_endpoint_solves for trace in traces),
+        audited_endpoint_attempts=sum(
+            trace.audited_endpoint_attempts for trace in traces
+        ),
+        audited_endpoint_solves=sum(
+            trace.audited_endpoint_solves for trace in traces
+        ),
         objective_change_attempts=sum(
             trace.objective_change_attempts for trace in traces
         ),
@@ -2285,6 +2321,7 @@ def run_prepared_highs_vffva(
     workers: int | None = None,
     chunk_size: int = 50,
     instrumentation: dict[str, object] | None = None,
+    audit_endpoints: bool = False,
 ) -> FVAResult:
     """Run a shared-memory VFFVA-style pass over a prepared flux region.
 
@@ -2293,6 +2330,8 @@ def run_prepared_highs_vffva(
     pass before the minimum pass starts.  HiGHS itself uses one thread per
     worker.  ``chunk_size=50`` preserves VFFVA's baseline dynamic schedule.
     """
+    if type(audit_endpoints) is not bool:
+        raise AnalysisError("audit_endpoints must be a boolean")
     _validate_prepared_flux_region(prepared)
     lp = prepared.lp
     retention = prepared.retention
@@ -2405,6 +2444,7 @@ def run_prepared_highs_vffva(
                     lp,
                     retention,
                     reference_fluxes,
+                    audit_endpoints=audit_endpoints,
                 )
                 worker.worker_id = trace.worker_id
                 worker.lifecycle = trace
@@ -2526,6 +2566,7 @@ def run_prepared_highs_vffva(
             started_threads,
             configured_workers=workers,
             chunk_size=chunk_size,
+            audit_endpoints=audit_endpoints,
             max_queue_accounted=max_queue_accounted,
             min_released_after_max=min_released_after_max,
         )
@@ -2575,13 +2616,17 @@ def run_prepared_highs_vffva(
 def run_highs_vffva(model: FluxModel, fraction_of_optimum: float = 1.0, *,
                      workers: int | None = None,
                      chunk_size: int = 50,
-                     instrumentation: dict[str, object] | None = None) -> FVAResult:
+                     instrumentation: dict[str, object] | None = None,
+                     audit_endpoints: bool = False) -> FVAResult:
     """Run reusable native FVA with VFFVA-style shared-memory workers."""
 
+    if type(audit_endpoints) is not bool:
+        raise AnalysisError("audit_endpoints must be a boolean")
     prepared = prepare_highs_flux_region(model, fraction_of_optimum)
     return run_prepared_highs_vffva(
         prepared,
         workers=workers,
         chunk_size=chunk_size,
         instrumentation=instrumentation,
+        audit_endpoints=audit_endpoints,
     )

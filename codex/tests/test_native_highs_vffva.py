@@ -123,10 +123,18 @@ def test_sign_compatible_small_constant_objective_keeps_full_fva_region(
 
 @pytest.mark.parametrize("fraction", [1.0, 0.9])
 @pytest.mark.parametrize("workers", [1, 2])
-def test_reference_parity_order_and_serial_parallel(fraction, workers):
+@pytest.mark.parametrize("audit_endpoints", [False, True])
+def test_reference_parity_order_and_serial_parallel(
+    fraction, workers, audit_endpoints
+):
     model = _model()
     expected = run_highs_fva_reference(model, fraction)
-    actual = run_highs_vffva(model, fraction, workers=workers)
+    actual = run_highs_vffva(
+        model,
+        fraction,
+        workers=workers,
+        audit_endpoints=audit_endpoints,
+    )
     assert tuple(actual.ranges.index) == tuple(r.reaction_id for r in model.reactions)
     pd.testing.assert_frame_equal(actual.ranges, expected.ranges, atol=1e-8, rtol=1e-8)
     assert actual.objective_value == pytest.approx(expected.objective_value)
@@ -156,10 +164,13 @@ def test_analytical_fixture_has_expected_retained_region():
     )
 
 
-def test_minimisation_and_multiterm_objectives_match_reference():
+@pytest.mark.parametrize("audit_endpoints", [False, True])
+def test_minimisation_and_multiterm_objectives_match_reference(audit_endpoints):
     model = _model(direction="minimise", fraction_objective=(("export", 1), ("source", 0.5)))
     expected = run_highs_fva_reference(model, 0.9)
-    actual = run_highs_vffva(model, 0.9, workers=1)
+    actual = run_highs_vffva(
+        model, 0.9, workers=1, audit_endpoints=audit_endpoints
+    )
     pd.testing.assert_frame_equal(actual.ranges, expected.ranges, atol=1e-8, rtol=1e-8)
 
 
@@ -247,6 +258,63 @@ def test_one_compile_one_solver_and_one_matrix_handles_all_endpoints(monkeypatch
     assert metrics["basis_refreshes"] == 0
 
 
+def test_default_hot_path_never_retrieves_a_complete_primal(monkeypatch):
+    original_worker = highs._ReusableFVAWorker
+
+    class NoPrimalSolver:
+        def __init__(self, solver):
+            self._solver = solver
+
+        def getSolution(self):
+            raise AssertionError("default endpoint path requested a complete primal")
+
+        def __getattr__(self, name):
+            return getattr(self._solver, name)
+
+    class NoPrimalWorker(original_worker):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.solver = NoPrimalSolver(self.solver)
+
+    monkeypatch.setattr(highs, "_ReusableFVAWorker", NoPrimalWorker)
+    metrics = {}
+    actual = run_highs_vffva(
+        _model(), 0.9, workers=1, instrumentation=metrics
+    )
+
+    pd.testing.assert_frame_equal(
+        actual.ranges,
+        run_highs_fva_reference(_model(), 0.9).ranges,
+        atol=1e-8,
+        rtol=1e-8,
+    )
+    assert metrics["audit_endpoints"] is False
+    assert metrics["audited_endpoint_attempts"] == 0
+    assert metrics["audited_endpoint_solves"] == 0
+
+
+def test_audit_mode_records_every_real_endpoint_audit():
+    metrics = {}
+    actual = run_highs_vffva(
+        _model(),
+        0.9,
+        workers=2,
+        chunk_size=1,
+        instrumentation=metrics,
+        audit_endpoints=True,
+    )
+
+    pd.testing.assert_frame_equal(
+        actual.ranges,
+        run_highs_fva_reference(_model(), 0.9).ranges,
+        atol=1e-8,
+        rtol=1e-8,
+    )
+    assert metrics["audit_endpoints"] is True
+    assert metrics["audited_endpoint_attempts"] == 10
+    assert metrics["audited_endpoint_solves"] == 10
+
+
 def test_endpoint_validation_ambiguity_refreshes_same_solver_once(monkeypatch):
     prepared = prepare_highs_flux_region(_model(), 1.0)
     original_validate = highs._validate
@@ -265,12 +333,15 @@ def test_endpoint_validation_ambiguity_refreshes_same_solver_once(monkeypatch):
         prepared,
         workers=1,
         instrumentation=metrics,
+        audit_endpoints=True,
     )
 
     assert injected
     assert metrics["solver_instances"] == 1
     assert metrics["matrix_builds"] == 1
     assert metrics["basis_refreshes"] == 1
+    assert metrics["audited_endpoint_attempts"] == 11
+    assert metrics["audited_endpoint_solves"] == 10
     pd.testing.assert_frame_equal(
         actual.ranges,
         run_highs_fva_reference(_model()).ranges,
@@ -390,6 +461,9 @@ def test_default_chunk_and_persistent_thread_lifecycle_are_real():
     assert metrics["endpoint_attempts"] == metrics["endpoint_solves"] == 10
     assert metrics["max_endpoint_solves"] == 5
     assert metrics["min_endpoint_solves"] == 5
+    assert metrics["audit_endpoints"] is False
+    assert metrics["audited_endpoint_attempts"] == 0
+    assert metrics["audited_endpoint_solves"] == 0
     assert metrics["objective_change_attempts"] == 10
     assert metrics["objective_changes"] == 10
     assert metrics["objective_clear_attempts"] == 10
@@ -605,6 +679,135 @@ def test_endpoint_solver_failure_identifies_reaction_direction_and_status(monkey
         run_highs_vffva(_model(), workers=1)
 
 
+@pytest.mark.parametrize(
+    ("case", "reaction_index", "expected"),
+    [
+        pytest.param(
+            "malformed",
+            0,
+            "malformed or non-finite complete primal",
+            id="malformed-primal",
+        ),
+        pytest.param(
+            "nonfinite",
+            0,
+            "malformed or non-finite complete primal",
+            id="nonfinite-primal",
+        ),
+        pytest.param(
+            "bounds",
+            0,
+            "max_upper_bound_violation=1.0",
+            id="bound-violation",
+        ),
+        pytest.param(
+            "mass_balance",
+            3,
+            "max_mass_balance_residual=",
+            id="mass-balance-violation",
+        ),
+    ],
+)
+def test_audit_mode_rejects_corrupt_complete_primals(
+    case, reaction_index, expected
+):
+    prepared = prepare_highs_flux_region(_model(), 0.9)
+
+    class Solution:
+        def __init__(self, col_value):
+            self.col_value = col_value
+
+    class CorruptPrimalSolver:
+        def __init__(self, solver):
+            self._solver = solver
+            self.get_solution_calls = 0
+            self.clear_calls = 0
+
+        def getSolution(self):
+            self.get_solution_calls += 1
+            values = list(self._solver.getSolution().col_value)
+            if case == "malformed":
+                values.pop()
+            elif case == "nonfinite":
+                values[3] = float("nan")
+            elif case == "bounds":
+                values[3] = 3.0
+            else:
+                values[0] -= 1.0
+            return Solution(values)
+
+        def clearSolver(self):
+            self.clear_calls += 1
+            return self._solver.clearSolver()
+
+        def __getattr__(self, name):
+            return getattr(self._solver, name)
+
+    worker = highs._ReusableFVAWorker(
+        prepared.lp,
+        prepared.retention,
+        tuple(prepared.fba.fluxes),
+        audit_endpoints=True,
+    )
+    worker.solver = CorruptPrimalSolver(worker.solver)
+    worker.begin_pass("max")
+
+    with pytest.raises(AnalysisError, match=expected) as captured:
+        worker.solve((reaction_index, "max"))
+
+    if case == "mass_balance":
+        assert "max_mass_balance_residual=0.0" not in str(captured.value)
+    assert worker.solver.get_solution_calls == 2
+    assert worker.solver.clear_calls == 1
+
+
+def test_default_hot_path_retries_nonfinite_scalar_without_getting_primal(monkeypatch):
+    original_worker = highs._ReusableFVAWorker
+    objective_calls = 0
+    solution_calls = 0
+
+    class RetryScalarSolver:
+        def __init__(self, solver):
+            self._solver = solver
+
+        def getObjectiveValue(self):
+            nonlocal objective_calls
+            objective_calls += 1
+            if objective_calls == 1:
+                return float("nan")
+            return self._solver.getObjectiveValue()
+
+        def getSolution(self):
+            nonlocal solution_calls
+            solution_calls += 1
+            return self._solver.getSolution()
+
+        def __getattr__(self, name):
+            return getattr(self._solver, name)
+
+    class RetryScalarWorker(original_worker):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.solver = RetryScalarSolver(self.solver)
+
+    monkeypatch.setattr(highs, "_ReusableFVAWorker", RetryScalarWorker)
+    metrics = {}
+    actual = run_highs_vffva(
+        _model(), workers=1, instrumentation=metrics
+    )
+
+    assert objective_calls == 11
+    assert solution_calls == 0
+    assert metrics["basis_refreshes"] == 1
+    assert metrics["endpoint_solves"] == 10
+    pd.testing.assert_frame_equal(
+        actual.ranges,
+        run_highs_fva_reference(_model()).ranges,
+        atol=1e-8,
+        rtol=1e-8,
+    )
+
+
 def test_cold_fva_rejects_nonfinite_declared_retained_objective(monkeypatch):
     def synthetic_fba(lp):
         return FBAResult(
@@ -683,6 +886,7 @@ def test_reusable_fva_endpoint_rejects_nonfinite_declared_retained_objective():
     )
     worker.reference_fluxes = (2.0, 2.0)
     worker.endpoint_count = 0
+    worker.audit_endpoints = True
     worker.solver = Solver()
 
     with pytest.raises(
@@ -690,6 +894,90 @@ def test_reusable_fva_endpoint_rejects_nonfinite_declared_retained_objective():
         match="FVA minimum for reaction 'X'.*declared biological objective.*not finite",
     ):
         worker.solve((0, "min"))
+
+
+def test_declared_objective_equivalence_is_explicit_audit_work(monkeypatch):
+    original = highs._validate_declared_objective_equivalence
+    audited_calls = 0
+
+    def reject_audited_endpoint(*args, **kwargs):
+        nonlocal audited_calls
+        if threading.current_thread().name.startswith("fluxemu-vffva-"):
+            audited_calls += 1
+            raise AnalysisError("synthetic declared objective equivalence failure")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        highs,
+        "_validate_declared_objective_equivalence",
+        reject_audited_endpoint,
+    )
+    run_highs_vffva(_model(), 0.9, workers=1)
+    assert audited_calls == 0
+
+    with pytest.raises(
+        AnalysisError, match="synthetic declared objective equivalence failure"
+    ):
+        run_highs_vffva(
+            _model(), 0.9, workers=1, audit_endpoints=True
+        )
+    assert audited_calls == 2
+
+
+def test_direct_declared_retention_is_explicit_audit_work(monkeypatch):
+    original = highs._validate_declared_objective_equivalence
+    audited_calls = 0
+
+    def violate_declared_retention(*args, **kwargs):
+        nonlocal audited_calls
+        if threading.current_thread().name.startswith("fluxemu-vffva-"):
+            audited_calls += 1
+            return -1.0
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        highs,
+        "_validate_declared_objective_equivalence",
+        violate_declared_retention,
+    )
+    run_highs_vffva(_model(), 0.9, workers=1)
+    assert audited_calls == 0
+
+    with pytest.raises(
+        AnalysisError, match="declared biological objective retention violation"
+    ):
+        run_highs_vffva(
+            _model(), 0.9, workers=1, audit_endpoints=True
+        )
+    assert audited_calls == 2
+
+
+def test_effective_retention_is_explicit_audit_work(monkeypatch):
+    original = highs._retained_objective_violation
+    audited_calls = 0
+
+    def violate_effective_retention(*args, **kwargs):
+        nonlocal audited_calls
+        if threading.current_thread().name.startswith("fluxemu-vffva-"):
+            audited_calls += 1
+            return 1.0, 1.0
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        highs,
+        "_retained_objective_violation",
+        violate_effective_retention,
+    )
+    run_highs_vffva(_model(), 0.9, workers=1)
+    assert audited_calls == 0
+
+    with pytest.raises(
+        AnalysisError, match="retained biological objective violation"
+    ):
+        run_highs_vffva(
+            _model(), 0.9, workers=1, audit_endpoints=True
+        )
+    assert audited_calls == 2
 
 
 @pytest.mark.parametrize("workers", [0, -1, 1.5, True])
@@ -702,6 +990,25 @@ def test_invalid_worker_count_is_rejected(workers):
 def test_invalid_dynamic_chunk_size_is_rejected(chunk_size):
     with pytest.raises(AnalysisError, match="chunk_size must be a positive integer"):
         run_highs_vffva(_model(), chunk_size=chunk_size)
+
+
+@pytest.mark.parametrize("audit_endpoints", [None, 0, 1, "yes"])
+def test_endpoint_audit_flag_requires_an_actual_boolean(audit_endpoints):
+    prepared = prepare_highs_flux_region(_model(), 0.9)
+
+    with pytest.raises(AnalysisError, match="audit_endpoints must be a boolean"):
+        run_highs_vffva(_model(), audit_endpoints=audit_endpoints)
+    with pytest.raises(AnalysisError, match="audit_endpoints must be a boolean"):
+        run_prepared_highs_vffva(
+            prepared, audit_endpoints=audit_endpoints
+        )
+    with pytest.raises(AnalysisError, match="audit_endpoints must be a boolean"):
+        highs._ReusableFVAWorker(
+            prepared.lp,
+            prepared.retention,
+            tuple(prepared.fba.fluxes),
+            audit_endpoints=audit_endpoints,
+        )
 
 
 @pytest.mark.parametrize("objective", ["biomass", "acetate"])
