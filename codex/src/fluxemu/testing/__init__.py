@@ -13,9 +13,11 @@ from .simple import (
     validate_bruno_assumptions,
     validate_renyi_order,
 )
+from .bruno import bruno_converse_at_order
 
 __all__ = [
     "BrunoOrderCertificate", "BrunoTheoremAssumptionError", "NumericalLimitError",
     "SimpleBinaryLawPair", "SimpleBinaryTestingConstraint",
+    "bruno_converse_at_order",
     "validate_bruno_assumptions", "validate_renyi_order",
 ]
