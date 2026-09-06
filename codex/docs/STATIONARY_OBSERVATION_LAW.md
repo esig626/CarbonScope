@@ -308,3 +308,9 @@ of a distribution or an invented effective count. No second law, new MFA
 optimizer, hypothesis-test decision rule, p-value, confidence region,
 finite-sample bound, composite testing, Bayesian inference, experiment design,
 transient MFA, JAX, or VFFVA performance work is included here.
+
+The separate `fluxemu.testing` package now reuses these laws for the published
+Bruno v2 simple binary error certificates and realised-count LLRs. See the
+[simple binary certificate guide](SIMPLE_BINARY_RENYI_CERTIFICATES.md).
+That layer preserves this observation implementation and the existing MFA
+objective; it adds no observation law or inferred count total.

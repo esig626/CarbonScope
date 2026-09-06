@@ -28,6 +28,27 @@ observation-law testing, uncertainty inference, and transient MFA are outside
 this core. SciPy is required only for the optimization action via the `mfa`
 extra; native schema/divergence/forward evaluation remains base-only.
 
+## Simple binary observation-law certificates
+
+The [simple binary layer](SIMPLE_BINARY_RENYI_CERTIFICATES.md) supports exactly
+two fixed complete flux hypotheses and the existing genuine fixed-total
+multinomial observation model. It applies Bruno v2 Theorem 1 only to matching
+positive supports, rejecting mismatches without smoothing. Multiple blocks
+require explicit independence; unequal declared totals remain separate.
+
+The public core evaluates a supplied finite real order greater than one.
+It implements no order search and does not certify the global continuous-order
+envelope. Binary64 representability limits are explicit, inherited invalid
+divergence numerics raise `NumericalLimitError`, and raw reverse overflow and
+forward underflow retain log-domain diagnostics. A lower certificate does not
+specify an actual error or establish that an error is achievable.
+
+Intensities, peak areas, percentages, and normalized MIDs supply no effective
+count total. The bridge adds no biological FBA objective restriction and never
+fits a state. Composite hypotheses, testing inversion, confidence regions,
+p-values, priors/Bayesian inference, other laws, uncertainty estimation,
+transient MFA, JAX, and experiment design remain outside this implementation.
+
 ## Explicit directional isotope semantics
 
 A direct isotope mapping without a `FluxProjectionRule` requires its physical
