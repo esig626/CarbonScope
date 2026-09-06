@@ -41,11 +41,15 @@ python codex/examples/stationary_mfa_recovery.py
 
 `fluxemu.fit_stationary_mfa` fits complete feasible states by minimizing the
 plain sum of `D_alpha(observed MID || predicted MID)`, with exact KL at order
-one and finite positive-real Rényi orders. The native Stage 1 forward APIs
-retain their existing behavior. See the
+one and finite positive-real Rényi orders. Experimental fractions,
+percentages, or non-negative intensity vectors can first be explicitly closed
+to the probability simplex with `fluxemu.normalise_mid`; the divergence and
+fitting layers never silently renormalise their inputs. See the
 [stationary MFA workflow](codex/docs/STATIONARY_MFA_RENYI_CORE.md) for the public
 API, support semantics, multistart diagnostics, and identifiable/non-identifiable
-recovery examples, and the
+recovery examples, the
+[explicit MID preprocessing guide](codex/docs/MID_PREPROCESSING.md) for experimental
+input normalisation, and the
 [mfapy engineering comparison](codex/docs/MFAPY_ENGINEERING_COMPARISON.md) for
 the audited reference lineage.
 
