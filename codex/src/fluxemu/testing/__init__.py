@@ -14,10 +14,18 @@ from .simple import (
     validate_renyi_order,
 )
 from .bruno import bruno_converse_at_order
+from .stationary import (
+    SimpleBinaryFluxHypotheses,
+    StationarySimpleTestingResult,
+    evaluate_stationary_simple_hypotheses,
+)
+from .likelihood import UndefinedLikelihoodRatioError, log_likelihood_ratio
 
 __all__ = [
     "BrunoOrderCertificate", "BrunoTheoremAssumptionError", "NumericalLimitError",
     "SimpleBinaryLawPair", "SimpleBinaryTestingConstraint",
-    "bruno_converse_at_order",
+    "SimpleBinaryFluxHypotheses", "StationarySimpleTestingResult",
+    "UndefinedLikelihoodRatioError", "bruno_converse_at_order",
+    "evaluate_stationary_simple_hypotheses", "log_likelihood_ratio",
     "validate_bruno_assumptions", "validate_renyi_order",
 ]
