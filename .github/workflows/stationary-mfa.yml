@@ -41,10 +41,11 @@ jobs:
           fi
       - name: Compile sources and tests
         run: /tmp/fluxemu-mfa-base/bin/python -m compileall -q codex/src codex/tests codex/examples/stationary_mfa_recovery.py
-      - name: Run base-only MFA schemas, divergence, and native-objective firewall
+      - name: Run base-only MFA schemas, preprocessing, divergence, and native-objective firewall
         run: >-
           /tmp/fluxemu-mfa-base/bin/python -m pytest -q
           codex/tests/test_mfa_schema.py
+          codex/tests/test_mfa_normalisation.py
           codex/tests/test_mfa_divergence.py
           codex/tests/test_mfa_import_isolation.py
       - name: Run complete relevant native Stage 1 regression gates
