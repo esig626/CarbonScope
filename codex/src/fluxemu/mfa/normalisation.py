@@ -19,12 +19,19 @@ from .divergence import MACHINE_SIMPLEX_TOLERANCE
 def _finite_real(value: object, name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, Real):
         raise InputValidationError(f"{name} must be a finite real number, not a boolean")
+    # Check the original scalar: conversion can round a tiny negative to -0.0.
+    if value < 0:
+        raise InputValidationError(f"{name} must be nonnegative")
     try:
         result = float(value)
     except (OverflowError, ValueError) as exc:
         raise InputValidationError(f"{name} must be a finite real number") from exc
     if not math.isfinite(result):
         raise InputValidationError(f"{name} must be a finite real number")
+    if value > 0 and result == 0.0:
+        raise ValidationError(
+            f"{name} conversion to float would erase positive support"
+        )
     return result
 
 
@@ -69,9 +76,6 @@ def normalise_mid(
         _finite_real(value, f"{name}[{index}]")
         for index, value in enumerate(entries)
     )
-    if any(value < 0.0 for value in raw):
-        raise InputValidationError(f"{name} entries must be nonnegative")
-
     scale = max(raw)
     if scale <= 0.0:
         raise InputValidationError(f"{name} must contain positive total mass")

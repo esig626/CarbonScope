@@ -1,8 +1,10 @@
 """Explicit preprocessing of experimental MID-like measurements."""
 
+from fractions import Fraction
 import math
 import sys
 
+import numpy as np
 import pytest
 
 from fluxemu.exceptions import InputValidationError, ValidationError
@@ -30,6 +32,47 @@ def test_percentages_and_intensities_preserve_composition_and_order():
 def test_large_finite_intensities_do_not_overflow_during_normalisation():
     huge = sys.float_info.max
     assert normalise_mid((huge, huge)) == (0.5, 0.5)
+
+
+@pytest.mark.parametrize("raw", [
+    (0.7842, 0.1816, 0.0305, 0.0036, 0.0),
+    (78.42, 18.16, 3.05, 0.36, 0.0),
+    (78420.0, 18160.0, 3050.0, 360.0, 0.0),
+])
+def test_rounded_experimental_mid_requires_explicit_preprocessing(raw):
+    measurements = list(raw)
+    normalised = normalise_mid(measurements)
+    assert measurements == list(raw)
+    assert normalised == pytest.approx(
+        tuple(value / math.fsum(raw) for value in raw), rel=0, abs=2e-16
+    )
+    assert normalised[-1] == 0.0
+    assert all(value > 0.0 for value in normalised[:-1])
+    assert abs(math.fsum(normalised) - 1.0) <= MACHINE_SIMPLEX_TOLERANCE
+    with pytest.raises(InputValidationError):
+        kl_divergence(raw, normalised)
+    for alpha in (0.5, 1.0, 2.0):
+        with pytest.raises(InputValidationError):
+            renyi_divergence(raw, normalised, alpha)
+        assert renyi_divergence(normalised, normalised, alpha) == 0.0
+
+
+@pytest.mark.parametrize("kind", [
+    "fraction",
+    pytest.param("longdouble", marks=pytest.mark.skipif(
+        np.finfo(np.longdouble).minexp >= np.finfo(float).minexp,
+        reason="longdouble has no wider exponent range than float",
+    )),
+])
+@pytest.mark.parametrize("sign", [-1, 1])
+def test_float_conversion_cannot_hide_sign_or_erase_support(kind, sign):
+    tiny = Fraction(1, 10 ** 400) if kind == "fraction" else np.longdouble("1e-400")
+    value = sign * tiny
+    assert value != 0 and float(value) == 0.0
+    error = InputValidationError if sign < 0 else ValidationError
+    message = "nonnegative" if sign < 0 else "positive support"
+    with pytest.raises(error, match=message):
+        normalise_mid((value, 1.0), name="experimental MID")
 
 
 @pytest.mark.parametrize(
