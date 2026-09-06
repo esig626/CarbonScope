@@ -27,23 +27,51 @@ class ExactPValueEnumerationLimitError(ValidationError):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class LikelihoodRatioPValue:
-    """Exact one-sided simple-null likelihood-ratio p-value.
+    """Exact one-sided simple-null likelihood-ratio p-value with provenance.
 
     ``p_value`` is P0{LLR(Y) >= LLR(y_obs)} for
-    LLR=log(P1/P0). It is tied to this fixed alternative and this realised
+    LLR=log(P1/P0). It is tied to this fixed law pair and this realised
     genuine-count observation. ``log_p_value`` is retained when exponentiation
     underflows.
     """
 
+    pair: SimpleBinaryLawPair
+    observations: tuple[tuple[int, ...], ...]
     p_value: float
     log_p_value: float
     observed_log_likelihood_ratio: float
     null_outcomes: int
     tail_outcomes: int
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.pair, SimpleBinaryLawPair):
+            raise InputValidationError("pair must be SimpleBinaryLawPair")
+        if not isinstance(self.observations, tuple) or len(self.observations) != len(self.pair.null_laws):
+            raise InputValidationError("observations must preserve the declared law-block order")
+        if not math.isfinite(self.p_value) or not 0 <= self.p_value <= 1:
+            raise InputValidationError("p_value must be finite and lie in [0, 1]")
+        if math.isnan(self.log_p_value) or self.log_p_value > 0:
+            raise InputValidationError("log_p_value must be nonpositive")
+        if math.isnan(self.observed_log_likelihood_ratio):
+            raise InputValidationError("observed_log_likelihood_ratio cannot be NaN")
+        for name in ("null_outcomes", "tail_outcomes"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, Integral) or value < 0:
+                raise InputValidationError(f"{name} must be a nonnegative integer, not bool")
+        if self.null_outcomes < 1 or self.tail_outcomes > self.null_outcomes:
+            raise InputValidationError("tail_outcomes must lie between zero and null_outcomes")
+
     @property
     def underflowed(self) -> bool:
         return self.p_value == 0.0 and math.isfinite(self.log_p_value)
+
+    @property
+    def null_fingerprint(self) -> str:
+        return self.pair.null_fingerprint
+
+    @property
+    def alternative_fingerprint(self) -> str:
+        return self.pair.alternative_fingerprint
 
 
 def _raw_counts(observation: MIDCountObservation | Iterable[int]) -> tuple[int, ...]:
@@ -255,6 +283,8 @@ def likelihood_ratio_p_value(
 
     if observed == math.inf:
         return LikelihoodRatioPValue(
+            pair=pair,
+            observations=samples,
             p_value=0.0,
             log_p_value=-math.inf,
             observed_log_likelihood_ratio=math.inf,
@@ -263,6 +293,8 @@ def likelihood_ratio_p_value(
         )
     if observed == -math.inf:
         return LikelihoodRatioPValue(
+            pair=pair,
+            observations=samples,
             p_value=1.0,
             log_p_value=0.0,
             observed_log_likelihood_ratio=-math.inf,
@@ -293,6 +325,8 @@ def likelihood_ratio_p_value(
         p_value = math.exp(log_tail)
 
     return LikelihoodRatioPValue(
+        pair=pair,
+        observations=samples,
         p_value=p_value,
         log_p_value=log_tail,
         observed_log_likelihood_ratio=float(observed),
