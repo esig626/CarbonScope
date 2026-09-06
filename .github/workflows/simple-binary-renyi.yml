@@ -1,4 +1,4 @@
-name: Simple binary Renyi certificates
+name: Simple binary Renyi bounds and exact p-values
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
         run: >-
           /tmp/fluxemu-testing-base/bin/python -m compileall -q
           codex/src codex/tests codex/examples/simple_binary_flux_discrimination.py
-      - name: Run published formulas, independent deterministic oracles, native bridge, and isolation
+      - name: Run published bounds, exact p-values, independent oracles, native bridge, and isolation
         run: >-
           /tmp/fluxemu-testing-base/bin/python -m pytest -q
           codex/tests/test_testing_*.py codex/tests/test_observation_*.py
