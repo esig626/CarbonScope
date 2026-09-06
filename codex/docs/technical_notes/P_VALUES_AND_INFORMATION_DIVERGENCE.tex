@@ -1,0 +1,378 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=28mm]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+\newcommand{\KL}{D_{\mathrm{KL}}}
+\newcommand{\Renyi}[1]{D_{#1}}
+\newcommand{\Pnull}{P_0}
+\newcommand{\Palt}{P_1}
+\newcommand{\E}{\mathbb{E}}
+
+\title{Technical Note: p-values, likelihood ratios, and information-theoretic divergence in FluxEMU}
+\author{FluxEMU technical notes}
+\date{6 September 2026}
+
+\begin{document}
+\maketitle
+
+\section{Purpose}
+
+Information-theoretic divergences are natural quantities for comparing isotope
+observation laws, but they are not quantities that most experimentalists use in
+routine interpretation. p-values, likelihood ratios, Type-I error, Type-II
+error, and power are much more familiar. The aim of this note is to make the
+relationship precise without treating a divergence as though it were itself a
+p-value.
+
+FluxEMU now distinguishes four related but different objects:
+\begin{enumerate}
+    \item a \emph{divergence} between complete observation laws;
+    \item the \emph{likelihood-ratio evidence} in one realised data set;
+    \item the \emph{p-value} obtained from the null tail of that evidence; and
+    \item a finite-sample \emph{Type-II lower bound} at a declared Type-I budget.
+\end{enumerate}
+
+These quantities answer different scientific questions and should be reported
+as such.
+
+\section{Multinomial data and the KL deviance}
+
+Suppose an experiment produces genuine isotopologue counts
+\begin{equation}
+K=(K_1,\ldots,K_m)\sim \operatorname{Multinomial}(n,p_0),
+\end{equation}
+where $p_0=(p_{01},\ldots,p_{0m})$ is a fully specified null MID. Let the
+realised count vector be $k$, with empirical proportions
+\begin{equation}
+\widehat p_i=\frac{k_i}{n}.
+\end{equation}
+
+The multinomial log likelihood under a probability vector $p$ is, up to the
+multinomial coefficient,
+\begin{equation}
+\ell(p;k)=\sum_{i=1}^m k_i\log p_i + C(k).
+\end{equation}
+The saturated multinomial model maximises this likelihood at
+$p=\widehat p$. Therefore the likelihood-ratio deviance comparing $p_0$ with
+the saturated model is
+\begin{align}
+G^2
+&=2\{\ell(\widehat p;k)-\ell(p_0;k)\}\\
+&=2\sum_{i=1}^m k_i\log\frac{\widehat p_i}{p_{0i}}\\
+&=2n\KL(\widehat p\|p_0).
+\end{align}
+This identity is exact, with the usual convention $0\log 0=0$.
+
+Thus KL divergence is already present inside the classical multinomial
+likelihood-ratio statistic:
+\begin{equation}
+\boxed{G^2=2n\KL(\widehat p\|p_0).}
+\end{equation}
+Under the regular large-sample conditions of Wilks' theorem, $G^2$ converges to
+a chi-square law. For a fully specified interior null on $m$ positive cells,
+the usual saturated-model comparison has $m-1$ degrees of freedom. This yields
+the familiar asymptotic p-value
+\begin{equation}
+p_{\mathrm{Wilks}}
+\approx
+\Pr\!\left\{\chi^2_{m-1}\ge 2n\KL(\widehat p\|p_0)\right\}.
+\end{equation}
+This is one direct bridge from KL divergence to a conventional p-value.
+FluxEMU's exact simple-vs-simple p-value, developed below, does not require this
+asymptotic approximation.
+
+\section{Two fixed flux hypotheses}
+
+For two fixed feasible flux states,
+\begin{equation}
+H_0:v=v_0,
+\qquad
+H_1:v=v_1,
+\end{equation}
+FluxEMU maps each flux state through stationary EMU prediction and the declared
+observation model to two complete laws,
+\begin{equation}
+\Pnull=P(Y\mid v_0),
+\qquad
+\Palt=P(Y\mid v_1).
+\end{equation}
+The natural realised-data statistic is the log likelihood ratio
+\begin{equation}
+L(y)=\log\frac{\Palt(y)}{\Pnull(y)}.
+\end{equation}
+Large positive values favour the fixed alternative relative to the fixed null;
+large negative values favour the null.
+
+For a realised genuine-count observation $y_{\mathrm{obs}}$, define
+\begin{equation}
+\boxed{
+p(y_{\mathrm{obs}})
+=
+\Pnull\!\left\{L(Y)\ge L(y_{\mathrm{obs}})\right\}.
+}
+\end{equation}
+This is an exact one-sided likelihood-ratio p-value for the declared simple
+null against the declared simple alternative. In words:
+
+\begin{quote}
+If $v_0$ were the true flux state, what is the probability of observing
+likelihood-ratio evidence in favour of $v_1$ at least as strong as the evidence
+actually observed?
+\end{quote}
+
+Because the statistic explicitly contains $P_1$, this p-value is
+alternative-specific. Changing the alternative can change the ordering of
+possible observations and therefore the p-value. It should not be presented as
+a generic goodness-of-fit p-value for $v_0$ against all departures.
+
+For a discrete count space, the tail probability defined with ``$\ge$'' is in
+general super-uniform under the null. Consequently an exact discrete p-value
+need not be continuously uniform under $H_0$ and may be conservative at a
+nominal threshold.
+
+\section{KL divergence as expected log evidence}
+
+The same likelihood ratio gives KL divergence an operational interpretation.
+If the alternative law is true,
+\begin{align}
+\E_{\Palt}[L(Y)]
+&=\sum_y \Palt(y)\log\frac{\Palt(y)}{\Pnull(y)}\\
+&=\KL(\Palt\|\Pnull).
+\end{align}
+If the null law is true,
+\begin{align}
+\E_{\Pnull}[L(Y)]
+&=\sum_y \Pnull(y)\log\frac{\Palt(y)}{\Pnull(y)}\\
+&=-\KL(\Pnull\|\Palt).
+\end{align}
+Therefore
+\begin{equation}
+\boxed{
+\KL(\Palt\|\Pnull)
+=\text{expected log evidence for }H_1\text{ when }H_1\text{ is true},
+}
+\end{equation}
+while $\KL(\Pnull\|\Palt)$ is the magnitude of the expected log evidence in
+the opposite direction under $H_0$.
+
+This interpretation is often more useful experimentally than describing KL
+divergence merely as a ``distance'' between distributions. KL divergence is
+not symmetric and is not a metric; its direction has an operational meaning.
+
+\section{Rényi divergence and likelihood-ratio tails}
+
+For a finite order $\lambda>1$ and mutually absolutely continuous laws,
+\begin{align}
+\Renyi{\lambda}(\Palt\|\Pnull)
+&=\frac{1}{\lambda-1}
+\log\sum_y \Palt(y)^\lambda\Pnull(y)^{1-\lambda}\\
+&=\frac{1}{\lambda-1}
+\log\E_{\Pnull}\!\left[\exp\{\lambda L(Y)\}\right].
+\end{align}
+Hence Rényi divergence encodes an exponential moment of the same
+likelihood-ratio evidence whose null tail defines the p-value. This provides a
+direct conceptual route
+\begin{equation}
+\boxed{
+\text{Rényi divergence}
+\longrightarrow
+\text{control of likelihood-ratio tails}
+\longrightarrow
+\text{finite-sample testing bounds}.
+}
+\end{equation}
+The finite-sample Bruno--Vandenbroucque--Esposito result implemented in
+FluxEMU uses both Rényi directions to lower-bound the optimal Type-II error
+under a fixed Type-I constraint.
+
+\section{Why the quantities should not be collapsed into one number}
+
+Let
+\begin{equation}
+\alpha=P_0(\text{decide }H_1),
+\qquad
+\beta=P_1(\text{decide }H_0).
+\end{equation}
+The roles of the principal quantities are:
+
+\begin{center}
+\begin{tabular}{p{0.28\textwidth}p{0.64\textwidth}}
+\toprule
+Quantity & Scientific question \\
+\midrule
+$D_\lambda(P_1\|P_0)$ and $D_\lambda(P_0\|P_1)$
+& How separated are the two complete observation laws? \\
+$L(y)$
+& Which fixed hypothesis does this realised data set favour, and by how much on the log-likelihood scale? \\
+$p(y)=P_0\{L(Y)\ge L(y)\}$
+& If the null were true, how often would evidence for this fixed alternative be at least this strong? \\
+$\beta^*(\epsilon)$
+& At Type-I budget $\alpha\le\epsilon$, how small can the best Type-II error be? \\
+Finite-order Bruno lower bound
+& What lower limit on $\beta^*(\epsilon)$ follows from the two Rényi divergences at the supplied order? \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A small p-value and a strong Type-II lower bound are not contradictory. The
+first describes the realised observation under the null; the second describes
+a limitation on the repeated-sampling discrimination problem at a fixed
+Type-I budget. One observed data set can look unusual under $H_0$ even when the
+experiment, considered before observing the data, has limited ability to
+reliably separate $H_0$ from $H_1$.
+
+\section{Data-versus-model and model-versus-model divergence}
+
+FluxEMU uses divergences in two distinct settings that should not be conflated.
+
+\subsection*{Data versus model}
+For observed proportions $\widehat p$ and a predicted MID $p_v$,
+\begin{equation}
+\KL(\widehat p\|p_v)
+\end{equation}
+measures the discrepancy between the realised empirical distribution and a
+model prediction. Under genuine multinomial counts, multiplying by $2n$ gives
+the likelihood-ratio deviance against the saturated model.
+
+\subsection*{Model versus model}
+For two complete observation laws,
+\begin{equation}
+D_\lambda(P_1\|P_0),
+\end{equation}
+measures statistical separation between the two fixed flux hypotheses before a
+particular count vector is observed. This is the quantity used by the
+finite-sample Type-II lower bound.
+
+\section{Large-deviation perspective}
+
+In many independent-sample problems, probabilities of suitably defined rare
+events have exponential form
+\begin{equation}
+P(\text{rare event})\asymp \exp\{-nI\},
+\end{equation}
+where $I$ is a large-deviation rate function. For empirical-distribution events
+under an i.i.d. model, the relevant rate function is often a KL divergence.
+This motivates the schematic relation
+\begin{equation}
+-\frac{1}{n}\log p \approx I,
+\end{equation}
+but this is not an exact general identity between a p-value and a divergence.
+The event definition, test statistic, finite-sample discreteness, and competing
+hypotheses all matter.
+
+\section{Exact finite-sample implementation in FluxEMU}
+
+For \texttt{likelihood\_ratio\_p\_value}, FluxEMU enumerates the complete
+positive-probability null count space and sums
+\begin{equation}
+P_0(y)
+\end{equation}
+over all outcomes satisfying
+\begin{equation}
+L(y)\ge L(y_{\mathrm{obs}}).
+\end{equation}
+For explicitly independent observation blocks, the joint null space is the
+Cartesian product of the blockwise count spaces and the joint log likelihood
+ratio is additive.
+
+The implementation preserves the following boundaries:
+\begin{itemize}
+    \item count totals must be genuine and explicitly declared;
+    \item percentages, peak areas, normalised MIDs, and arbitrary intensities are not converted to pseudo-counts;
+    \item exact structural zeros are retained;
+    \item no pseudo-counts, smoothing, or support clipping are introduced;
+    \item the exact enumeration has an explicit maximum-outcome limit;
+    \item exceeding that limit raises an error rather than silently changing to a chi-square, Monte Carlo, or other approximation;
+    \item the p-value is reported separately from the Rényi divergences and the Type-II lower bound.
+\end{itemize}
+
+\section{Worked FluxEMU mixer example}
+
+Take
+\begin{equation}
+p_0=(0.25,0.75),
+\qquad
+p_1=(0.5,0.5),
+\qquad
+n=4,
+\end{equation}
+and suppose the realised genuine counts are
+\begin{equation}
+y_{\mathrm{obs}}=(3,1).
+\end{equation}
+The realised log likelihood ratio is
+\begin{equation}
+L(y_{\mathrm{obs}})
+=\log\frac{P_1(3,1)}{P_0(3,1)}
+\approx 1.6739764.
+\end{equation}
+Under $P_0$, evidence at least this strong occurs for counts $(3,1)$ and $(4,0)$,
+so
+\begin{align}
+p(y_{\mathrm{obs}})
+&=P_0(3,1)+P_0(4,0)\\
+&=4(0.25)^3(0.75)+(0.25)^4\\
+&=0.05078125.
+\end{align}
+At Rényi order $\lambda=2$, the complete $n=4$ multinomial laws satisfy
+\begin{equation}
+D_2(P_1\|P_0)\approx1.15072829,
+\qquad
+D_2(P_0\|P_1)\approx0.89257421.
+\end{equation}
+At Type-I budget $\epsilon=0.05$, the Bruno Type-II lower bound at that same
+order is approximately
+\begin{equation}
+0.602476804.
+\end{equation}
+The p-value, the divergences, and the Type-II lower bound therefore describe
+three different features of one simple testing problem; none should be used as
+a synonym for another.
+
+\section{Experimentalist-facing interpretation}
+
+For a fixed comparison $v_0$ versus $v_1$, a useful report can present the
+quantities together:
+
+\begin{quote}
+The observed isotope counts favour $v_1$ over $v_0$ with log likelihood ratio
+$L(y)$. If $v_0$ were true, evidence at least this strong in favour of $v_1$
+would occur with probability $p$. The complete observation laws have the
+reported KL/Rényi divergences. At the chosen false-positive budget $\epsilon$,
+the finite-sample Rényi result gives the reported lower bound on the optimal
+false-negative probability.
+\end{quote}
+
+This keeps familiar inferential language while preserving the additional
+information supplied by the information-theoretic formulation.
+
+\begin{thebibliography}{9}
+
+\bibitem{kl1951}
+S. Kullback and R. A. Leibler,
+``On Information and Sufficiency'',
+\emph{Annals of Mathematical Statistics}, 22(1):79--86, 1951.
+
+\bibitem{np1933}
+J. Neyman and E. S. Pearson,
+``On the Problem of the Most Efficient Tests of Statistical Hypotheses'',
+\emph{Philosophical Transactions of the Royal Society A}, 231:289--337, 1933.
+
+\bibitem{wilks1938}
+S. S. Wilks,
+``The Large-Sample Distribution of the Likelihood Ratio for Testing Composite Hypotheses'',
+\emph{Annals of Mathematical Statistics}, 9(1):60--62, 1938.
+
+\bibitem{bruno2026}
+R. Bruno, A. Vandenbroucque, and A. R. Esposito,
+``A Finite-Sample Strong Converse for Binary Hypothesis Testing via (Reverse) Rényi Divergence'',
+arXiv:2601.09550v2, 2026.
+
+\end{thebibliography}
+
+\end{document}
