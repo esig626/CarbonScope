@@ -53,5 +53,15 @@ input normalisation, and the
 [mfapy engineering comparison](codex/docs/MFAPY_ENGINEERING_COMPARISON.md) for
 the audited reference lineage.
 
+For measurements with genuine isotopologue-count semantics,
+`fluxemu.observation` provides an explicit fixed-total multinomial law,
+raw count records, reproducible sampling, and a native stationary EMU bridge.
+It also exposes the exact multinomial KL/Rényi identities. Count totals must
+be supplied explicitly: percentages, peak areas, normalized MIDs, and arbitrary
+intensities are never converted into pseudo-counts. This separate layer leaves
+the existing MFA objective unchanged. See the
+[stationary observation-law guide](codex/docs/STATIONARY_OBSERVATION_LAW.md)
+for the API, likelihood identity, numerical boundaries, and synthetic example.
+
 Exploratory hypothesis testing, topology reconstruction, and biological
 research remain in the separate fluxemu-prototype repository.

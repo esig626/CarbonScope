@@ -26,6 +26,10 @@ from .multinomial import (
     multinomial_count_constant,
     renyi_multinomial,
 )
+from .stationary import (
+    evaluate_stationary_observation_laws,
+    sample_stationary_observations,
+)
 
 __all__ = [
     "MAX_MULTINOMIAL_LOG_MASS_ERROR", "MAX_MULTINOMIAL_TOTAL",
@@ -33,6 +37,7 @@ __all__ = [
     "StationaryCountSample", "StationaryCountSpecification",
     "StationaryObservationExperiment", "StationaryObservationLawComponent",
     "StationaryObservationLawResult", "StationaryObservationSpecification",
+    "evaluate_stationary_observation_laws", "sample_stationary_observations",
     "independent_product_kl", "independent_product_renyi", "kl_multinomial",
     "multinomial_count_constant", "renyi_multinomial",
     "stationary_observation_specification_fingerprint",
