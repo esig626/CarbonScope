@@ -32,14 +32,14 @@ public deterministic and ensemble APIs, dependency boundary, sampling
 guarantees, validation rules, and reproducible FastFVA evidence.
 
 Stationary MFA is available as a separate native fitting layer with the
-optional optimizer dependency:
+optional optimiser dependency:
 
 ```bash
 python -m pip install './codex[mfa]'
 python codex/examples/stationary_mfa_recovery.py
 ```
 
-`fluxemu.fit_stationary_mfa` fits complete feasible states by minimizing the
+`fluxemu.fit_stationary_mfa` fits complete feasible states by minimising the
 plain sum of `D_alpha(observed MID || predicted MID)`, with exact KL at order
 one and finite positive-real Rényi orders. Experimental fractions,
 percentages, or non-negative intensity vectors can first be explicitly closed
@@ -57,29 +57,43 @@ For measurements with genuine isotopologue-count semantics,
 `fluxemu.observation` provides an explicit fixed-total multinomial law,
 raw count records, reproducible sampling, and a native stationary EMU bridge.
 It also exposes the exact multinomial KL/Rényi identities. Count totals must
-be supplied explicitly: percentages, peak areas, normalized MIDs, and arbitrary
+be supplied explicitly: percentages, peak areas, normalised MIDs, and arbitrary
 intensities are never converted into pseudo-counts. This separate layer leaves
 the existing MFA objective unchanged. See the
 [stationary observation-law guide](codex/docs/STATIONARY_OBSERVATION_LAW.md)
 for the API, likelihood identity, numerical boundaries, and synthetic example.
 
 For two fixed feasible flux hypotheses, `fluxemu.testing` evaluates the
-order-specific finite-sample Type-II lower certificates of Bruno,
-Vandenbroucque & Esposito, arXiv:2601.09550v2. It reuses the stationary count-law
-bridge, checks the theorem's mutual-absolute-continuity assumption exactly,
-and exposes both Rényi directions, raw components, provenance, and count-sample
-log-likelihood ratios. Ordinary evaluation accepts any finite real order
-greater than one within the documented numerical limits; no grid or global
-order optimization is substituted. Run:
+order-specific finite-sample Type-II lower bounds of Bruno, Vandenbroucque &
+Esposito, arXiv:2601.09550v2. It reuses the stationary count-law bridge, checks
+the theorem's mutual-absolute-continuity assumption exactly, and exposes both
+Rényi directions, raw bound components, provenance, and count-sample
+log-likelihood ratios.
+
+For a realised genuine-count observation it can also report the exact
+simple-null likelihood-ratio p-value
+`P0{log(P1(Y)/P0(Y)) >= log(P1(y_obs)/P0(y_obs))}`. The p-value is a separate
+sample-specific quantity: it is not a divergence and it is not a Type-II lower
+bound. Exact p-value evaluation enumerates the positive-probability null count
+space up to an explicit caller-controlled limit; FluxEMU does not silently
+substitute a chi-square or Monte Carlo approximation when that limit is
+exceeded.
+
+Ordinary Rényi-bound evaluation accepts any finite real order greater than one
+within the documented numerical limits; no grid or global order optimisation
+is substituted. Run:
 
 ```bash
 python codex/examples/simple_binary_flux_discrimination.py
 ```
 
-See the [simple binary certificate guide](codex/docs/SIMPLE_BINARY_RENYI_CERTIFICATES.md)
-for the exact error convention, count boundary, public APIs, and independent
-deterministic-test validation. This layer uses the base dependencies and leaves
-the existing MFA fitting objective unchanged.
+See the [simple binary bounds guide](codex/docs/SIMPLE_BINARY_RENYI_BOUNDS.md)
+for the exact error convention, p-value semantics, count boundary, public APIs,
+and validation, and the
+[technical p-value note](codex/docs/technical_notes/P_VALUES_AND_INFORMATION_DIVERGENCE.tex)
+for the mathematical bridge between likelihood-ratio p-values, KL divergence,
+and Rényi divergence. This layer uses the base dependencies and leaves the
+existing MFA fitting objective unchanged.
 
 Exploratory composite hypothesis testing, topology reconstruction, and biological
 research remain in the separate fluxemu-prototype repository.

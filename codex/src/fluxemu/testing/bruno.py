@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from .. import observation as _observation
 from ..exceptions import InputValidationError, ValidationError
 from .simple import (
-    BrunoOrderCertificate,
+    BrunoOrderCertificate as BrunoOrderBound,
     NumericalLimitError,
     SimpleBinaryLawPair,
     SimpleBinaryTestingConstraint,
@@ -59,8 +59,8 @@ def bruno_converse_at_order(
     *,
     epsilon: Real,
     order: Real,
-) -> BrunoOrderCertificate:
-    """Certify a lower bound on optimal Type II at one finite real order >1.
+) -> BrunoOrderBound:
+    """Return a lower bound on optimal Type II at one finite real order >1.
 
     ``laws`` is a :class:`SimpleBinaryLawPair` or the result of the stationary
     simple-hypothesis bridge, which exposes its validated ``law_pair``.
@@ -77,14 +77,14 @@ def bruno_converse_at_order(
     Natural logarithms, ``expm1``, and ``log1p`` retain small differences near
     order one and interior epsilon endpoints. A vacuous reverse component
     below floating-point range is exposed as -inf with its finite log-space
-    diagnostic; the forward component and combined certificate remain finite.
+    diagnostic; the forward component and combined bound remain finite.
     Forward underflow retains its finite log bound. The result is the bound
     at this order, without a claim about the full continuous-order envelope.
     """
     pair = getattr(laws, "law_pair", laws)
     if not isinstance(pair, SimpleBinaryLawPair):
         raise InputValidationError(
-            "Bruno certification requires SimpleBinaryLawPair or a stationary "
+            "Bruno bound evaluation requires SimpleBinaryLawPair or a stationary "
             "simple-testing result with a validated law_pair"
         )
     constraint = SimpleBinaryTestingConstraint(epsilon=epsilon)
@@ -126,11 +126,11 @@ def bruno_converse_at_order(
     type_ii_lower_bound = max(reverse_lower_bound, forward_lower_bound)
     if not math.isfinite(type_ii_lower_bound) or not 0 <= type_ii_lower_bound <= 1:
         raise NumericalLimitError(
-            "combined Bruno lower certificate exceeded [0, 1] at numerical precision; "
+            "combined Bruno Type-II lower bound exceeded [0, 1] at numerical precision; "
             "raw components are not clipped"
         )
 
-    return BrunoOrderCertificate(
+    return BrunoOrderBound(
         pair=pair,
         constraint=constraint,
         order=finite_order,
