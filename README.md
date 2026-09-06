@@ -31,6 +31,23 @@ See the [Stage 1 native workflow](codex/docs/STAGE1_NATIVE_WORKFLOW.md) for the
 public deterministic and ensemble APIs, dependency boundary, sampling
 guarantees, validation rules, and reproducible FastFVA evidence.
 
+Stationary MFA is available as a separate native fitting layer with the
+optional optimizer dependency:
+
+```bash
+python -m pip install './codex[mfa]'
+python codex/examples/stationary_mfa_recovery.py
+```
+
+`fluxemu.fit_stationary_mfa` fits complete feasible states by minimizing the
+plain sum of `D_alpha(observed MID || predicted MID)`, with exact KL at order
+one and finite positive-real Rényi orders. The native Stage 1 forward APIs
+retain their existing behavior. See the
+[stationary MFA workflow](codex/docs/STATIONARY_MFA_RENYI_CORE.md) for the public
+API, support semantics, multistart diagnostics, and identifiable/non-identifiable
+recovery examples, and the
+[mfapy engineering comparison](codex/docs/MFAPY_ENGINEERING_COMPARISON.md) for
+the audited reference lineage.
+
 Exploratory hypothesis testing, topology reconstruction, and biological
-research remain in the separate fluxemu-prototype repository. Inverse MFA and
-information-theoretic analysis are not part of this standalone Stage 1 engine.
+research remain in the separate fluxemu-prototype repository.

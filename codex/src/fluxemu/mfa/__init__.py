@@ -1,7 +1,7 @@
-"""Stationary MFA scientific records and exact KL/Rényi MID divergences.
+"""Native stationary MFA with exact KL/Rényi MID-divergence fitting.
 
 Pure data and divergence functionality does not import optional optimization
-backends. A later fit action loads its backend only when it is needed.
+backends. Fitting loads SciPy only when optimization is requested.
 """
 
 from .divergence import kl_divergence, renyi_divergence, validate_mid
@@ -20,6 +20,7 @@ from .schema import (
     mfa_problem_fingerprint,
     validate_stationary_mfa_problem,
 )
+from .stationary import evaluate_stationary_mfa, fit_stationary_mfa
 
 __all__ = [
     "DivergenceObjectiveConfig",
@@ -32,6 +33,8 @@ __all__ = [
     "StationaryMFAProblem",
     "StationaryMFAResult",
     "StationaryMIDObservation",
+    "evaluate_stationary_mfa",
+    "fit_stationary_mfa",
     "kl_divergence",
     "mfa_fit_fingerprint",
     "mfa_problem_fingerprint",

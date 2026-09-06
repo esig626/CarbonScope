@@ -298,6 +298,9 @@ The standard installation supplies NumPy, pandas, PyYAML, highspy, and
 python-libSBML. `highspy` is a default dependency, not a `highs` extra. The
 optional `compat` extra installs COBRApy for compatibility/parity work, and the
 optional `transient` extra installs SciPy for transient integration. The
+optional `mfa` extra installs SciPy for the separate native stationary fitting
+layer; importing FluxEMU or evaluating a stationary MFA objective does not
+load SciPy. The
 `mfapy` extra supplies the compatible SciPy dependency for an externally
 available or vendored mfapy backend; it does not distribute mfapy itself. None
 of those optional stacks participates in native Stage 1.
@@ -351,3 +354,6 @@ No timing ratio is a CI gate.
 Stage 1 ends at forward flux-to-MID ensembles. It does not implement inverse
 MFA, fitting, confidence intervals, Monte-Carlo MFA uncertainty, information
 theory, or hypothesis testing.
+The separate [stationary MFA layer](STATIONARY_MFA_RENYI_CORE.md) now reuses
+this forward stack and shared feasible geometry for KL/Rényi MID fitting;
+it does not change the scope or default retention of the Stage 1 APIs.

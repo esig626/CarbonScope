@@ -5,6 +5,29 @@ notes apply only to historical compatibility/parity paths and are not native
 runtime requirements. See [Stage 1 native workflow](STAGE1_NATIVE_WORKFLOW.md)
 for the supported public pipeline.
 
+## Stationary MFA fitting
+
+The [stationary MFA core](STATIONARY_MFA_RENYI_CORE.md) fits complete feasible
+states with exact KL/Rényi divergence on whole MID distributions. It inherits
+native stationary EMU mapping/correction restrictions. Divergence arithmetic
+requires unit mass within 16 ulps; a broader schema normalization tolerance
+does not permit silent repair or guarantee numerical evaluability.
+
+Sequential multistart SLSQP does not certify a global optimum, stationarity,
+or a uniquely identifiable flux state. Exact infinite support losses and
+undefined forward predictions remain explicit; finite differences at a
+boundary can reject an otherwise feasible start, even one with matching MIDs.
+Every attempt is retained, and only `MFAStartDiagnostic.accepted` marks an
+eligible candidate after numerical and independent feasibility checks.
+Matching MIDs can leave absolute flux scale undetermined, as demonstrated by
+the supplied non-identifiability control.
+
+Exact measured fluxes and hard intervals use explicitly chosen canonical
+bounds. Soft measured-flux observations, global search, parallel starts,
+observation-law testing, uncertainty inference, and transient MFA are outside
+this core. SciPy is required only for the optimization action via the `mfa`
+extra; native schema/divergence/forward evaluation remains base-only.
+
 ## Explicit directional isotope semantics
 
 A direct isotope mapping without a `FluxProjectionRule` requires its physical
@@ -85,8 +108,9 @@ audited compatibility workspace. The `mfapy` optional dependency group supplies
 SciPy compatibility but does not distribute mfapy itself.
 
 `nlopt` is absent and unnecessary for forward EMU. The local patch makes its
-import optional and raises only when nlopt fitting is called. Fitting,
-parameter estimation, confidence intervals, and INST-MFA are outside scope.
+import optional and raises only when nlopt fitting is called. Legacy mfapy
+fitting, confidence intervals, and INST-MFA are outside the compatibility scope;
+native stationary fitting is provided separately by `fluxemu.mfa`.
 mfapy reports some construction failures by printing and returning a partial
 object; FluxEMU prevalidates its input and checks for a usable `calmdv` function.
 

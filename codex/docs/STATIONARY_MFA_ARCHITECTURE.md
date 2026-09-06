@@ -104,6 +104,10 @@ When complete starts are supplied, every supplied start is attempted in order;
 `n_starts` controls generation only. Malformed supplied states fail validation.
 Each attempt retains initial/final state and loss, backend status/success,
 iterations, evaluations, validation outcome, and contextual trial failures.
+The explicit `accepted` flag identifies eligible candidates, separately from
+raw optimizer success and original-model feasibility. A malformed or nonfinite
+final backend gradient rejects numerical convergence even when the backend
+reports success. These checks do not certify stationarity or global optimality.
 An unevaluated loss is `None`, distinct from an exactly infinite divergence.
 If no start succeeds, `MFAFitError` exposes all start diagnostics.
 
