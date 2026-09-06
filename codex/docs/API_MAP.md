@@ -33,6 +33,22 @@ package. See [stationary MFA](STATIONARY_MFA_RENYI_CORE.md) for the current
 contract and [mfapy engineering comparison](MFAPY_ENGINEERING_COMPARISON.md)
 for the separate source audit of the retained MFA workflow mechanics.
 
+`fluxemu.observation` owns explicit genuine-count multinomial laws, their
+KL/Rényi identities, and stationary EMU-to-law evaluation.
+`fluxemu.testing` provides the separate published simple binary testing layer:
+
+| Public testing API | Native responsibility |
+| --- | --- |
+| `SimpleBinaryLawPair`, `SimpleBinaryTestingConstraint` | Fixed null/alternative roles, explicit product independence, Type-I budget, support and provenance. |
+| `bruno_converse_at_order`, `BrunoOrderCertificate` | Bruno v2 full-law order-specific Type-II lower certificate, both Rényi directions and raw components. |
+| `SimpleBinaryFluxHypotheses`, `evaluate_stationary_simple_hypotheses`, `StationarySimpleTestingResult` | Two complete feasible states through the existing observation bridge; aligned laws, native reports and fingerprints. |
+| `log_likelihood_ratio` | `log P1 - log P0` for genuine count samples, including explicit infinite/undefined support cases. |
+
+These APIs require no optional optimizer. See the
+[simple binary guide](SIMPLE_BINARY_RENYI_CERTIFICATES.md) for theorem assumptions,
+numerical limits, and the distinction between a lower certificate and an actual
+test error. Composite hypotheses and testing inversion are outside this layer.
+
 ## Legacy mfapy compatibility source
 
 ### Parser contract and constructor dictionaries

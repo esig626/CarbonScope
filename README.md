@@ -63,5 +63,23 @@ the existing MFA objective unchanged. See the
 [stationary observation-law guide](codex/docs/STATIONARY_OBSERVATION_LAW.md)
 for the API, likelihood identity, numerical boundaries, and synthetic example.
 
-Exploratory hypothesis testing, topology reconstruction, and biological
+For two fixed feasible flux hypotheses, `fluxemu.testing` evaluates the
+order-specific finite-sample Type-II lower certificates of Bruno,
+Vandenbroucque & Esposito, arXiv:2601.09550v2. It reuses the stationary count-law
+bridge, checks the theorem's mutual-absolute-continuity assumption exactly,
+and exposes both Rényi directions, raw components, provenance, and count-sample
+log-likelihood ratios. Ordinary evaluation accepts any finite real order
+greater than one within the documented numerical limits; no grid or global
+order optimization is substituted. Run:
+
+```bash
+python codex/examples/simple_binary_flux_discrimination.py
+```
+
+See the [simple binary certificate guide](codex/docs/SIMPLE_BINARY_RENYI_CERTIFICATES.md)
+for the exact error convention, count boundary, public APIs, and independent
+deterministic-test validation. This layer uses the base dependencies and leaves
+the existing MFA fitting objective unchanged.
+
+Exploratory composite hypothesis testing, topology reconstruction, and biological
 research remain in the separate fluxemu-prototype repository.
