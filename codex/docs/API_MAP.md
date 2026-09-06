@@ -24,6 +24,15 @@ independent sample validation are exported from `fluxemu.flux_analysis`.
 COBRApy remains an optional projection/parity oracle and mfapy remains an
 optional historical forward-backend oracle.
 
+`fluxemu.fit_stationary_mfa` and `fluxemu.evaluate_stationary_mfa` directly
+reexport native stationary fitting and objective evaluation from `fluxemu.mfa`.
+That module exports the ordered MFA scientific records, exact KL/Rényi
+divergences, validation, fingerprints, and complete result/start diagnostics.
+Only fitting loads optional SciPy; native MFA imports neither compatibility
+package. See [stationary MFA](STATIONARY_MFA_RENYI_CORE.md) for the current
+contract and [mfapy engineering comparison](MFAPY_ENGINEERING_COMPARISON.md)
+for the separate source audit of the retained MFA workflow mechanics.
+
 ## Legacy mfapy compatibility source
 
 ### Parser contract and constructor dictionaries

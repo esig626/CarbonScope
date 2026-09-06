@@ -249,11 +249,11 @@ class RetainedObjectiveConstraint:
 
 @dataclass(frozen=True, slots=True)
 class PreparedFluxRegion:
-    """One compiled LP and its single independently validated FBA optimum."""
+    """One compiled LP, validated FBA anchor, and optional objective retention."""
 
     lp: CompiledFluxLP
     fba: FBAResult
-    retention: RetainedObjectiveConstraint
+    retention: RetainedObjectiveConstraint | None
 
 
 def _condition_objective(
@@ -1508,15 +1508,22 @@ def _validate_fractional_optimum_sign(
 
 
 def prepare_highs_flux_region(
-    model: FluxModel, fraction_of_optimum: float = 1.0
+    model: FluxModel, fraction_of_optimum: float | None = 1.0
 ) -> PreparedFluxRegion:
-    """Compile once and solve the retained biological objective exactly once."""
+    """Prepare one native region; ``None`` means only steady state and bounds.
 
-    fraction = _fraction(fraction_of_optimum)
+    The biological optimum supplies a feasible anchor in both modes. It adds
+    a constraint only for an explicitly retained fraction; defaults preserve
+    the Stage 1 optimal-face behavior.
+    """
+
+    fraction = None if fraction_of_optimum is None else _fraction(fraction_of_optimum)
     lp = compile_flux_lp(model)
     if fraction == 1.0:
         _validate_optimal_face_solver_resolution(lp)
     fba = _run_compiled_fba(lp)
+    if fraction is None:
+        return PreparedFluxRegion(lp, fba, None)
     _validate_fractional_optimum_sign(
         lp.objective_direction, fba.objective_value, fraction
     )
@@ -1706,7 +1713,7 @@ def _validate_prepared_flux_region(prepared: PreparedFluxRegion) -> None:
     if (
         not isinstance(lp, CompiledFluxLP)
         or not isinstance(fba, FBAResult)
-        or not isinstance(retention, RetainedObjectiveConstraint)
+        or (retention is not None and not isinstance(retention, RetainedObjectiveConstraint))
     ):
         raise AnalysisError("prepared flux region contains malformed records")
     _validate_compiled_lp_integrity(lp)
@@ -1756,6 +1763,8 @@ def _validate_prepared_flux_region(prepared: PreparedFluxRegion) -> None:
         )
     except (IndexError, TypeError, ValueError, OverflowError) as error:
         raise AnalysisError("prepared FBA primal is malformed") from error
+    if retention is None:
+        return
     fraction = _fraction(retention.fraction_of_optimum)
     try:
         if (
@@ -1803,9 +1812,9 @@ def _validate_prepared_flux_region(prepared: PreparedFluxRegion) -> None:
         _validate_optimal_face_solver_resolution(lp)
 
 
-def run_highs_fva_reference(model: FluxModel, fraction_of_optimum: float = 1.0) -> FVAResult:
+def run_highs_fva_reference(model: FluxModel, fraction_of_optimum: float | None = 1.0) -> FVAResult:
     prepared = prepare_highs_flux_region(model, fraction_of_optimum)
-    fraction = prepared.retention.fraction_of_optimum
+    fraction = prepared.retention.fraction_of_optimum if prepared.retention is not None else None
     lp = prepared.lp
     fba = prepared.fba
     retention = prepared.retention
@@ -1816,50 +1825,51 @@ def run_highs_fva_reference(model: FluxModel, fraction_of_optimum: float = 1.0) 
         _validate(lp, low_flux, low, costs)
         high_flux, high, _ = _solve(lp, costs, "max", f"FVA maximum for reaction {reaction_id!r}", retention)
         _validate(lp, high_flux, high, costs)
-        # Independently enforce the retained biological objective at every endpoint.
-        for endpoint in (low_flux, high_flux):
-            value = _biological_objective_value(lp, endpoint)
-            declared = _validate_declared_objective_equivalence(
-                lp,
-                endpoint,
-                value,
-                f"FVA endpoint for reaction {reaction_id!r}",
-                retention.effective_optimum,
-                retention.effective_bound,
-            )
-            direct_violation = (
-                max(retention.bound - declared, 0.0)
-                if retention.sense == ">="
-                else max(declared - retention.bound, 0.0)
-            )
-            direct_scale = max(
-                _objective_activity_scale(lp),
-                abs(retention.effective_optimum),
-                abs(retention.effective_bound),
-            )
-            direct_tolerance = (
-                OBJECTIVE_TOLERANCE * direct_scale
-                if direct_scale > 0.0
-                else OBJECTIVE_TOLERANCE
-            )
-            if direct_violation > direct_tolerance:
-                raise AnalysisError(
-                    f"FVA endpoint for reaction {reaction_id!r} violates the "
-                    "declared biological objective retention: "
-                    f"declared={declared:g}, bound={retention.bound:g}, "
-                    f"violation={direct_violation:g}"
+        if retention is not None:
+            # Independently enforce the retained biological objective at every endpoint.
+            for endpoint in (low_flux, high_flux):
+                value = _biological_objective_value(lp, endpoint)
+                declared = _validate_declared_objective_equivalence(
+                    lp,
+                    endpoint,
+                    value,
+                    f"FVA endpoint for reaction {reaction_id!r}",
+                    retention.effective_optimum,
+                    retention.effective_bound,
                 )
-            effective_value = _effective_objective_value(lp, endpoint)
-            violation, normalized_violation = _retained_objective_violation(
-                lp,
-                value,
-                prepared.retention.sense,
-                prepared.retention.bound,
-                effective_value=effective_value,
-                effective_bound=prepared.retention.effective_bound,
-            )
-            if normalized_violation > OBJECTIVE_TOLERANCE:
-                raise AnalysisError(f"FVA endpoint for reaction {reaction_id!r} violates objective retention")
+                direct_violation = (
+                    max(retention.bound - declared, 0.0)
+                    if retention.sense == ">="
+                    else max(declared - retention.bound, 0.0)
+                )
+                direct_scale = max(
+                    _objective_activity_scale(lp),
+                    abs(retention.effective_optimum),
+                    abs(retention.effective_bound),
+                )
+                direct_tolerance = (
+                    OBJECTIVE_TOLERANCE * direct_scale
+                    if direct_scale > 0.0
+                    else OBJECTIVE_TOLERANCE
+                )
+                if direct_violation > direct_tolerance:
+                    raise AnalysisError(
+                        f"FVA endpoint for reaction {reaction_id!r} violates the "
+                        "declared biological objective retention: "
+                        f"declared={declared:g}, bound={retention.bound:g}, "
+                        f"violation={direct_violation:g}"
+                    )
+                effective_value = _effective_objective_value(lp, endpoint)
+                violation, normalized_violation = _retained_objective_violation(
+                    lp,
+                    value,
+                    prepared.retention.sense,
+                    prepared.retention.bound,
+                    effective_value=effective_value,
+                    effective_bound=prepared.retention.effective_bound,
+                )
+                if normalized_violation > OBJECTIVE_TOLERANCE:
+                    raise AnalysisError(f"FVA endpoint for reaction {reaction_id!r} violates objective retention")
         minima.append(low); maxima.append(high)
     _canonicalize_fva_endpoints(
         lp.reaction_ids, minima, maxima, tuple(fba.fluxes)
@@ -1950,7 +1960,7 @@ class _ReusableFVAWorker:
     def __init__(
         self,
         lp: CompiledFluxLP,
-        retention: RetainedObjectiveConstraint,
+        retention: RetainedObjectiveConstraint | None,
         reference_fluxes: Sequence[float],
         *,
         audit_endpoints: bool = False,
@@ -1998,39 +2008,40 @@ class _ReusableFVAWorker:
         starts = list(lp.solver_row_starts)
         indices = list(lp.solver_column_indices)
         values = list(lp.solver_coefficients)
-        sense = retention.sense
-        effective_bound = retention.effective_bound
-        objective_scale = _objective_scale(lp)
-        normalized_bound = (
-            effective_bound / objective_scale
-            if objective_scale > 0.0
-            else effective_bound
-        )
-        optimal_face = (
-            retention.fraction_of_optimum == 1.0
-            or retention.bound == retention.biological_optimum
-        )
-        lower.append(
-            normalized_bound
-            if optimal_face or sense == ">="
-            else -highspy.kHighsInf
-        )
-        upper.append(
-            normalized_bound
-            if optimal_face or sense == "<="
-            else highspy.kHighsInf
-        )
-        indices.extend(
-            i
-            for i, value in enumerate(lp.effective_objective_coefficients)
-            if value
-        )
-        values.extend(
-            value / objective_scale if objective_scale > 0.0 else value
-            for value in lp.effective_objective_coefficients
-            if value
-        )
-        starts.append(len(indices))
+        if retention is not None:
+            sense = retention.sense
+            effective_bound = retention.effective_bound
+            objective_scale = _objective_scale(lp)
+            normalized_bound = (
+                effective_bound / objective_scale
+                if objective_scale > 0.0
+                else effective_bound
+            )
+            optimal_face = (
+                retention.fraction_of_optimum == 1.0
+                or retention.bound == retention.biological_optimum
+            )
+            lower.append(
+                normalized_bound
+                if optimal_face or sense == ">="
+                else -highspy.kHighsInf
+            )
+            upper.append(
+                normalized_bound
+                if optimal_face or sense == "<="
+                else highspy.kHighsInf
+            )
+            indices.extend(
+                i
+                for i, value in enumerate(lp.effective_objective_coefficients)
+                if value
+            )
+            values.extend(
+                value / objective_scale if objective_scale > 0.0 else value
+                for value in lp.effective_objective_coefficients
+                if value
+            )
+            starts.append(len(indices))
         self.solver.addRows(len(lower), lower, upper, len(indices), starts, indices, values)
 
     def begin_pass(self, direction: str) -> None:
@@ -2141,53 +2152,54 @@ class _ReusableFVAWorker:
                         if costs is None:  # pragma: no cover - audit invariant
                             raise AnalysisError("missing endpoint audit objective")
                         _validate(self.lp, fluxes, value, costs)
-                        biological = _biological_objective_value(self.lp, fluxes)
-                        declared = _validate_declared_objective_equivalence(
-                            self.lp,
-                            fluxes,
-                            biological,
-                            operation,
-                            self.retention.effective_optimum,
-                            self.retention.effective_bound,
-                        )
-                        direct_violation = (
-                            max(self.retention.bound - declared, 0.0)
-                            if self.retention.sense == ">="
-                            else max(declared - self.retention.bound, 0.0)
-                        )
-                        direct_scale = max(
-                            _objective_activity_scale(self.lp),
-                            abs(self.retention.effective_optimum),
-                            abs(self.retention.effective_bound),
-                        )
-                        direct_tolerance = (
-                            OBJECTIVE_TOLERANCE * direct_scale
-                            if direct_scale > 0.0
-                            else OBJECTIVE_TOLERANCE
-                        )
-                        if direct_violation > direct_tolerance:
-                            raise AnalysisError(
-                                "declared biological objective retention violation: "
-                                f"declared={declared:g}, "
-                                f"bound={self.retention.bound:g}, "
-                                f"violation={direct_violation:g}"
-                            )
-                        effective = _effective_objective_value(self.lp, fluxes)
-                        violation, normalized_violation = (
-                            _retained_objective_violation(
+                        if self.retention is not None:
+                            biological = _biological_objective_value(self.lp, fluxes)
+                            declared = _validate_declared_objective_equivalence(
                                 self.lp,
+                                fluxes,
                                 biological,
-                                self.retention.sense,
-                                self.retention.bound,
-                                effective_value=effective,
-                                effective_bound=self.retention.effective_bound,
+                                operation,
+                                self.retention.effective_optimum,
+                                self.retention.effective_bound,
                             )
-                        )
-                        if normalized_violation > OBJECTIVE_TOLERANCE:
-                            raise AnalysisError(
-                                "retained biological objective violation "
-                                f"{violation:g}"
+                            direct_violation = (
+                                max(self.retention.bound - declared, 0.0)
+                                if self.retention.sense == ">="
+                                else max(declared - self.retention.bound, 0.0)
                             )
+                            direct_scale = max(
+                                _objective_activity_scale(self.lp),
+                                abs(self.retention.effective_optimum),
+                                abs(self.retention.effective_bound),
+                            )
+                            direct_tolerance = (
+                                OBJECTIVE_TOLERANCE * direct_scale
+                                if direct_scale > 0.0
+                                else OBJECTIVE_TOLERANCE
+                            )
+                            if direct_violation > direct_tolerance:
+                                raise AnalysisError(
+                                    "declared biological objective retention violation: "
+                                    f"declared={declared:g}, "
+                                    f"bound={self.retention.bound:g}, "
+                                    f"violation={direct_violation:g}"
+                                )
+                            effective = _effective_objective_value(self.lp, fluxes)
+                            violation, normalized_violation = (
+                                _retained_objective_violation(
+                                    self.lp,
+                                    biological,
+                                    self.retention.sense,
+                                    self.retention.bound,
+                                    effective_value=effective,
+                                    effective_bound=self.retention.effective_bound,
+                                )
+                            )
+                            if normalized_violation > OBJECTIVE_TOLERANCE:
+                                raise AnalysisError(
+                                    "retained biological objective violation "
+                                    f"{violation:g}"
+                                )
                         if lifecycle is not None:
                             lifecycle.audited_endpoint_solves += 1
                     last_error = None
@@ -2453,7 +2465,7 @@ def run_prepared_highs_vffva(
                     worker.configured_solver_threads
                 )
                 trace.matrix_builds += 1
-                trace.retention_rows += 1
+                trace.retention_rows += int(retention is not None)
             except BaseException as error:
                 record_failure(
                     error, f"FVA worker {trace.worker_id} initialization failed"
@@ -2605,15 +2617,15 @@ def run_prepared_highs_vffva(
     ranges = pd.DataFrame({"minimum": minima, "maximum": maxima}, index=lp.reaction_ids)
     return FVAResult(
         ranges,
-        prepared.retention.fraction_of_optimum,
-        prepared.retention.biological_optimum,
+        prepared.retention.fraction_of_optimum if prepared.retention is not None else None,
+        prepared.fba.objective_value,
         lp.objective_direction,
         lp.fingerprint,
         _fva_ranges_sha256(ranges, lp.fingerprint),
     )
 
 
-def run_highs_vffva(model: FluxModel, fraction_of_optimum: float = 1.0, *,
+def run_highs_vffva(model: FluxModel, fraction_of_optimum: float | None = 1.0, *,
                      workers: int | None = None,
                      chunk_size: int = 50,
                      instrumentation: dict[str, object] | None = None,

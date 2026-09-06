@@ -16,6 +16,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mfa = [
+  "scipy>=1.13",
+]
 compat = [
   "cobra==0.31.1",
 ]
