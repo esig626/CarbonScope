@@ -5,6 +5,7 @@ backends. Fitting loads SciPy only when optimization is requested.
 """
 
 from .divergence import kl_divergence, renyi_divergence, validate_mid
+from .normalisation import normalise_mid
 from .schema import (
     DivergenceObjectiveConfig,
     MFAFitError,
@@ -38,6 +39,7 @@ __all__ = [
     "kl_divergence",
     "mfa_fit_fingerprint",
     "mfa_problem_fingerprint",
+    "normalise_mid",
     "renyi_divergence",
     "validate_mid",
     "validate_stationary_mfa_problem",
