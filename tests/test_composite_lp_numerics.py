@@ -12,6 +12,7 @@ from fluxemu.testing import (
     NumericalLimitError,
     exact_finite_composite_minimax,
 )
+import fluxemu.testing.composite as composite_module
 
 
 def _problem(null, alternative):
@@ -23,6 +24,10 @@ def _problem(null, alternative):
             members=(MultinomialMIDLaw(1, alternative),), member_ids=("Q",),
         ),
     )
+
+
+def test_direct_composite_module_uses_same_guarded_minimax_solver():
+    assert composite_module.exact_finite_composite_minimax is exact_finite_composite_minimax
 
 
 def test_scaled_lp_respects_small_type_i_budget_in_rare_event_problem():
