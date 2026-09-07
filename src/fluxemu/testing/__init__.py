@@ -42,9 +42,12 @@ from .composite import (
     VerifiedCompositeRenyiProjection,
     calibrate_composite_projected_test,
     composite_renyi_converse_at_order,
-    exact_finite_composite_minimax,
     projected_composite_bound_at_order,
     verified_composite_renyi_projection,
+)
+from .composite_lp import (
+    MIN_EXACT_COMPOSITE_EPSILON,
+    exact_finite_composite_minimax,
 )
 from .composite_stationary import (
     CompositeFluxHypotheses,
@@ -61,7 +64,7 @@ __all__ = [
     "bruno_converse_at_order", "evaluate_stationary_simple_hypotheses",
     "likelihood_ratio_p_value", "log_likelihood_ratio",
     "validate_bruno_assumptions", "validate_renyi_order",
-    "DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES",
+    "DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES", "MIN_EXACT_COMPOSITE_EPSILON",
     "CalibratedCompositeProjectedTest", "CompositeBinaryTestingProblem",
     "CompositeEnumerationLimitError", "CompositeFluxHypotheses",
     "CompositeMIDLawFamily", "CompositeOptimizationError",
