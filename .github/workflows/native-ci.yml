@@ -86,5 +86,6 @@ jobs:
         run: |
           python examples/stationary_mfa_recovery.py
           python examples/simple_binary_flux_discrimination.py
+          python examples/composite_binary_mid_discrimination.py
       - name: Verify clean checkout
         run: test -z "$(git status --porcelain)"
