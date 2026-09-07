@@ -1,31 +1,36 @@
-"""Finite explicit composite testing for genuine-count MID laws.
+"""Finite composite testing for independent products of genuine-count MID laws.
 
-This module implements settled finite-sample composite machinery without
-assuming a finite-blocklength least-favourable-pair reduction. Hypothesis
-classes are explicit finite collections of categorical MID laws observed
-through one common genuine multinomial count total.
+Each hypothesis member is one complete observable law: an explicitly ordered
+product of fixed-total multinomial MID blocks. Composite classes are explicit
+finite collections of such laws. They are never silently convexified and their
+member frequencies are never interpreted as biological priors.
 
-The arbitrary-class Rényi converse is the finite-family specialisation of the
-pairwise composite converse. Exact minimax testing is solved over the complete
-count space as a randomized linear program. Subcritical projected testing uses
-a finite-family Rényi-minimizing pair only after directly verifying the two
-uniform moment inequalities required by the composite achievability theorem.
+The module provides four deliberately separate objects:
 
-No finite family is silently convexified. No selected Rényi pair is advertised
-as finite-sample least favourable.
+* an order-specific pairwise composite Rényi Type-II lower bound;
+* a bounded exact randomised minimax LP oracle on the complete joint count space;
+* a finite-family Rényi-minimising *candidate score* for 0<lambda<1, together
+  with direct uniform-moment/support verification; and
+* analytical or exactly enumerated threshold/calibration results for a verified
+  candidate score.
+
+A vertex-pair Rényi minimum in a finite non-convex family is not called a joint
+Rényi projection and is never advertised as a finite-n least-favourable pair.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal, localcontext
+from itertools import product
 import math
 from numbers import Integral, Real
+from typing import Iterable
 
 import numpy as np
 
 from ..exceptions import FluxEMUError, InputValidationError, ValidationError
-from ..observation import MultinomialMIDLaw, renyi_multinomial
+from ..observation import MultinomialMIDLaw, independent_product_renyi
 from .simple import (
     NumericalLimitError,
     SimpleBinaryTestingConstraint,
@@ -36,21 +41,22 @@ from .simple import (
 
 
 DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES = 1_000_000
-COMPOSITE_NUMERICAL_TOLERANCE = 1e-9
-_PROJECTION_TOLERANCE = 1e-10
+MIN_EXACT_COMPOSITE_EPSILON = 1e-12
+COMPOSITE_NUMERICAL_TOLERANCE = 1e-10
+_SCORE_VERIFICATION_TOLERANCE = 1e-10
 _DECIMAL_PRECISION = 60
 
 
 class CompositeEnumerationLimitError(ValidationError):
-    """The exact composite count space exceeds the explicit enumeration cap."""
+    """The complete joint count space exceeds the explicit enumeration cap."""
 
 
-class CompositeProjectionError(FluxEMUError):
-    """A finite family does not satisfy the verified projected-test contract."""
+class CompositeScoreVerificationError(FluxEMUError):
+    """A finite-family candidate score lacks verified uniform error control."""
 
 
 class CompositeOptimizationError(FluxEMUError):
-    """The exact finite-family minimax optimization failed numerically."""
+    """Exact finite-family minimax optimisation failed numerically."""
 
 
 def _identifier(value: object, name: str) -> str:
@@ -59,17 +65,103 @@ def _identifier(value: object, name: str) -> str:
     return value
 
 
+def _block_identity(value: object, index: int) -> tuple[str, str, str]:
+    if not isinstance(value, tuple) or len(value) != 3:
+        raise InputValidationError(
+            f"block identity {index} must be an immutable experiment/target/replicate triple"
+        )
+    result = tuple(_identifier(item, "block identity field") for item in value)
+    return result  # type: ignore[return-value]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class IndependentMIDProductLaw:
+    """One complete observation law over explicitly independent MID blocks."""
+
+    blocks: tuple[MultinomialMIDLaw, ...]
+    block_identities: tuple[tuple[str, str, str], ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.blocks, tuple) or not self.blocks:
+            raise InputValidationError(
+                "independent MID product blocks must be a nonempty immutable tuple"
+            )
+        if not all(isinstance(block, MultinomialMIDLaw) for block in self.blocks):
+            raise InputValidationError(
+                "every independent MID product block must be MultinomialMIDLaw"
+            )
+        if not isinstance(self.block_identities, tuple):
+            raise InputValidationError("block_identities must be an immutable tuple")
+        if self.block_identities:
+            if len(self.block_identities) != len(self.blocks):
+                raise InputValidationError(
+                    "block_identities must identify every independent MID block"
+                )
+            identities = tuple(
+                _block_identity(value, index)
+                for index, value in enumerate(self.block_identities)
+            )
+        else:
+            identities = tuple(
+                ("block", str(index), "counts") for index in range(len(self.blocks))
+            )
+        if len(set(identities)) != len(identities):
+            raise InputValidationError("independent MID block identities must be unique")
+        object.__setattr__(self, "block_identities", identities)
+
+    @property
+    def block_totals(self) -> tuple[int, ...]:
+        return tuple(block.n for block in self.blocks)
+
+    @property
+    def block_mass_classes(self) -> tuple[tuple[int, ...], ...]:
+        return tuple(block.mass_classes for block in self.blocks)
+
+    @property
+    def block_signature(
+        self,
+    ) -> tuple[tuple[tuple[str, str, str], int, tuple[int, ...]], ...]:
+        return tuple(
+            (identity, block.n, block.mass_classes)
+            for identity, block in zip(self.block_identities, self.blocks, strict=True)
+        )
+
+    @property
+    def full_support(self) -> bool:
+        return all(
+            all(probability > 0 for probability in block.probabilities)
+            for block in self.blocks
+        )
+
+    @property
+    def fingerprint(self) -> str:
+        return _testing_digest(
+            (
+                "independent-mid-product-law-v1",
+                self.block_identities,
+                tuple(block.fingerprint for block in self.blocks),
+            )
+        )
+
+    def log_pmf(self, outcome: tuple[tuple[int, ...], ...]) -> float:
+        if not isinstance(outcome, tuple) or len(outcome) != len(self.blocks):
+            raise InputValidationError(
+                "joint composite outcome must contain one count vector per MID block"
+            )
+        values = tuple(
+            block.log_pmf(counts)
+            for block, counts in zip(self.blocks, outcome, strict=True)
+        )
+        if any(value == -math.inf for value in values):
+            return -math.inf
+        return math.fsum(values)
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CompositeMIDLawFamily:
-    """One explicit finite hypothesis class of genuine-count MID laws.
+    """One explicit finite hypothesis class of complete product observation laws."""
 
-    ``members`` is the class itself. It is never interpreted as a convex hull.
-    Every member must use the same genuine count total and ordered mass-class
-    space. ``member_ids`` preserves the caller's declared scientific order and
-    may identify flux states or other fixed mechanisms.
-    """
-
-    members: tuple[MultinomialMIDLaw, ...]
+    members: tuple[IndependentMIDProductLaw, ...]
     member_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -77,25 +169,20 @@ class CompositeMIDLawFamily:
             raise InputValidationError(
                 "composite family members must be a nonempty immutable tuple"
             )
-        if not all(isinstance(item, MultinomialMIDLaw) for item in self.members):
+        if not all(isinstance(member, IndependentMIDProductLaw) for member in self.members):
             raise InputValidationError(
-                "every composite family member must be MultinomialMIDLaw"
+                "every composite family member must be IndependentMIDProductLaw"
             )
-        first = self.members[0]
+        signature = self.members[0].block_signature
         for index, member in enumerate(self.members[1:], start=1):
-            if member.n != first.n:
+            if member.block_signature != signature:
                 raise InputValidationError(
-                    f"composite family member {index} has count total {member.n}; "
-                    f"expected common total {first.n}"
-                )
-            if member.mass_classes != first.mass_classes:
-                raise InputValidationError(
-                    f"composite family member {index} has a different mass-class space"
+                    f"composite family member {index} has a different observation-block structure"
                 )
         if not isinstance(self.member_ids, tuple):
             raise InputValidationError("member_ids must be an immutable tuple")
         if self.member_ids and len(self.member_ids) != len(self.members):
-            raise InputValidationError("member_ids must identify every family member")
+            raise InputValidationError("member_ids must identify every composite family member")
         if self.member_ids:
             ids = tuple(_identifier(value, "member_id") for value in self.member_ids)
         else:
@@ -108,43 +195,29 @@ class CompositeMIDLawFamily:
         object.__setattr__(self, "member_ids", ids)
 
     @property
-    def n(self) -> int:
-        return self.members[0].n
+    def block_signature(
+        self,
+    ) -> tuple[tuple[tuple[str, str, str], int, tuple[int, ...]], ...]:
+        return self.members[0].block_signature
 
     @property
-    def mass_classes(self) -> tuple[int, ...]:
-        return self.members[0].mass_classes
-
-    @property
-    def dimension(self) -> int:
-        return len(self.mass_classes)
-
-    @property
-    def full_support(self) -> bool:
-        return all(
-            all(probability > 0 for probability in member.probabilities)
-            for member in self.members
-        )
+    def block_count(self) -> int:
+        return len(self.members[0].blocks)
 
     @property
     def fingerprint(self) -> str:
         return _testing_digest(
             (
-                "finite-composite-mid-family-v1",
+                "finite-composite-mid-product-family-v1",
                 self.member_ids,
-                tuple(item.fingerprint for item in self.members),
+                tuple(member.fingerprint for member in self.members),
             )
         )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CompositeBinaryTestingProblem:
-    """Explicit finite H0/H1 classes with common genuine-count semantics.
-
-    H0 is ``null`` and H1 is ``alternative``. A randomized test value is the
-    probability of deciding H1. Worst-case Type I and Type II errors therefore
-    take the supremum over the null and alternative families respectively.
-    """
+    """Explicit finite H0/H1 classes over one shared product observation space."""
 
     null: CompositeMIDLawFamily
     alternative: CompositeMIDLawFamily
@@ -154,79 +227,67 @@ class CompositeBinaryTestingProblem:
             raise InputValidationError("null must be CompositeMIDLawFamily")
         if not isinstance(self.alternative, CompositeMIDLawFamily):
             raise InputValidationError("alternative must be CompositeMIDLawFamily")
-        if self.null.n != self.alternative.n:
+        if self.null.block_signature != self.alternative.block_signature:
             raise InputValidationError(
-                "composite null and alternative must share one genuine count total"
-            )
-        if self.null.mass_classes != self.alternative.mass_classes:
-            raise InputValidationError(
-                "composite null and alternative must share the ordered mass-class space"
+                "composite null and alternative must share the complete ordered observation-block structure"
             )
 
     @property
-    def n(self) -> int:
-        return self.null.n
-
-    @property
-    def mass_classes(self) -> tuple[int, ...]:
-        return self.null.mass_classes
-
-    @property
-    def dimension(self) -> int:
-        return self.null.dimension
+    def block_signature(
+        self,
+    ) -> tuple[tuple[tuple[str, str, str], int, tuple[int, ...]], ...]:
+        return self.null.block_signature
 
     @property
     def fingerprint(self) -> str:
         return _testing_digest(
             (
-                "finite-composite-binary-testing-problem-v1",
+                "finite-composite-binary-product-testing-problem-v1",
                 ("H0", self.null.fingerprint),
                 ("H1", self.alternative.fingerprint),
             )
         )
 
 
-def _validate_projection_order(order: Real) -> float:
-    value = _finite_real(order, "projected Rényi order lambda")
+def _validate_score_order(order: Real) -> float:
+    value = _finite_real(order, "candidate-score Rényi order lambda")
     if not 0 < order < 1:
         raise InputValidationError(
-            "projected Rényi order lambda must satisfy 0 < lambda < 1"
+            "candidate-score Rényi order lambda must satisfy 0 < lambda < 1"
         )
     if not 0 < value < 1:
         raise NumericalLimitError(
-            "projected Rényi order rounds to an endpoint at float precision"
+            "candidate-score Rényi order rounds to an endpoint at float precision"
         )
     return value
 
 
-def _categorical_renyi(
-    left: MultinomialMIDLaw,
-    right: MultinomialMIDLaw,
+def _full_renyi(
+    left: IndependentMIDProductLaw,
+    right: IndependentMIDProductLaw,
     order: float,
 ) -> float:
-    value = renyi_multinomial(left, right, order)
+    value = independent_product_renyi(left.blocks, right.blocks, order)
     if value == math.inf:
         return math.inf
     if not math.isfinite(value) or value < 0:
         raise NumericalLimitError(
-            "composite categorical Rényi divergence is nonfinite or negative "
-            "at numerical precision"
+            "composite product Rényi divergence is nonfinite or negative at numerical precision"
         )
-    return value / left.n
+    return value
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CompositeRenyiConverseBound:
-    """Order-specific lower bound on minimax Type-II error for a finite class."""
+    """Order-specific pairwise composite lower bound on worst-case Type-II error."""
 
     problem: CompositeBinaryTestingProblem
     constraint: SimpleBinaryTestingConstraint
     order: float
-    rate: float
     reverse_renyi: float
-    full_law_reverse_renyi: float
     null_member_index: int | None
     alternative_member_index: int | None
+    raw_reverse_lower_bound: float
     type_ii_lower_bound: float
 
     @property
@@ -256,15 +317,13 @@ def composite_renyi_converse_at_order(
     epsilon: Real,
     order: Real,
 ) -> CompositeRenyiConverseBound:
-    """Evaluate the finite-family composite reverse-Rényi converse at one order.
+    """Evaluate the full-observation finite-family converse at one lambda>1.
 
-    This is the finite explicit-class specialisation of the pairwise composite
-    converse. It makes no convexity, projection, ordering, or least-favourable
-    pair assumption. The supplied finite order ``lambda>1`` is used unchanged;
-    this function does not search or approximate the continuous-order envelope.
-
-    The common genuine count total ``n`` is the i.i.d. blocklength and
-    ``epsilon = exp(-n r)`` defines the corresponding Type-I rate ``r``.
+    For every declared P in H0 and Q in H1, the simple reverse-Rényi inequality
+    applies to the corresponding full product observation laws. Minimising the
+    directed full-law divergence therefore gives a valid lower bound on the
+    composite worst-case Type-II error. No convexity or least-favourable-pair
+    reduction is assumed.
     """
 
     if not isinstance(problem, CompositeBinaryTestingProblem):
@@ -275,15 +334,22 @@ def composite_renyi_converse_at_order(
     best_pair: tuple[int, int] | None = None
     for null_index, null in enumerate(problem.null.members):
         for alternative_index, alternative in enumerate(problem.alternative.members):
-            value = _categorical_renyi(alternative, null, finite_order)
+            value = _full_renyi(alternative, null, finite_order)
             if value < best:
                 best = value
                 best_pair = (null_index, alternative_index)
 
-    rate = -math.log(constraint.epsilon) / problem.n
-    gap = 0.0 if best == math.inf else max(rate - best, 0.0)
-    exponent = problem.n * (finite_order - 1.0) / finite_order * gap
-    lower = -math.expm1(-exponent)
+    if best == math.inf:
+        raw = -math.inf
+    else:
+        log_power = (finite_order - 1.0) / finite_order * math.fsum(
+            (math.log(constraint.epsilon), best)
+        )
+        try:
+            raw = -math.expm1(log_power)
+        except OverflowError:
+            raw = -math.inf
+    lower = max(0.0, raw)
     if not math.isfinite(lower) or not 0 <= lower <= 1:
         raise NumericalLimitError(
             "composite Rényi converse left the probability interval [0, 1]"
@@ -295,34 +361,18 @@ def composite_renyi_converse_at_order(
         problem=problem,
         constraint=constraint,
         order=finite_order,
-        rate=rate,
         reverse_renyi=best,
-        full_law_reverse_renyi=(
-            math.inf if best == math.inf else problem.n * best
-        ),
         null_member_index=null_index,
         alternative_member_index=alternative_index,
+        raw_reverse_lower_bound=raw,
         type_ii_lower_bound=lower,
     )
 
 
 def _validate_max_outcomes(value: int) -> int:
     if isinstance(value, bool) or not isinstance(value, Integral) or value < 1:
-        raise InputValidationError(
-            "max_outcomes must be a positive integer, not bool"
-        )
+        raise InputValidationError("max_outcomes must be a positive integer, not bool")
     return int(value)
-
-
-def _outcome_count(problem: CompositeBinaryTestingProblem, limit: int) -> int:
-    count = math.comb(problem.n + problem.dimension - 1, problem.dimension - 1)
-    if count > limit:
-        raise CompositeEnumerationLimitError(
-            "exact composite testing requires enumeration of "
-            f"{count} count outcomes, exceeding max_outcomes={limit}; "
-            "no approximation was substituted"
-        )
-    return count
 
 
 def _compositions(total: int, cells: int):
@@ -334,60 +384,91 @@ def _compositions(total: int, cells: int):
             yield (first, *remaining)
 
 
-def _enumerate_outcomes(
+def _joint_outcome_count(problem: CompositeBinaryTestingProblem, limit: int) -> int:
+    count = 1
+    for _, total, mass_classes in problem.block_signature:
+        block_count = math.comb(total + len(mass_classes) - 1, len(mass_classes) - 1)
+        if count > limit // block_count:
+            raise CompositeEnumerationLimitError(
+                "exact composite testing joint count space exceeds "
+                f"max_outcomes={limit}; no approximation was substituted"
+            )
+        count *= block_count
+    if count > limit:
+        raise CompositeEnumerationLimitError(
+            "exact composite testing joint count space contains "
+            f"{count} outcomes, exceeding max_outcomes={limit}; no approximation was substituted"
+        )
+    return count
+
+
+def _enumerate_joint_outcomes(
     problem: CompositeBinaryTestingProblem,
     max_outcomes: int,
-) -> tuple[tuple[int, ...], ...]:
+) -> tuple[tuple[tuple[int, ...], ...], ...]:
     limit = _validate_max_outcomes(max_outcomes)
-    expected = _outcome_count(problem, limit)
-    outcomes = tuple(_compositions(problem.n, problem.dimension))
-    if len(outcomes) != expected:  # pragma: no cover - mathematical invariant
+    expected = _joint_outcome_count(problem, limit)
+    blocks = tuple(
+        tuple(_compositions(total, len(mass_classes)))
+        for _, total, mass_classes in problem.block_signature
+    )
+    outcomes = tuple(product(*blocks))
+    if len(outcomes) != expected:  # pragma: no cover - combinatorial invariant
         raise CompositeOptimizationError(
-            "internal count-space enumeration size is inconsistent"
+            "internal joint count-space enumeration size is inconsistent"
         )
     return outcomes
 
 
 def _law_mass_vector(
-    law: MultinomialMIDLaw,
-    outcomes: tuple[tuple[int, ...], ...],
+    law: IndependentMIDProductLaw,
+    outcomes: tuple[tuple[tuple[int, ...], ...], ...],
 ) -> np.ndarray:
     values = np.empty(len(outcomes), dtype=float)
-    for index, counts in enumerate(outcomes):
-        log_mass = law.log_pmf(counts)
+    for index, outcome in enumerate(outcomes):
+        log_mass = law.log_pmf(outcome)
         if log_mass == -math.inf:
             values[index] = 0.0
             continue
         mass = math.exp(log_mass)
         if mass == 0.0:
             raise NumericalLimitError(
-                "positive multinomial outcome mass underflowed during exact "
+                "positive joint product-law outcome mass underflowed during exact "
                 "composite enumeration; the law was not repaired"
             )
         values[index] = mass
     total = math.fsum(float(item) for item in values)
     if not math.isfinite(total) or abs(total - 1.0) > 5e-9:
         raise NumericalLimitError(
-            "enumerated multinomial probability mass does not sum to one "
-            "within the finite-sample numerical contract"
+            "enumerated composite product-law mass does not sum to one within the numerical contract"
         )
     return values
 
 
 def _family_mass_matrix(
     family: CompositeMIDLawFamily,
-    outcomes: tuple[tuple[int, ...], ...],
+    outcomes: tuple[tuple[tuple[int, ...], ...], ...],
 ) -> np.ndarray:
-    return np.vstack(tuple(_law_mass_vector(law, outcomes) for law in family.members))
+    return np.vstack(tuple(_law_mass_vector(member, outcomes) for member in family.members))
+
+
+def _accurate_expectations(matrix: np.ndarray, decision: np.ndarray) -> tuple[float, ...]:
+    return tuple(
+        math.fsum(
+            float(probability) * float(value)
+            for probability, value in zip(row, decision, strict=True)
+        )
+        for row in matrix
+    )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FiniteCompositeMinimaxResult:
-    """Exact randomized minimax solution on the enumerated count space."""
+    """Exact represented finite-class randomised minimax solution."""
 
     problem: CompositeBinaryTestingProblem
     constraint: SimpleBinaryTestingConstraint
-    outcomes: tuple[tuple[int, ...], ...]
+    outcomes: tuple[tuple[tuple[int, ...], ...], ...]
     rejection_probabilities: tuple[float, ...]
     null_type_i_errors: tuple[float, ...]
     alternative_type_ii_errors: tuple[float, ...]
@@ -397,8 +478,12 @@ class FiniteCompositeMinimaxResult:
     active_alternative_members: tuple[int, ...]
 
     @property
-    def randomized(self) -> bool:
+    def randomised(self) -> bool:
         return any(0.0 < value < 1.0 for value in self.rejection_probabilities)
+
+    @property
+    def randomized(self) -> bool:
+        return self.randomised
 
     @property
     def active_null_member_ids(self) -> tuple[str, ...]:
@@ -418,27 +503,33 @@ def exact_finite_composite_minimax(
     epsilon: Real,
     max_outcomes: int = DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES,
 ) -> FiniteCompositeMinimaxResult:
-    """Solve the exact finite-class randomized minimax test by linear programming.
+    """Solve the complete represented finite-class minimax test by LP.
 
-    The optimization ranges over one rejection probability in ``[0,1]`` for
-    every complete count outcome. Every declared null and alternative law is a
-    separate worst-case constraint. Structural zeros are retained. If the count
-    space exceeds ``max_outcomes`` the function fails instead of changing the
-    statistical problem.
+    The joint count space is the Cartesian product of every declared MID-block
+    count space. This is intended as a small-problem/discretised oracle; if the
+    product exceeds ``max_outcomes`` the function fails rather than reducing or
+    approximating the observation space.
 
-    SciPy is imported only here and is available through the ``testing`` extra.
+    Null constraints are divided by epsilon before being passed to HiGHS so an
+    absolute LP feasibility tolerance cannot become the statistical Type-I
+    tolerance. Budgets below ``MIN_EXACT_COMPOSITE_EPSILON`` fail explicitly.
     """
 
     if not isinstance(problem, CompositeBinaryTestingProblem):
         raise InputValidationError("problem must be CompositeBinaryTestingProblem")
     constraint = SimpleBinaryTestingConstraint(epsilon=epsilon)
-    outcomes = _enumerate_outcomes(problem, max_outcomes)
+    if constraint.epsilon < MIN_EXACT_COMPOSITE_EPSILON:
+        raise NumericalLimitError(
+            "exact composite minimax Type-I budget is below the supported LP "
+            f"numerical floor {MIN_EXACT_COMPOSITE_EPSILON:g}; no budget substitution was made"
+        )
+    outcomes = _enumerate_joint_outcomes(problem, max_outcomes)
     null_mass = _family_mass_matrix(problem.null, outcomes)
     alternative_mass = _family_mass_matrix(problem.alternative, outcomes)
 
     try:
         from scipy.optimize import linprog
-    except ImportError as error:  # pragma: no cover - CI exercises installed extra
+    except ImportError as error:  # pragma: no cover - full CI installs testing extra
         raise CompositeOptimizationError(
             "exact composite minimax testing requires the 'testing' SciPy extra"
         ) from error
@@ -447,16 +538,23 @@ def exact_finite_composite_minimax(
     variable_count = outcome_count + 1
     objective = np.zeros(variable_count, dtype=float)
     objective[-1] = 1.0
-
     rows: list[np.ndarray] = []
     rhs: list[float] = []
+    inverse_budget = 1.0 / constraint.epsilon
+    if not math.isfinite(inverse_budget):
+        raise NumericalLimitError(
+            "exact composite Type-I budget cannot be represented in the scaled LP"
+        )
     for probabilities in null_mass:
         row = np.zeros(variable_count, dtype=float)
-        row[:outcome_count] = probabilities
+        row[:outcome_count] = probabilities * inverse_budget
+        if not np.isfinite(row).all():
+            raise NumericalLimitError(
+                "scaled composite Type-I constraint exceeds finite LP representability"
+            )
         rows.append(row)
-        rhs.append(constraint.epsilon)
+        rhs.append(1.0)
     for probabilities in alternative_mass:
-        # beta >= 1 - E_Q[phi]  <=>  -E_Q[phi] - beta <= -1
         row = np.zeros(variable_count, dtype=float)
         row[:outcome_count] = -probabilities
         row[-1] = -1.0
@@ -469,13 +567,17 @@ def exact_finite_composite_minimax(
         b_ub=np.asarray(rhs, dtype=float),
         bounds=[(0.0, 1.0)] * variable_count,
         method="highs",
+        options={
+            "primal_feasibility_tolerance": 1e-10,
+            "dual_feasibility_tolerance": 1e-10,
+            "ipm_optimality_tolerance": 1e-12,
+        },
     )
     if not result.success or result.x is None:
         raise CompositeOptimizationError(
             "exact finite composite minimax LP failed: "
             + (result.message or "unknown HiGHS failure")
         )
-
     phi = np.asarray(result.x[:outcome_count], dtype=float)
     beta_variable = float(result.x[-1])
     if not np.isfinite(phi).all() or np.any(phi < 0) or np.any(phi > 1):
@@ -487,36 +589,36 @@ def exact_finite_composite_minimax(
             "exact composite minimax LP returned an invalid Type-II objective"
         )
 
-    null_errors = null_mass @ phi
-    alternative_errors = 1.0 - alternative_mass @ phi
-    worst_alpha = float(np.max(null_errors))
-    worst_beta = float(np.max(alternative_errors))
-    tolerance = COMPOSITE_NUMERICAL_TOLERANCE
-    if worst_alpha > constraint.epsilon + tolerance:
+    null_errors = _accurate_expectations(null_mass, phi)
+    alternative_power = _accurate_expectations(alternative_mass, phi)
+    alternative_errors = tuple(1.0 - value for value in alternative_power)
+    worst_alpha = max(null_errors)
+    worst_beta = max(alternative_errors)
+    alpha_tolerance = 5e-10 * constraint.epsilon
+    if worst_alpha > constraint.epsilon + alpha_tolerance:
         raise CompositeOptimizationError(
-            "exact composite minimax LP violates the declared Type-I constraint"
+            "exact composite minimax LP violates the declared Type-I constraint: "
+            f"worst alpha={worst_alpha:.17g}, epsilon={constraint.epsilon:.17g}"
         )
-    if abs(worst_beta - beta_variable) > tolerance:
+    if abs(worst_beta - beta_variable) > 5e-10:
         raise CompositeOptimizationError(
             "exact composite minimax LP objective disagrees with evaluated worst-case Type II"
         )
     active_null = tuple(
-        index
-        for index, value in enumerate(null_errors)
-        if abs(float(value) - worst_alpha) <= tolerance
+        index for index, value in enumerate(null_errors)
+        if abs(value - worst_alpha) <= 1e-9
     )
     active_alternative = tuple(
-        index
-        for index, value in enumerate(alternative_errors)
-        if abs(float(value) - worst_beta) <= tolerance
+        index for index, value in enumerate(alternative_errors)
+        if abs(value - worst_beta) <= 1e-9
     )
     return FiniteCompositeMinimaxResult(
         problem=problem,
         constraint=constraint,
         outcomes=outcomes,
         rejection_probabilities=tuple(float(value) for value in phi),
-        null_type_i_errors=tuple(float(value) for value in null_errors),
-        alternative_type_ii_errors=tuple(float(value) for value in alternative_errors),
+        null_type_i_errors=null_errors,
+        alternative_type_ii_errors=alternative_errors,
         worst_type_i_error=worst_alpha,
         minimax_type_ii_error=worst_beta,
         active_null_members=active_null,
@@ -524,25 +626,120 @@ def exact_finite_composite_minimax(
     )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class VerifiedCompositeRenyiProjection:
-    """Finite-family joint Rényi minimizer with directly verified uniform bounds.
+def _score_blocks(
+    null: IndependentMIDProductLaw,
+    alternative: IndependentMIDProductLaw,
+) -> tuple[tuple[float, ...], ...]:
+    result: list[tuple[float, ...]] = []
+    for p_block, q_block in zip(null.blocks, alternative.blocks, strict=True):
+        values: list[float] = []
+        for p, q in zip(p_block.probabilities, q_block.probabilities, strict=True):
+            if p > 0 and q > 0:
+                values.append(math.log(q / p))
+            elif p == 0 and q > 0:
+                values.append(math.inf)
+            elif p > 0 and q == 0:
+                values.append(-math.inf)
+            else:
+                # The score is irrelevant on a category absent from both selected
+                # laws only if every represented class member is also zero there;
+                # that support condition is checked separately below.
+                values.append(0.0)
+        result.append(tuple(values))
+    return tuple(result)
 
-    The selected pair is a minimizer over the explicitly declared finite class.
-    Because a finite class is not silently convexified, projection optimality
-    alone does not imply the uniform inequalities. They are checked directly
-    over every family member before this object can be returned.
-    """
+
+def _logsumexp(values: Iterable[float]) -> float:
+    items = tuple(values)
+    if not items:
+        return -math.inf
+    if any(value == math.inf for value in items):
+        return math.inf
+    finite = tuple(value for value in items if value != -math.inf)
+    if not finite:
+        return -math.inf
+    pivot = max(finite)
+    return pivot + math.log(math.fsum(math.exp(value - pivot) for value in finite))
+
+
+def _block_log_moment(
+    probabilities: tuple[float, ...],
+    scores: tuple[float, ...],
+    exponent: float,
+) -> float:
+    terms: list[float] = []
+    for probability, score in zip(probabilities, scores, strict=True):
+        if probability == 0:
+            continue
+        if score == math.inf:
+            terms.append(math.inf if exponent > 0 else -math.inf)
+        elif score == -math.inf:
+            terms.append(-math.inf if exponent > 0 else math.inf)
+        else:
+            terms.append(math.log(probability) + exponent * score)
+    return _logsumexp(terms)
+
+
+def _member_log_moment(
+    member: IndependentMIDProductLaw,
+    score_blocks: tuple[tuple[float, ...], ...],
+    exponent: float,
+) -> float:
+    values = []
+    for block, scores in zip(member.blocks, score_blocks, strict=True):
+        log_single = _block_log_moment(block.probabilities, scores, exponent)
+        if log_single == math.inf:
+            return math.inf
+        if log_single == -math.inf:
+            return -math.inf
+        values.append(block.n * log_single)
+    return math.fsum(values)
+
+
+def _shared_zero_support_failures(
+    problem: CompositeBinaryTestingProblem,
+    null_index: int,
+    alternative_index: int,
+) -> tuple[str, ...]:
+    p_star = problem.null.members[null_index]
+    q_star = problem.alternative.members[alternative_index]
+    failures: list[str] = []
+    for block_index, (p_block, q_block) in enumerate(
+        zip(p_star.blocks, q_star.blocks, strict=True)
+    ):
+        for class_index, (p, q) in enumerate(
+            zip(p_block.probabilities, q_block.probabilities, strict=True)
+        ):
+            if p != 0 or q != 0:
+                continue
+            positive_elsewhere = any(
+                member.blocks[block_index].probabilities[class_index] > 0
+                for family in (problem.null, problem.alternative)
+                for member in family.members
+            )
+            if positive_elsewhere:
+                failures.append(
+                    f"selected pair has p*=q*=0 at block {block_index}, mass class {class_index}, "
+                    "but another represented member assigns positive mass there"
+                )
+    return tuple(failures)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CompositeRenyiScoreCandidate:
+    """Finite-family vertex-pair Rényi minimum and its uniform-gate diagnostics."""
 
     problem: CompositeBinaryTestingProblem
     order: float
     null_member_index: int
     alternative_member_index: int
-    single_draw_renyi: float
-    hellinger_integral: float
-    log_likelihood_ratio: tuple[float, ...]
-    maximum_null_moment: float
-    maximum_alternative_moment: float
+    renyi: float
+    score_blocks: tuple[tuple[float, ...], ...]
+    log_hellinger_integral: float
+    maximum_log_null_moment: float
+    maximum_log_alternative_moment: float
+    uniform_moment_bounds_verified: bool
+    verification_failures: tuple[str, ...]
 
     @property
     def null_member_id(self) -> str:
@@ -556,218 +753,319 @@ class VerifiedCompositeRenyiProjection:
     def finite_n_least_favourable_claimed(self) -> bool:
         return False
 
+    @property
+    def joint_convex_projection_claimed(self) -> bool:
+        return False
 
-def _projection_moments(
+
+def _candidate_for_pair(
     problem: CompositeBinaryTestingProblem,
+    order: float,
+    divergence: float,
     null_index: int,
     alternative_index: int,
-    order: float,
-) -> tuple[float, float, float, tuple[float, ...]]:
-    p_star = problem.null.members[null_index].probabilities
-    q_star = problem.alternative.members[alternative_index].probabilities
-    if any(p <= 0 for p in p_star) or any(q <= 0 for q in q_star):
-        raise CompositeProjectionError(
-            "verified projected testing currently requires full support in the selected pair"
-        )
-    log_ratio = tuple(math.log(q / p) for p, q in zip(p_star, q_star, strict=True))
-    z = math.fsum(
-        q**order * p ** (1.0 - order)
-        for p, q in zip(p_star, q_star, strict=True)
+    tolerance: float,
+) -> CompositeRenyiScoreCandidate:
+    score_blocks = _score_blocks(
+        problem.null.members[null_index], problem.alternative.members[alternative_index]
     )
+    failures = list(_shared_zero_support_failures(problem, null_index, alternative_index))
+    log_z = -math.inf if divergence == math.inf else (order - 1.0) * divergence
     null_moments = tuple(
-        math.fsum(
-            probability * math.exp(order * score)
-            for probability, score in zip(member.probabilities, log_ratio, strict=True)
-        )
+        _member_log_moment(member, score_blocks, order)
         for member in problem.null.members
     )
     alternative_moments = tuple(
-        math.fsum(
-            probability * math.exp((order - 1.0) * score)
-            for probability, score in zip(member.probabilities, log_ratio, strict=True)
-        )
+        _member_log_moment(member, score_blocks, order - 1.0)
         for member in problem.alternative.members
     )
-    return z, max(null_moments), max(alternative_moments), log_ratio
+    max_null = max(null_moments)
+    max_alternative = max(alternative_moments)
+    if max_null > log_z + tolerance:
+        failures.append(
+            "null-side uniform exponential-moment inequality fails: "
+            f"max_log_moment={max_null:g}, log_z={log_z:g}"
+        )
+    if max_alternative > log_z + tolerance:
+        failures.append(
+            "alternative-side uniform exponential-moment inequality fails: "
+            f"max_log_moment={max_alternative:g}, log_z={log_z:g}"
+        )
+    return CompositeRenyiScoreCandidate(
+        problem=problem,
+        order=order,
+        null_member_index=null_index,
+        alternative_member_index=alternative_index,
+        renyi=divergence,
+        score_blocks=score_blocks,
+        log_hellinger_integral=log_z,
+        maximum_log_null_moment=max_null,
+        maximum_log_alternative_moment=max_alternative,
+        uniform_moment_bounds_verified=not failures,
+        verification_failures=tuple(failures),
+    )
 
 
-def verified_composite_renyi_projection(
+def composite_renyi_score_candidate(
     problem: CompositeBinaryTestingProblem,
     *,
     order: Real,
-    tolerance: float = _PROJECTION_TOLERANCE,
-) -> VerifiedCompositeRenyiProjection:
-    """Return a finite-class Rényi minimizer only if the uniform bounds verify.
+    tolerance: float = _SCORE_VERIFICATION_TOLERANCE,
+) -> CompositeRenyiScoreCandidate:
+    """Return a minimum-divergence finite-family pair plus honest gate status.
 
-    All declared laws must have full support in this production path. The
-    finite family is not convexified. Candidate joint minimizers are checked
-    directly against both uniform moment inequalities from the composite
-    achievability theorem. If no minimizer satisfies them, the function fails
-    rather than presenting a pairwise statistic as a composite test.
+    A finite represented class is generally non-convex. The selected vertex
+    pair is therefore only a candidate score. Among tied minimum-divergence
+    pairs, a pair satisfying the two uniform moment inequalities is preferred;
+    otherwise the first declared minimiser is returned with explicit failures.
     """
 
     if not isinstance(problem, CompositeBinaryTestingProblem):
         raise InputValidationError("problem must be CompositeBinaryTestingProblem")
-    finite_order = _validate_projection_order(order)
-    tolerance_value = _finite_real(tolerance, "projection tolerance")
+    finite_order = _validate_score_order(order)
+    tolerance_value = _finite_real(tolerance, "score verification tolerance")
     if tolerance_value <= 0:
-        raise InputValidationError("projection tolerance must be positive")
-    if not problem.null.full_support or not problem.alternative.full_support:
-        raise CompositeProjectionError(
-            "verified projected finite-family testing currently requires every "
-            "null and alternative MID to have full support; exact minimax and "
-            "the composite converse remain available with structural zeros"
+        raise InputValidationError("score verification tolerance must be positive")
+    pairs = tuple(
+        (
+            _full_renyi(alternative, null, finite_order),
+            null_index,
+            alternative_index,
         )
-
-    candidates: list[tuple[float, int, int]] = []
-    for null_index, null in enumerate(problem.null.members):
-        for alternative_index, alternative in enumerate(problem.alternative.members):
-            divergence = _categorical_renyi(alternative, null, finite_order)
-            candidates.append((divergence, null_index, alternative_index))
-    minimum = min(item[0] for item in candidates)
-    minimizers = tuple(
-        item for item in candidates
-        if abs(item[0] - minimum)
-        <= tolerance_value * max(1.0, abs(minimum))
+        for null_index, null in enumerate(problem.null.members)
+        for alternative_index, alternative in enumerate(problem.alternative.members)
     )
-    failures: list[str] = []
-    for divergence, null_index, alternative_index in minimizers:
-        z, max_null, max_alternative, log_ratio = _projection_moments(
-            problem, null_index, alternative_index, finite_order
+    minimum = min(value for value, _, _ in pairs)
+    if minimum == math.inf:
+        minimisers = tuple(item for item in pairs if item[0] == math.inf)
+    else:
+        minimisers = tuple(
+            item for item in pairs
+            if abs(item[0] - minimum) <= tolerance_value * max(1.0, abs(minimum))
         )
-        scale = max(1.0, abs(z))
-        if (
-            max_null <= z + tolerance_value * scale
-            and max_alternative <= z + tolerance_value * scale
-        ):
-            return VerifiedCompositeRenyiProjection(
-                problem=problem,
-                order=finite_order,
-                null_member_index=null_index,
-                alternative_member_index=alternative_index,
-                single_draw_renyi=divergence,
-                hellinger_integral=z,
-                log_likelihood_ratio=log_ratio,
-                maximum_null_moment=max_null,
-                maximum_alternative_moment=max_alternative,
-            )
-        failures.append(
-            f"({problem.null.member_ids[null_index]!r}, "
-            f"{problem.alternative.member_ids[alternative_index]!r}): "
-            f"max_null={max_null:g}, max_alternative={max_alternative:g}, z={z:g}"
+    evaluated = tuple(
+        _candidate_for_pair(
+            problem, finite_order, divergence, null_index, alternative_index,
+            tolerance_value,
         )
-    raise CompositeProjectionError(
-        "the finite-class Rényi minimizer does not satisfy the two uniform "
-        "moment inequalities required for composite achievability; no composite "
-        "projected test was constructed. Checked minimizer(s): "
-        + "; ".join(failures)
+        for divergence, null_index, alternative_index in minimisers
+    )
+    return next(
+        (candidate for candidate in evaluated if candidate.uniform_moment_bounds_verified),
+        evaluated[0],
     )
 
 
-def _decimal_score(
-    counts: tuple[int, ...],
-    projection: VerifiedCompositeRenyiProjection,
-) -> Decimal:
-    null = projection.problem.null.members[projection.null_member_index]
-    alternative = projection.problem.alternative.members[
-        projection.alternative_member_index
-    ]
+def verified_composite_renyi_score(
+    problem: CompositeBinaryTestingProblem,
+    *,
+    order: Real,
+    tolerance: float = _SCORE_VERIFICATION_TOLERANCE,
+) -> CompositeRenyiScoreCandidate:
+    """Return the finite-family candidate score only when both gates verify."""
+
+    candidate = composite_renyi_score_candidate(
+        problem, order=order, tolerance=tolerance
+    )
+    if not candidate.uniform_moment_bounds_verified:
+        raise CompositeScoreVerificationError(
+            "finite-family Rényi-minimising vertex pair is only a candidate score; "
+            "uniform composite moment/support verification failed: "
+            + "; ".join(candidate.verification_failures)
+        )
+    return candidate
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CompositeScoreBound:
+    """Analytical threshold and Type-II guarantees for a verified score."""
+
+    candidate: CompositeRenyiScoreCandidate
+    constraint: SimpleBinaryTestingConstraint
+    threshold: float
+    raw_exponential_upper_bound: float
+    constant_randomised_upper_bound: float
+    minimax_type_ii_upper_bound: float
+
+
+def composite_score_bound_at_order(
+    candidate: CompositeRenyiScoreCandidate,
+    *,
+    epsilon: Real,
+) -> CompositeScoreBound:
+    """Return the analytical score construction without outcome enumeration."""
+
+    if not isinstance(candidate, CompositeRenyiScoreCandidate):
+        raise InputValidationError("candidate must be CompositeRenyiScoreCandidate")
+    if not candidate.uniform_moment_bounds_verified:
+        raise CompositeScoreVerificationError(
+            "candidate score lacks verified uniform composite moment bounds"
+        )
+    constraint = SimpleBinaryTestingConstraint(epsilon=epsilon)
+    lam = candidate.order
+    divergence = candidate.renyi
+    if divergence == math.inf:
+        threshold = -math.inf
+        raw = 0.0
+    else:
+        threshold = (
+            -math.log(constraint.epsilon) - (1.0 - lam) * divergence
+        ) / lam
+        log_raw = -(1.0 - lam) / lam * math.fsum(
+            (divergence, math.log(constraint.epsilon))
+        )
+        raw = (
+            math.exp(log_raw)
+            if log_raw <= math.log(np.finfo(float).max)
+            else math.inf
+        )
+    constant = 1.0 - constraint.epsilon
+    minimax_upper = min(constant, raw)
+    if not math.isfinite(minimax_upper) or not 0 <= minimax_upper <= 1:
+        raise NumericalLimitError(
+            "composite score Type-II minimax upper bound is numerically invalid"
+        )
+    return CompositeScoreBound(
+        candidate=candidate,
+        constraint=constraint,
+        threshold=threshold,
+        raw_exponential_upper_bound=raw,
+        constant_randomised_upper_bound=constant,
+        minimax_type_ii_upper_bound=minimax_upper,
+    )
+
+
+def _decimal_score_for_outcome(
+    outcome: tuple[tuple[int, ...], ...],
+    candidate: CompositeRenyiScoreCandidate,
+) -> Decimal | None:
+    positive_infinity = False
+    negative_infinity = False
     with localcontext() as context:
         context.prec = _DECIMAL_PRECISION
         total = Decimal(0)
-        for count, p, q in zip(
-            counts, null.probabilities, alternative.probabilities, strict=True
+        for counts, p_block, q_block in zip(
+            outcome,
+            candidate.problem.null.members[candidate.null_member_index].blocks,
+            candidate.problem.alternative.members[candidate.alternative_member_index].blocks,
+            strict=True,
         ):
-            if count:
-                total += Decimal(int(count)) * (
-                    Decimal.from_float(q).ln() - Decimal.from_float(p).ln()
-                )
+            for count, p, q in zip(
+                counts, p_block.probabilities, q_block.probabilities, strict=True
+            ):
+                if not count:
+                    continue
+                if p == 0 and q > 0:
+                    positive_infinity = True
+                elif p > 0 and q == 0:
+                    negative_infinity = True
+                elif p == 0 and q == 0:
+                    # Verification ensures every represented member has zero mass
+                    # here. An outcome using this coordinate is therefore outside
+                    # the represented joint support and its decision is irrelevant.
+                    return None
+                else:
+                    total += Decimal(int(count)) * (
+                        Decimal.from_float(q).ln() - Decimal.from_float(p).ln()
+                    )
+        if positive_infinity and negative_infinity:
+            return None
+        if positive_infinity:
+            return Decimal("Infinity")
+        if negative_infinity:
+            return Decimal("-Infinity")
         return total
 
 
+def _decision_for_threshold(
+    outcomes: tuple[tuple[tuple[int, ...], ...], ...],
+    candidate: CompositeRenyiScoreCandidate,
+    threshold: float,
+    null_mass: np.ndarray,
+    alternative_mass: np.ndarray,
+) -> np.ndarray:
+    threshold_decimal = Decimal.from_float(threshold)
+    decision = np.zeros(len(outcomes), dtype=float)
+    total_mass = np.sum(null_mass, axis=0) + np.sum(alternative_mass, axis=0)
+    for index, outcome in enumerate(outcomes):
+        score = _decimal_score_for_outcome(outcome, candidate)
+        if score is None:
+            if float(total_mass[index]) > 0:
+                raise CompositeScoreVerificationError(
+                    "verified candidate score is undefined on positive represented joint support"
+                )
+            continue
+        decision[index] = 1.0 if score >= threshold_decimal else 0.0
+    return decision
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
-class CompositeProjectedBound:
-    """Closed-form projected test and its actual finite-family errors."""
+class CompositeScoreTestEvaluation:
+    """Exactly enumerated errors of the analytical deterministic score test."""
 
-    projection: VerifiedCompositeRenyiProjection
-    constraint: SimpleBinaryTestingConstraint
-    rate: float
-    threshold: float
-    raw_exponential_upper_bound: float
-    type_ii_upper_bound: float
-    actual_worst_type_i_error: float
-    actual_worst_type_ii_error: float
-    outcomes: int
+    bound: CompositeScoreBound
+    outcomes: tuple[tuple[tuple[int, ...], ...], ...]
+    rejection_probabilities: tuple[float, ...]
+    null_type_i_errors: tuple[float, ...]
+    alternative_type_ii_errors: tuple[float, ...]
+    worst_type_i_error: float
+    worst_type_ii_error: float
 
 
-def projected_composite_bound_at_order(
-    projection: VerifiedCompositeRenyiProjection,
+def evaluate_composite_score_test(
+    bound: CompositeScoreBound,
     *,
-    epsilon: Real,
     max_outcomes: int = DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES,
-) -> CompositeProjectedBound:
-    """Evaluate the theorem's deterministic projected threshold at finite n."""
+) -> CompositeScoreTestEvaluation:
+    """Enumerate the analytical score rule only when the joint space is small."""
 
-    if not isinstance(projection, VerifiedCompositeRenyiProjection):
-        raise InputValidationError(
-            "projection must be VerifiedCompositeRenyiProjection"
-        )
-    problem = projection.problem
-    constraint = SimpleBinaryTestingConstraint(epsilon=epsilon)
-    outcomes = _enumerate_outcomes(problem, max_outcomes)
+    if not isinstance(bound, CompositeScoreBound):
+        raise InputValidationError("bound must be CompositeScoreBound")
+    problem = bound.candidate.problem
+    outcomes = _enumerate_joint_outcomes(problem, max_outcomes)
     null_mass = _family_mass_matrix(problem.null, outcomes)
     alternative_mass = _family_mass_matrix(problem.alternative, outcomes)
-    rate = -math.log(constraint.epsilon) / problem.n
-    lam = projection.order
-    divergence = projection.single_draw_renyi
-    threshold = problem.n * (rate - (1.0 - lam) * divergence) / lam
-    threshold_decimal = Decimal.from_float(threshold)
-    rejection = np.asarray(
-        [
-            1.0 if _decimal_score(counts, projection) >= threshold_decimal else 0.0
-            for counts in outcomes
-        ],
-        dtype=float,
+    decision = _decision_for_threshold(
+        outcomes, bound.candidate, bound.threshold, null_mass, alternative_mass
     )
-    null_errors = null_mass @ rejection
-    alternative_errors = 1.0 - alternative_mass @ rejection
-    worst_alpha = float(np.max(null_errors))
-    worst_beta = float(np.max(alternative_errors))
-    if worst_alpha > constraint.epsilon + COMPOSITE_NUMERICAL_TOLERANCE:
-        raise CompositeProjectionError(
-            "verified projected threshold exceeded the declared composite "
-            "Type-I constraint at numerical precision"
+    null_errors = _accurate_expectations(null_mass, decision)
+    alternative_power = _accurate_expectations(alternative_mass, decision)
+    alternative_errors = tuple(1.0 - value for value in alternative_power)
+    worst_alpha = max(null_errors)
+    worst_beta = max(alternative_errors)
+    tolerance = max(1e-15, 5e-10 * bound.constraint.epsilon)
+    if worst_alpha > bound.constraint.epsilon + tolerance:
+        raise CompositeScoreVerificationError(
+            "analytical verified score rule exceeds the declared Type-I budget "
+            f"after exact represented-family evaluation: alpha={worst_alpha:.17g}"
         )
-
-    log_raw = -problem.n * (1.0 - lam) / lam * (divergence - rate)
-    raw = math.exp(log_raw) if log_raw <= math.log(np.finfo(float).max) else math.inf
-    upper = min(1.0 - constraint.epsilon, raw)
-    if upper < 0 or not math.isfinite(upper):
-        raise NumericalLimitError(
-            "projected composite Type-II upper bound is numerically invalid"
+    if (
+        math.isfinite(bound.raw_exponential_upper_bound)
+        and worst_beta > bound.raw_exponential_upper_bound + 5e-10
+    ):
+        raise CompositeScoreVerificationError(
+            "enumerated deterministic score error exceeds its analytical exponential bound"
         )
-    return CompositeProjectedBound(
-        projection=projection,
-        constraint=constraint,
-        rate=rate,
-        threshold=threshold,
-        raw_exponential_upper_bound=raw,
-        type_ii_upper_bound=upper,
-        actual_worst_type_i_error=worst_alpha,
-        actual_worst_type_ii_error=worst_beta,
-        outcomes=len(outcomes),
+    return CompositeScoreTestEvaluation(
+        bound=bound,
+        outcomes=outcomes,
+        rejection_probabilities=tuple(float(value) for value in decision),
+        null_type_i_errors=null_errors,
+        alternative_type_ii_errors=alternative_errors,
+        worst_type_i_error=worst_alpha,
+        worst_type_ii_error=worst_beta,
     )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class CalibratedCompositeProjectedTest:
-    """Exact finite-family calibration within one projected-score threshold family."""
+class CalibratedCompositeScoreTest:
+    """Exact represented-family calibration within one verified score family."""
 
-    projection: VerifiedCompositeRenyiProjection
+    candidate: CompositeRenyiScoreCandidate
     constraint: SimpleBinaryTestingConstraint
     threshold_score: float
-    boundary_randomization: float
-    outcomes: tuple[tuple[int, ...], ...]
+    boundary_randomisation: float
+    outcomes: tuple[tuple[tuple[int, ...], ...], ...]
     rejection_probabilities: tuple[float, ...]
     null_type_i_errors: tuple[float, ...]
     alternative_type_ii_errors: tuple[float, ...]
@@ -775,35 +1073,46 @@ class CalibratedCompositeProjectedTest:
     worst_type_ii_error: float
 
     @property
+    def boundary_randomization(self) -> float:
+        return self.boundary_randomisation
+
+    @property
     def exhausts_type_i_budget(self) -> bool:
-        return abs(self.worst_type_i_error - self.constraint.epsilon) <= 1e-9
+        return abs(self.worst_type_i_error - self.constraint.epsilon) <= max(
+            1e-15, 5e-10 * self.constraint.epsilon
+        )
 
 
-def calibrate_composite_projected_test(
-    projection: VerifiedCompositeRenyiProjection,
+def calibrate_composite_score_test(
+    candidate: CompositeRenyiScoreCandidate,
     *,
     epsilon: Real,
     max_outcomes: int = DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES,
-) -> CalibratedCompositeProjectedTest:
-    """Calibrate the maximal admissible randomized upper projected-score test.
+) -> CalibratedCompositeScoreTest:
+    """Exhaust Type-I budget within the fixed verified upper-score family."""
 
-    For the explicitly finite family, worst-case errors are evaluated exactly
-    over all declared members. The threshold family is traversed in decreasing
-    projected score and boundary randomization is chosen to exhaust the Type-I
-    budget. This is a restricted optimum within the selected score family, not
-    a claim of unrestricted minimax optimality.
-    """
-
-    if not isinstance(projection, VerifiedCompositeRenyiProjection):
-        raise InputValidationError(
-            "projection must be VerifiedCompositeRenyiProjection"
+    if not isinstance(candidate, CompositeRenyiScoreCandidate):
+        raise InputValidationError("candidate must be CompositeRenyiScoreCandidate")
+    if not candidate.uniform_moment_bounds_verified:
+        raise CompositeScoreVerificationError(
+            "candidate score lacks verified uniform composite moment bounds"
         )
-    problem = projection.problem
     constraint = SimpleBinaryTestingConstraint(epsilon=epsilon)
-    outcomes = _enumerate_outcomes(problem, max_outcomes)
+    problem = candidate.problem
+    outcomes = _enumerate_joint_outcomes(problem, max_outcomes)
     null_mass = _family_mass_matrix(problem.null, outcomes)
     alternative_mass = _family_mass_matrix(problem.alternative, outcomes)
-    scores = tuple(_decimal_score(counts, projection) for counts in outcomes)
+    total_mass = np.sum(null_mass, axis=0) + np.sum(alternative_mass, axis=0)
+    scores: list[Decimal] = []
+    for index, outcome in enumerate(outcomes):
+        score = _decimal_score_for_outcome(outcome, candidate)
+        if score is None:
+            if float(total_mass[index]) > 0:
+                raise CompositeScoreVerificationError(
+                    "verified candidate score is undefined on positive represented joint support"
+                )
+            score = Decimal("-Infinity")
+        scores.append(score)
     groups: dict[Decimal, list[int]] = {}
     for index, score in enumerate(scores):
         groups.setdefault(score, []).append(index)
@@ -811,71 +1120,65 @@ def calibrate_composite_projected_test(
 
     rejection = np.zeros(len(outcomes), dtype=float)
     above_null = np.zeros(len(problem.null.members), dtype=float)
-    above_alternative = np.zeros(len(problem.alternative.members), dtype=float)
-
     chosen_score: Decimal | None = None
     chosen_eta: float | None = None
     for score in ordered_scores:
         indices = groups[score]
         boundary_null = np.sum(null_mass[:, indices], axis=1)
-        boundary_alternative = np.sum(alternative_mass[:, indices], axis=1)
         fully_included = above_null + boundary_null
         if float(np.max(fully_included)) <= constraint.epsilon:
             rejection[indices] = 1.0
             above_null = fully_included
-            above_alternative = above_alternative + boundary_alternative
             continue
-
-        eta_limits = []
-        for current, boundary in zip(above_null, boundary_null, strict=True):
-            if boundary <= 0:
-                continue
-            eta_limits.append(
-                (constraint.epsilon - float(current)) / float(boundary)
+        limits = tuple(
+            (constraint.epsilon - float(current)) / float(boundary)
+            for current, boundary in zip(above_null, boundary_null, strict=True)
+            if boundary > 0
+        )
+        if not limits:
+            raise CompositeScoreVerificationError(
+                "calibration encountered a positive-score boundary with no null mass"
             )
-        if not eta_limits:
-            raise CompositeProjectionError(
-                "calibration encountered a score boundary with zero null mass "
-                "under every declared member"
+        eta = min(limits)
+        tolerance = max(1e-15, 5e-10 * constraint.epsilon)
+        if eta < -tolerance or eta > 1.0 + tolerance or not math.isfinite(eta):
+            raise CompositeScoreVerificationError(
+                "calibration boundary randomisation left [0, 1]"
             )
-        eta = min(eta_limits)
-        if not math.isfinite(eta) or eta < 0 or eta > 1:
-            raise CompositeProjectionError(
-                "calibration boundary randomization left [0, 1]"
-            )
+        eta = min(1.0, max(0.0, eta))
         rejection[indices] = eta
         above_null = above_null + eta * boundary_null
-        above_alternative = above_alternative + eta * boundary_alternative
         chosen_score = score
         chosen_eta = eta
         break
-
     if chosen_score is None or chosen_eta is None:
-        raise CompositeProjectionError(
-            "calibration failed to encounter the Type-I boundary"
+        raise CompositeScoreVerificationError(
+            "calibration failed to encounter the composite Type-I boundary"
         )
 
-    null_errors = null_mass @ rejection
-    alternative_errors = 1.0 - alternative_mass @ rejection
-    worst_alpha = float(np.max(null_errors))
-    worst_beta = float(np.max(alternative_errors))
-    if worst_alpha > constraint.epsilon + COMPOSITE_NUMERICAL_TOLERANCE:
-        raise CompositeProjectionError(
-            "calibrated projected test violates the composite Type-I constraint"
+    null_errors = _accurate_expectations(null_mass, rejection)
+    alternative_power = _accurate_expectations(alternative_mass, rejection)
+    alternative_errors = tuple(1.0 - value for value in alternative_power)
+    worst_alpha = max(null_errors)
+    worst_beta = max(alternative_errors)
+    tolerance = max(1e-15, 5e-10 * constraint.epsilon)
+    if worst_alpha > constraint.epsilon + tolerance:
+        raise CompositeScoreVerificationError(
+            "calibrated score test violates the composite Type-I constraint"
         )
-    if abs(worst_alpha - constraint.epsilon) > COMPOSITE_NUMERICAL_TOLERANCE:
-        raise CompositeProjectionError(
-            "calibrated projected test did not exhaust the Type-I budget"
+    if abs(worst_alpha - constraint.epsilon) > tolerance:
+        raise CompositeScoreVerificationError(
+            "calibrated score test did not exhaust the composite Type-I budget"
         )
-    return CalibratedCompositeProjectedTest(
-        projection=projection,
+    return CalibratedCompositeScoreTest(
+        candidate=candidate,
         constraint=constraint,
         threshold_score=float(chosen_score),
-        boundary_randomization=chosen_eta,
+        boundary_randomisation=chosen_eta,
         outcomes=outcomes,
         rejection_probabilities=tuple(float(value) for value in rejection),
-        null_type_i_errors=tuple(float(value) for value in null_errors),
-        alternative_type_ii_errors=tuple(float(value) for value in alternative_errors),
+        null_type_i_errors=null_errors,
+        alternative_type_ii_errors=alternative_errors,
         worst_type_i_error=worst_alpha,
         worst_type_ii_error=worst_beta,
     )
@@ -883,19 +1186,24 @@ def calibrate_composite_projected_test(
 
 __all__ = [
     "DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES",
-    "CalibratedCompositeProjectedTest",
+    "MIN_EXACT_COMPOSITE_EPSILON",
+    "CalibratedCompositeScoreTest",
     "CompositeBinaryTestingProblem",
     "CompositeEnumerationLimitError",
     "CompositeMIDLawFamily",
     "CompositeOptimizationError",
-    "CompositeProjectedBound",
-    "CompositeProjectionError",
     "CompositeRenyiConverseBound",
+    "CompositeRenyiScoreCandidate",
+    "CompositeScoreBound",
+    "CompositeScoreTestEvaluation",
+    "CompositeScoreVerificationError",
     "FiniteCompositeMinimaxResult",
-    "VerifiedCompositeRenyiProjection",
-    "calibrate_composite_projected_test",
+    "IndependentMIDProductLaw",
+    "calibrate_composite_score_test",
     "composite_renyi_converse_at_order",
+    "composite_renyi_score_candidate",
+    "composite_score_bound_at_order",
+    "evaluate_composite_score_test",
     "exact_finite_composite_minimax",
-    "projected_composite_bound_at_order",
-    "verified_composite_renyi_projection",
+    "verified_composite_renyi_score",
 ]
