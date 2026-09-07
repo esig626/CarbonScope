@@ -26,21 +26,27 @@ The Bruno theorem path requires exact mutual absolute continuity of the fixed ob
 
 ## Finite composite testing
 
-Composite testing currently supports **explicit finite** H0 and H1 families of genuine-count categorical MID laws with a common count total and mass-class space. The stationary flux bridge maps finite tuples of complete feasible `CanonicalFluxState` records to such families.
+Composite testing currently supports **explicit finite represented classes** of complete observable laws. A member may contain one genuine-count multinomial MID block or an explicitly independent ordered product of multiple blocks. Corresponding H0/H1 members must share the complete block identity, count-total and mass-class structure.
 
-The implementation does not silently convexify a finite family. Continuous or implicitly parameterised uncertainty classes, numerical optimisation over a continuum of flux states, nuisance distributions, random effects and observation-kernel uncertainty are not implemented.
+The stationary bridge maps finite tuples of complete feasible `CanonicalFluxState` records through the native observation chain into one product observation law per state. Multiple blocks require explicit `independent_blocks=True`.
 
-`composite_renyi_converse_at_order(...)` evaluates the arbitrary-finite-class converse at one supplied finite `lambda > 1`. It does not optimise over the continuous-order envelope.
+The implementation does not silently convexify a finite family, use member sampling frequency as a prior, or pass hidden state IDs/flux coordinates into the decision rule. Continuous or implicitly parameterised mechanism classes, optimisation over a continuum of flux/nuisance states, random effects and observation-kernel uncertainty are not yet implemented.
 
-`exact_finite_composite_minimax(...)` enumerates the complete multinomial count space and solves a randomised minimax linear programme. Enumeration has an explicit outcome cap. Exceeding it raises `CompositeEnumerationLimitError`; no approximation or reduced support is substituted. The LP requires the optional `testing` SciPy extra.
+`composite_renyi_converse_at_order(...)` evaluates the order-specific finite-family converse at one supplied finite `lambda > 1` using full product-law Rényi divergence. It does not optimise over the continuous-order envelope.
 
-The order-below-one projected path currently requires full support for every declared member. Structural zeros remain supported by the exact minimax and converse paths. A finite-family Rényi-minimising pair is accepted for projected testing only if both uniform composite moment inequalities are directly verified over every declared member.
+`exact_finite_composite_minimax(...)` enumerates the **complete Cartesian product** of all declared MID-block count spaces and solves a randomised minimax linear programme. This is a small-problem/discretised oracle. The joint outcome count grows multiplicatively across blocks; exceeding the explicit cap raises `CompositeEnumerationLimitError` and no approximation or reduced support is substituted. The LP requires the optional `testing` SciPy extra.
 
-A verified Rényi-minimising pair is **not** automatically a finite-blocklength least-favourable pair. `calibrate_composite_projected_test(...)` is optimal only within the fixed projected-score upper-threshold family. It is not labelled as unrestricted minimax equality unless comparison with `exact_finite_composite_minimax(...)` actually establishes equality for the represented finite problem.
+A Type-I budget below `MIN_EXACT_COMPOSITE_EPSILON = 1e-12` is rejected as a numerical LP limit rather than silently enlarged. Null constraints are scaled by the budget before HiGHS optimisation and worst-case errors are recomputed afterwards.
 
-The stationary composite bridge currently supports exactly one experiment/target/replicate genuine-count block. General non-identical independent product-block composite testing is not inferred from the simple product-law API.
+For `0 < lambda < 1`, `composite_renyi_score_candidate(...)` selects the minimum-divergence **vertex pair** in the represented finite class. This object is only a candidate score. It is not called a joint convex-class Rényi projection and is not automatically a finite-blocklength least-favourable pair.
 
-Test inversion into flux compatibility/confidence regions is not implemented.
+Structural zeros are retained in candidate-score construction. Uniform support and exponential-moment conditions are checked directly over every represented H0/H1 member. `verified_composite_renyi_score(...)` fails if those gates do not hold. A coordinate with `P*=Q*=0` is harmless only when every represented member is also zero there.
+
+`composite_score_bound_at_order(...)` produces an analytical threshold and Type-II guarantees without joint-outcome enumeration. `evaluate_composite_score_test(...)` and `calibrate_composite_score_test(...)` require enumeration and therefore share the same combinatorial scalability limits as the exact minimax oracle.
+
+Score calibration is optimal only within the fixed verified upper-score threshold family. It is not labelled as unrestricted minimax equality unless comparison with `exact_finite_composite_minimax(...)` actually establishes equality for the represented finite problem.
+
+A sampled finite flux-state family is exactly the class represented to these finite solvers. FluxEMU does not claim that a finite sample is the complete underlying continuous/biological mechanism class. Test inversion into flux compatibility/confidence regions is not implemented.
 
 ## Stationary and transient EMU scope
 
@@ -62,7 +68,7 @@ A sampled finite flux-state set can be passed explicitly to composite testing, b
 
 HiGHS, NumPy and SciPy computations are subject to finite binary64 precision. Numerically singular EMU systems, ambiguous reduced geometry and unrepresentable testing inputs fail explicitly rather than being silently repaired.
 
-Exact count-space procedures scale combinatorially with count total and number of mass classes. Explicit caps are safety boundaries, not evidence that larger problems are statistically approximated.
+Exact count-space procedures scale combinatorially within each multinomial block and multiplicatively across independent blocks. Explicit caps are safety boundaries, not evidence that larger problems are statistically approximated.
 
 The packaged real-model acceptance suite provides substantial software evidence, but it is not a proof that every genome-scale model, tracer experiment or biological interpretation is valid.
 
