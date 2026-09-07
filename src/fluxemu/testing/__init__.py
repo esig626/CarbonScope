@@ -28,6 +28,7 @@ from .likelihood import (
     likelihood_ratio_p_value,
     log_likelihood_ratio,
 )
+from . import composite as _composite
 from .composite import (
     DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES,
     CalibratedCompositeProjectedTest,
@@ -54,6 +55,12 @@ from .composite_stationary import (
     StationaryCompositeTestingResult,
     evaluate_stationary_composite_hypotheses,
 )
+
+# ``composite.py`` owns the finite-family records and enumeration helpers used
+# by the guarded LP implementation. Keep its direct function attribute aligned
+# with the public solver so every supported import path has identical numerical
+# semantics while avoiding a circular module-level dependency inside the core.
+_composite.exact_finite_composite_minimax = exact_finite_composite_minimax
 
 __all__ = [
     "BrunoOrderBound", "BrunoTheoremAssumptionError", "NumericalLimitError",
