@@ -1,176 +1,155 @@
 # Finite composite binary testing
 
-FluxEMU implements a finite, explicit composite binary testing problem for genuine isotopologue counts. The implementation is deliberately narrower than a general uncertainty-class framework: the null and alternative are declared finite families of fixed categorical MID laws, or finite families of complete feasible flux states that map to those laws.
+FluxEMU implements an explicit finite composite-testing layer for **complete observable laws**. A class member is an ordered product of genuine-count multinomial MID blocks with explicitly declared independence. A finite H0/H1 family can be supplied directly or generated from complete feasible flux states through native stationary EMU.
 
-No finite family is silently replaced by its convex hull and no continuum of mechanisms is inferred.
+The represented family is exactly the statistical class passed to the solver. FluxEMU does not silently convexify it, treat member frequency as a prior, or claim that a finite sample exhausts a larger biological mechanism class.
 
 ## Statistical problem
 
-Let
+For a randomised decision rule `phi(y)` equal to the probability of deciding H1,
 
 ```text
-H0: p is one of P = {p_1, ..., p_J}
-H1: q is one of Q = {q_1, ..., q_K}
+alpha(phi; H0) = max_{P in H0} E_P[phi(Y)]
+beta(phi; H1)  = max_{Q in H1} E_Q[1 - phi(Y)].
 ```
 
-where every member uses the same ordered mass classes and the same genuine count total `n`. The observation is
+At Type-I budget `epsilon`, the represented finite minimax value is
 
 ```text
-Y ~ Multinomial(n, p)   under H0
-Y ~ Multinomial(n, q)   under H1.
+beta*(epsilon)
+  = min_phi max_{Q in H1} E_Q[1-phi]
+    subject to max_{P in H0} E_P[phi] <= epsilon.
 ```
 
-A randomised test `phi(y)` is the probability of deciding H1. FluxEMU uses the minimax errors
+The decision rule consumes observable data only. Flux coordinates, state IDs, sampling frequencies, inverse-MFA estimates, priors and class averages do not enter the statistic.
 
-```text
-alpha(phi; P) = max_j E_{P_j}[phi(Y)]
-beta(phi; Q)  = max_k E_{Q_k}[1 - phi(Y)].
-```
+## Complete product observation laws
 
-For a Type-I budget `epsilon`, the exact finite-family minimax value is
+`IndependentMIDProductLaw` contains one or more ordered `MultinomialMIDLaw` blocks and their experiment/target/replicate identities. Corresponding H0/H1 members must have the same block order, count totals and mass-class spaces. Count totals may differ between blocks.
 
-```text
-beta*(epsilon; P, Q)
-  = min_phi max_k E_{Q_k}[1 - phi(Y)]
-    subject to max_j E_{P_j}[phi(Y)] <= epsilon.
-```
-
-The roles remain fixed: H0 is null, H1 is alternative, Type I means deciding H1 under H0, and Type II means deciding H0 under H1.
-
-## Finite-family Rényi converse
-
-For a supplied finite real order `lambda > 1`, FluxEMU computes the directed composite single-draw separation
+For explicitly independent blocks,
 
 ```text
 D_lambda(Q || P)
-  = min_{q in Q, p in P} D_lambda(q || p).
+  = sum_b D_lambda(Q_b || P_b).
 ```
 
-Writing
+This lets the composite layer operate directly on a joint panel of MID measurements without pretending the blocks are independent decisions.
+
+## Order-specific composite Rényi converse
+
+`composite_renyi_converse_at_order(...)` accepts a supplied finite `lambda > 1` and computes
 
 ```text
-r = -log(epsilon) / n,
+D_lambda(H1 || H0)
+  = min_{Q in H1, P in H0} D_lambda(Q || P)
 ```
 
-the implemented order-specific lower bound is
+for the **full product observation laws**. The order-specific pairwise composite lower bound is
 
 ```text
-beta*(epsilon; P, Q)
-  >= 1 - exp(
-       -n * (lambda - 1)/lambda
-          * [r - D_lambda(Q || P)]_+
+beta*(epsilon)
+  >= max(
+       0,
+       1 - exp((lambda-1)/lambda * [log(epsilon) + D_lambda(H1||H0)])
      ).
 ```
 
-Use `composite_renyi_converse_at_order(...)`.
+No convexity, ordering or least-favourable-pair assumption is needed for this converse. The supplied order is used unchanged; FluxEMU does not replace a continuous-order optimisation by a finite grid.
 
-This calculation requires no convexity, projection, ordering or least-favourable-pair assumption. It does not search over Rényi orders and does not claim to evaluate the continuous-order envelope.
+## Exact represented finite minimax oracle
 
-## Exact finite-sample minimax test
+`exact_finite_composite_minimax(...)` enumerates the Cartesian product of all MID-block count spaces and solves the complete randomised minimax problem as a linear programme. There is one decision variable in `[0,1]` for every joint count outcome, one Type-I constraint for every null member and one Type-II worst-case constraint for every alternative member.
 
-`exact_finite_composite_minimax(...)` enumerates the complete count space and solves the randomised minimax problem as a linear programme. There is one decision variable `phi(y) in [0,1]` for every count outcome, one Type-I constraint for every null member, and one Type-II worst-case constraint for every alternative member.
+This is a small-problem/discretised oracle, not the scalable path for a large multi-block panel. The joint space is protected by `max_outcomes`; exceeding the cap raises `CompositeEnumerationLimitError` and does not trigger a reduced-space, Monte Carlo or asymptotic substitute.
 
-This is an exact optimisation of the represented finite probability model up to numerical LP precision. It is not a deterministic-only approximation.
+The Type-I constraints are scaled before HiGHS optimisation and worst-case errors are recomputed afterwards with accurate summation. Budgets below `MIN_EXACT_COMPOSITE_EPSILON = 1e-12` are rejected as an explicit LP numerical-limit condition rather than silently enlarged.
 
-Enumeration has an explicit `max_outcomes` cap. If the complete count space is larger, FluxEMU raises `CompositeEnumerationLimitError`. It does not switch to Monte Carlo, asymptotics or a reduced outcome set.
-
-The null LP constraints are scaled by the supplied Type-I budget before solving so HiGHS' absolute feasibility tolerance does not become an implicit statistical tolerance. Worst-case errors are recomputed with accurate floating-point summation after optimisation. Type-I budgets below `MIN_EXACT_COMPOSITE_EPSILON = 1e-12` are rejected explicitly as a numerical-limit condition; FluxEMU does not substitute a larger budget.
-
-The LP requires SciPy and is available through
+The LP requires the optional testing dependency:
 
 ```bash
 python -m pip install '.[testing]'
 ```
 
-## Verified order-below-one projected test
+## Finite-family Rényi candidate score
 
-For `0 < lambda < 1`, a pair that minimises Rényi divergence over an arbitrary finite family does **not** automatically define a valid composite test. In particular, pairwise optimality alone does not guarantee uniform error control.
+For `0 < lambda < 1`, minimising Rényi divergence over a finite non-convex family selects a **vertex-pair candidate score**. It is not automatically a joint Rényi projection of convex classes and not automatically a finite-blocklength least-favourable pair.
 
-`verified_composite_renyi_projection(...)` therefore performs two separate steps:
-
-1. find a Rényi-minimising pair among the explicitly declared members;
-2. directly verify the two uniform single-draw moment inequalities over every null and alternative member.
-
-For a selected full-support pair `(p*, q*)`, set
+`composite_renyi_score_candidate(...)` returns the minimum-divergence represented pair together with direct support and uniform-moment diagnostics. If `(P*,Q*)` is selected, its full product log-likelihood-ratio score is
 
 ```text
-h(x) = log(q*(x) / p*(x))
-z     = sum_x q*(x)^lambda p*(x)^(1-lambda).
+h(y) = log Q*(y) - log P*(y).
 ```
 
-The pair is accepted for composite projected testing only if
+The candidate is marked uniformly verified only when the complete represented families satisfy
 
 ```text
-max_{p in P} E_p[exp(lambda h)]         <= z
-max_{q in Q} E_q[exp((lambda-1) h)]     <= z
+max_{P in H0} log E_P[exp(lambda h)]
+  <= (lambda-1) D_lambda(Q*||P*)
+
+max_{Q in H1} log E_Q[exp((lambda-1) h)]
+  <= (lambda-1) D_lambda(Q*||P*).
 ```
 
-within the explicit numerical tolerance. If either inequality fails, FluxEMU raises `CompositeProjectionError` rather than presenting a pairwise likelihood ratio as a composite procedure.
+The moment calculations factor over the independent multinomial blocks, so they do not require joint count-space enumeration.
 
-The current projected path requires full support for every declared family member. Structural zeros remain supported by the exact minimax and converse paths.
+Structural zeros are retained. Infinite score coordinates are permitted when the uniform support conditions make them harmless. A category with `P*=Q*=0` may be ignored only if every represented class member also assigns zero mass there. Otherwise the candidate fails verification.
 
-## Closed-form projected bound
+`verified_composite_renyi_score(...)` raises `CompositeScoreVerificationError` when the finite-family minimum is only pairwise and the uniform composite gates fail.
 
-For a verified pair, define the categorical projected divergence
+## Analytical score bound
+
+For a verified candidate and Type-I budget `epsilon`, `composite_score_bound_at_order(...)` returns the analytical threshold
 
 ```text
-D* = D_lambda(q* || p*)
+tau = [-log(epsilon) - (1-lambda) D_lambda(Q*||P*)] / lambda
 ```
 
-and the threshold
+and the projected-score Type-II exponential guarantee
 
 ```text
-tau_min = n * [r - (1-lambda) D*] / lambda.
+exp(-(1-lambda)/lambda * [D_lambda(Q*||P*) + log(epsilon)]).
 ```
 
-The deterministic upper-threshold test based on the count-weighted score is evaluated by `projected_composite_bound_at_order(...)`. The returned object reports separately:
+The function also reports the separate constant-randomised-test guarantee `1-epsilon` and their minimum as a bound on the represented minimax value. It does not require enumeration of the joint count space.
 
-- `raw_exponential_upper_bound`, the theorem's analytical upper bound for that projected threshold rule, which may be greater than one and therefore vacuous;
-- `actual_worst_type_i_error`, evaluated over the declared finite null family;
-- `actual_worst_type_ii_error`, evaluated over the declared finite alternative family;
-- `type_ii_upper_bound`, the global minimax upper bound obtained by taking the better analytical guarantee between the projected construction and the separate constant randomised test `phi=epsilon`.
+`evaluate_composite_score_test(...)` is the optional small-space oracle that enumerates the deterministic threshold rule and reports its actual worst-case Type-I and Type-II errors.
 
-The last quantity is **not** asserted to upper-bound the actual Type-II error of the deterministic projected threshold when the constant randomised test is the better construction. These are different tests and are deliberately reported separately.
+## Calibration within the score family
 
-## Calibration within the projected score family
+`calibrate_composite_score_test(...)` keeps the verified score fixed, enumerates the represented joint count space, orders outcomes by that score and randomises at the boundary required to exhaust the Type-I budget.
 
-`calibrate_composite_projected_test(...)` keeps the verified score fixed and calibrates a randomised upper-threshold rule directly against the finite composite Type-I constraint. It enumerates all count outcomes, groups equal score values exactly at the represented log-ratio precision, and randomises at the first boundary needed to exhaust the Type-I budget.
-
-This gives the restricted optimum within that ordered threshold family. In general,
+This is an optimum only within that fixed upper-score threshold family. In general,
 
 ```text
-exact minimax beta*
-    <= calibrated projected beta
-    <= deterministic projected beta.
+exact represented minimax beta*
+    <= calibrated score-family beta
+    <= deterministic analytical-score beta.
 ```
 
 Equality is not assumed.
 
-## No automatic least-favourable-pair claim
+## Flux-state family bridge
 
-A Rényi-minimising pair, even one satisfying the two uniform moment inequalities, is not automatically a finite-blocklength least-favourable pair. The public projection record therefore explicitly reports that no finite-`n` least-favourable claim is being made.
+`evaluate_stationary_composite_hypotheses(...)` accepts finite tuples of complete `CanonicalFluxState` records for H0 and H1. Every state passes the existing original-model feasibility and stationary-EMU validation before its count blocks are grouped into an `IndependentMIDProductLaw`.
 
-Exact reduction to a simple pair requires an additional ordering/optimality result. FluxEMU does not infer such a result from numerical pair minimisation.
+Multiple experiment/target/replicate blocks require explicit `independent_blocks=True`. The state/member IDs are retained only for provenance. The decision layer sees the generated observable laws, not the hidden flux state or its sampling frequency.
 
-## Flux-state families
-
-`evaluate_stationary_composite_hypotheses(...)` accepts explicit finite tuples of complete `CanonicalFluxState` records for H0 and H1. Every state is validated by the existing original-model feasibility layer and mapped through native stationary EMU to a genuine-count law.
-
-The bridge currently requires exactly one experiment/target/replicate count block. This is intentional: the implemented finite composite theory is the common i.i.d. categorical problem. FluxEMU does not infer a composite theorem for non-identical independent product blocks from the simple-testing product API.
-
-A finite sampled flux-state family is exactly the class represented to the finite solver. FluxEMU does not claim that the sample exhausts a larger continuous or biological mechanism class, nor does it treat sampling frequency as a prior over mechanisms.
+This is the intended finite represented-class bridge for comparing mechanistically generated MID-law families. A sampled state family remains a discretisation of any larger continuous mechanism class unless a separate argument establishes otherwise.
 
 ## Current non-goals
 
-The current release does not implement:
+The current finite engine does not implement:
 
 - automatic convex-hull closure of finite flux families;
-- continuous or implicitly parameterised composite classes;
-- numerical optimisation over a continuum of flux mechanisms to locate a joint Rényi projection;
-- a claim that a projected pair is finite-sample least favourable without separate ordering evidence;
-- general multi-block composite testing with unequal genuine count totals;
+- continuous or implicitly parameterised mechanism classes;
+- numerical optimisation over a continuum of nuisance/flux parameters;
+- a claim that a vertex-pair Rényi minimum is a joint convex projection;
+- a claim that a candidate score pair is finite-sample least favourable without separate ordering/optimality evidence;
+- scalable exact minimax optimisation over enormous multi-block count spaces;
+- biological-replicate random effects or culture-varying nuisance products;
 - a generic composite p-value;
-- test inversion into flux compatibility or confidence regions;
-- Bayesian nuisance integration or random-effects models.
+- test inversion into flux compatibility/confidence regions;
+- Bayesian nuisance integration.
 
-These are separate statistical specifications, not UI options to be guessed by software.
+Those require separate statistical specifications. The finite product-law layer is the validated core/oracle on which those later mechanisms can be built.
