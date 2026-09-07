@@ -1,99 +1,114 @@
 # FluxEMU
 
-Standalone software development repository for FluxEMU.
+FluxEMU is a native Python framework for stationary and transient carbon-isotope modelling, metabolic flux analysis, and finite-sample inference for genuine isotopologue-count observations.
 
-This repository contains the reusable metabolic/isotope modelling package,
-authoritative carbon-transition library, compatibility infrastructure, and
-validation benchmarks.
-
-Stage 1 supports the native public sequence:
+The principal native stationary path is
 
 ```text
-canonical model -> FBA -> FastFVA -> complete feasible flux states
-                -> stationary EMU -> sample-indexed MID ensemble
+SBML/FBC model
+  -> canonical FluxEMU model
+  -> HiGHS FBA / FVA
+  -> complete feasible flux states
+  -> stationary EMU prediction
+  -> MID ensemble / stationary MFA
+  -> explicit observation laws
+  -> simple-binary likelihood-ratio evidence and Rényi Type-II lower bounds
 ```
 
-Its production FastFVA engine is a HiGHS-native port/adaptation of the
-shared-memory computational architecture in Marouen Ben Guebila's
-[VFFVA](https://github.com/marouenbg/VFFVA/tree/7cf7b82505bf99aed38a2073e3ed308f79e95802),
-audited at pinned commit `7cf7b82505bf99aed38a2073e3ed308f79e95802`.
-FluxEMU retains its own more general linear-objective and objective-retention
-semantics; it does not require the original VFFVA binary or its CPLEX, GLPK, or
-MPI dependencies.
+FluxEMU does not depend on COBRApy or mfapy at runtime.
 
-Install the standard native package from the repository root with:
+## Installation
+
+From the repository root:
 
 ```bash
-python -m pip install ./codex
+python -m pip install .
 ```
 
-See the [Stage 1 native workflow](codex/docs/STAGE1_NATIVE_WORKFLOW.md) for the
-public deterministic and ensemble APIs, dependency boundary, sampling
-guarantees, validation rules, and reproducible FastFVA evidence.
-
-Stationary MFA is available as a separate native fitting layer with the
-optional optimiser dependency:
+Stationary MFA and transient integration use SciPy through optional extras:
 
 ```bash
-python -m pip install './codex[mfa]'
-python codex/examples/stationary_mfa_recovery.py
+python -m pip install '.[mfa]'
+python -m pip install '.[transient]'
 ```
 
-`fluxemu.fit_stationary_mfa` fits complete feasible states by minimising the
-plain sum of `D_alpha(observed MID || predicted MID)`, with exact KL at order
-one and finite positive-real Rényi orders. Experimental fractions,
-percentages, or non-negative intensity vectors can first be explicitly closed
-to the probability simplex with `fluxemu.normalise_mid`; the divergence and
-fitting layers never silently renormalise their inputs. See the
-[stationary MFA workflow](codex/docs/STATIONARY_MFA_RENYI_CORE.md) for the public
-API, support semantics, multistart diagnostics, and identifiable/non-identifiable
-recovery examples, the
-[explicit MID preprocessing guide](codex/docs/MID_PREPROCESSING.md) for experimental
-input normalisation, and the
-[mfapy engineering comparison](codex/docs/MFAPY_ENGINEERING_COMPARISON.md) for
-the audited reference lineage.
+## Native stationary workflow
 
-For measurements with genuine isotopologue-count semantics,
-`fluxemu.observation` provides an explicit fixed-total multinomial law,
-raw count records, reproducible sampling, and a native stationary EMU bridge.
-It also exposes the exact multinomial KL/Rényi identities. Count totals must
-be supplied explicitly: percentages, peak areas, normalised MIDs, and arbitrary
-intensities are never converted into pseudo-counts. This separate layer leaves
-the existing MFA objective unchanged. See the
-[stationary observation-law guide](codex/docs/STATIONARY_OBSERVATION_LAW.md)
-for the API, likelihood identity, numerical boundaries, and synthetic example.
-
-For two fixed feasible flux hypotheses, `fluxemu.testing` evaluates the
-order-specific finite-sample Type-II lower bounds of Bruno, Vandenbroucque &
-Esposito, arXiv:2601.09550v2. It reuses the stationary count-law bridge, checks
-the theorem's mutual-absolute-continuity assumption exactly, and exposes both
-Rényi directions, raw bound components, provenance, and count-sample
-log-likelihood ratios.
-
-For a realised genuine-count observation it can also report the exact
-simple-null likelihood-ratio p-value
-`P0{log(P1(Y)/P0(Y)) >= log(P1(y_obs)/P0(y_obs))}`. The p-value is a separate
-sample-specific quantity: it is not a divergence and it is not a Type-II lower
-bound. Exact p-value evaluation enumerates the positive-probability null count
-space up to an explicit caller-controlled limit; FluxEMU does not silently
-substitute a chi-square or Monte Carlo approximation when that limit is
-exceeded.
-
-Ordinary Rényi-bound evaluation accepts any finite real order greater than one
-within the documented numerical limits; no grid or global order optimisation
-is substituted. Run:
+The command-line interface accepts an SBML Level 3 FBC model and a FluxEMU experiment YAML:
 
 ```bash
-python codex/examples/simple_binary_flux_discrimination.py
+fluxemu run --model model.xml --experiment experiment.yaml --output results
 ```
 
-See the [simple binary bounds guide](codex/docs/SIMPLE_BINARY_RENYI_BOUNDS.md)
-for the exact error convention, p-value semantics, count boundary, public APIs,
-and validation, and the
-[technical p-value note](codex/docs/technical_notes/P_VALUES_AND_INFORMATION_DIVERGENCE.tex)
-for the mathematical bridge between likelihood-ratio p-values, KL divergence,
-and Rényi divergence. This layer uses the base dependencies and leaves the
-existing MFA fitting objective unchanged.
+The public Python orchestration API includes `run_native_fba`, `run_native_fva`, `run_native_stationary_analysis`, and complete-feasible-state ensemble functions in `fluxemu.analysis`.
 
-Exploratory composite hypothesis testing, topology reconstruction, and biological
-research remain in the separate fluxemu-prototype repository.
+FVA endpoints are diagnostics only. FluxEMU never combines independently optimised FVA coordinates into a flux vector. Ensemble calculations use complete jointly feasible states.
+
+See [docs/STAGE1_NATIVE_WORKFLOW.md](docs/STAGE1_NATIVE_WORKFLOW.md) and [docs/EXPERIMENT_FORMAT.md](docs/EXPERIMENT_FORMAT.md).
+
+## Stationary MFA
+
+`fluxemu.fit_stationary_mfa` fits complete feasible flux states by minimising a plain sum of
+
+```text
+D_alpha(observed MID || predicted MID)
+```
+
+with exact KL at `alpha=1` and finite positive-real Rényi orders otherwise. External rounded fractions, percentages, or non-negative intensity vectors can be explicitly closed to the probability simplex with `fluxemu.normalise_mid`; fitting and divergence functions never silently renormalise inputs.
+
+The optimiser is constrained by native FluxEMU flux geometry and uses multistart SLSQP. It does not claim a global optimum or unique identifiability.
+
+See [docs/STATIONARY_MFA_RENYI_CORE.md](docs/STATIONARY_MFA_RENYI_CORE.md) and [docs/MID_PREPROCESSING.md](docs/MID_PREPROCESSING.md).
+
+## Genuine-count observation laws
+
+For measurements with genuine count semantics, `fluxemu.observation` provides explicit fixed-total multinomial laws
+
+```text
+Y | v ~ Multinomial(n, p_v)
+```
+
+with declared count totals, exact structural-zero support, reproducible sampling and independent-product divergence identities. Percentages, peak areas, normalised MIDs and arbitrary intensities are never converted into pseudo-counts and no effective sample size is inferred.
+
+See [docs/STATIONARY_OBSERVATION_LAW.md](docs/STATIONARY_OBSERVATION_LAW.md).
+
+## Simple binary evidence and finite-sample bounds
+
+For two fixed feasible flux states, FluxEMU supports:
+
+- `log_likelihood_ratio(...)`, with `LLR(y)=log P1(y)-log P0(y)`;
+- `likelihood_ratio_p_value(...)`, the exact simple-null tail `P0{LLR(Y) >= LLR(y_obs)}` when the null count space is enumerable within the explicit limit;
+- `bruno_converse_at_order(...)`, the order-specific finite-sample Bruno et al. lower bound on optimal Type-II error under a declared Type-I budget.
+
+The conventions are fixed:
+
+```text
+H0 = P0 = null
+H1 = P1 = alternative
+Type I  = P0(decide H1)
+Type II = P1(decide H0)
+reverse Rényi = D_lambda(P1 || P0)
+forward Rényi = D_lambda(P0 || P1)
+```
+
+A p-value is realised-data evidence under the fixed null. A Rényi Type-II lower bound is a constraint on achievable testing performance for the fixed law pair. Neither is a substitute for the other.
+
+FluxEMU evaluates any supplied finite real `lambda > 1` subject to explicit numerical limits. It does not replace the continuous Rényi-order envelope with a finite grid.
+
+See [docs/SIMPLE_BINARY_RENYI_BOUNDS.md](docs/SIMPLE_BINARY_RENYI_BOUNDS.md) and [docs/technical_notes/P_VALUES_AND_INFORMATION_DIVERGENCE.tex](docs/technical_notes/P_VALUES_AND_INFORMATION_DIVERGENCE.tex).
+
+## Transient forward EMU
+
+`fluxemu.emu` also contains a native fixed-flux transient EMU integrator with explicit pool quantities, time points and initial unlabelled internal state. This is forward simulation only; transient inverse MFA is not implemented.
+
+## Validation
+
+The test suite includes analytical controls, exact finite-count enumeration, independent deterministic-test oracles, a direct full-isotopomer implementation of the Antoniewicz TCA benchmark, and the packaged E. coli acceptance model. The curated carbon-transition library retains explicit source provenance and atom mappings.
+
+The production FastFVA architecture is a HiGHS-native adaptation of the shared-memory computational design of Marouen Ben Guebila's VFFVA. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Scientific boundaries
+
+FluxEMU currently does not provide composite hypothesis testing, test inversion into flux confidence/compatibility regions, Bayesian inference, automatic atom-map inference, natural-abundance correction in the native stationary engine, or transient inverse MFA. Exact p-values are intentionally limited to enumerable genuine-count spaces and never silently fall back to an asymptotic or Monte Carlo procedure.
+
+See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for the complete current limitations.
