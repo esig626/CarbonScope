@@ -1,7 +1,8 @@
-"""Simple binary bounds and realised-data evidence for declared observation laws.
+"""Simple and finite-composite testing over declared genuine-count laws.
 
-H0 is the fixed null law P0; H1 is the fixed alternative law P1. Type I is
-P0(decide H1), and Type II is P1(decide H0). MFA fitting remains separate.
+Simple testing fixes one H0/P0 law and one H1/P1 law. Composite testing uses
+explicit finite H0/H1 law families and keeps minimax worst-case Type I/II roles
+separate from MFA fitting. Composite classes are never silently convexified.
 """
 
 from .simple import (
@@ -27,6 +28,29 @@ from .likelihood import (
     likelihood_ratio_p_value,
     log_likelihood_ratio,
 )
+from .composite import (
+    DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES,
+    CalibratedCompositeProjectedTest,
+    CompositeBinaryTestingProblem,
+    CompositeEnumerationLimitError,
+    CompositeMIDLawFamily,
+    CompositeOptimizationError,
+    CompositeProjectedBound,
+    CompositeProjectionError,
+    CompositeRenyiConverseBound,
+    FiniteCompositeMinimaxResult,
+    VerifiedCompositeRenyiProjection,
+    calibrate_composite_projected_test,
+    composite_renyi_converse_at_order,
+    exact_finite_composite_minimax,
+    projected_composite_bound_at_order,
+    verified_composite_renyi_projection,
+)
+from .composite_stationary import (
+    CompositeFluxHypotheses,
+    StationaryCompositeTestingResult,
+    evaluate_stationary_composite_hypotheses,
+)
 
 __all__ = [
     "BrunoOrderBound", "BrunoTheoremAssumptionError", "NumericalLimitError",
@@ -37,4 +61,14 @@ __all__ = [
     "bruno_converse_at_order", "evaluate_stationary_simple_hypotheses",
     "likelihood_ratio_p_value", "log_likelihood_ratio",
     "validate_bruno_assumptions", "validate_renyi_order",
+    "DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES",
+    "CalibratedCompositeProjectedTest", "CompositeBinaryTestingProblem",
+    "CompositeEnumerationLimitError", "CompositeFluxHypotheses",
+    "CompositeMIDLawFamily", "CompositeOptimizationError",
+    "CompositeProjectedBound", "CompositeProjectionError",
+    "CompositeRenyiConverseBound", "FiniteCompositeMinimaxResult",
+    "StationaryCompositeTestingResult", "VerifiedCompositeRenyiProjection",
+    "calibrate_composite_projected_test", "composite_renyi_converse_at_order",
+    "evaluate_stationary_composite_hypotheses", "exact_finite_composite_minimax",
+    "projected_composite_bound_at_order", "verified_composite_renyi_projection",
 ]
