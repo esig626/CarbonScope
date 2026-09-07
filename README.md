@@ -12,7 +12,7 @@ SBML/FBC model
   -> stationary EMU prediction
   -> MID ensemble / stationary MFA
   -> explicit observation laws
-  -> simple-binary likelihood-ratio evidence and Rényi Type-II lower bounds
+  -> simple or finite-composite hypothesis testing
 ```
 
 FluxEMU does not depend on COBRApy or mfapy at runtime.
@@ -25,11 +25,12 @@ From the repository root:
 python -m pip install .
 ```
 
-Stationary MFA and transient integration use SciPy through optional extras:
+Stationary MFA, transient integration, and exact finite-composite minimax optimisation use SciPy through optional extras:
 
 ```bash
 python -m pip install '.[mfa]'
 python -m pip install '.[transient]'
+python -m pip install '.[testing]'
 ```
 
 ## Native stationary workflow
@@ -97,18 +98,44 @@ FluxEMU evaluates any supplied finite real `lambda > 1` subject to explicit nume
 
 See [docs/SIMPLE_BINARY_RENYI_BOUNDS.md](docs/SIMPLE_BINARY_RENYI_BOUNDS.md) and [docs/technical_notes/P_VALUES_AND_INFORMATION_DIVERGENCE.tex](docs/technical_notes/P_VALUES_AND_INFORMATION_DIVERGENCE.tex).
 
+## Finite composite binary testing
+
+FluxEMU also supports explicit finite H0 and H1 families of genuine-count MID laws, including families generated from complete feasible flux states.
+
+For a randomised test `phi`, the composite errors are
+
+```text
+Type I  = max_{P in H0} E_P[phi]
+Type II = max_{Q in H1} E_Q[1 - phi].
+```
+
+The production API includes:
+
+- `composite_renyi_converse_at_order(...)`: the order-specific `lambda > 1` composite Type-II lower bound obtained from the minimum directed Rényi separation over all declared H0/H1 pairs;
+- `exact_finite_composite_minimax(...)`: complete count-space enumeration and exact randomised minimax linear programming, protected by an explicit outcome cap;
+- `verified_composite_renyi_projection(...)`: an order `0 < lambda < 1` pair-derived score only when both required uniform composite moment inequalities are directly verified over every declared member;
+- `projected_composite_bound_at_order(...)`: the closed-form projected threshold and its actual finite-family errors;
+- `calibrate_composite_projected_test(...)`: exact Type-I calibration within that fixed score family;
+- `evaluate_stationary_composite_hypotheses(...)`: native stationary EMU mapping from finite feasible flux-state families to the testing problem.
+
+Finite families are never silently convexified. A Rényi-minimising pair is not automatically reported as a finite-blocklength least-favourable pair, and calibration of a projected score is not reported as unrestricted minimax equality unless it actually agrees with the exact minimax solution.
+
+The current flux-state bridge supports one genuine-count experiment/target/replicate block. General continuum uncertainty classes, multi-block composite testing, generic composite p-values and test inversion are not inferred from the finite-class API.
+
+See [docs/COMPOSITE_TESTING.md](docs/COMPOSITE_TESTING.md).
+
 ## Transient forward EMU
 
 `fluxemu.emu` also contains a native fixed-flux transient EMU integrator with explicit pool quantities, time points and initial unlabelled internal state. This is forward simulation only; transient inverse MFA is not implemented.
 
 ## Validation
 
-The test suite includes analytical controls, exact finite-count enumeration, independent deterministic-test oracles, a direct full-isotopomer implementation of the Antoniewicz TCA benchmark, and the packaged E. coli acceptance model. The curated carbon-transition library retains explicit source provenance and atom mappings.
+The test suite includes analytical controls, exact finite-count enumeration, independent deterministic-test oracles, exact finite-composite minimax controls, adversarial nonordered composite families, a direct full-isotopomer implementation of the Antoniewicz TCA benchmark, and the packaged E. coli acceptance model. The curated carbon-transition library retains explicit source provenance and atom mappings.
 
 The production FastFVA architecture is a HiGHS-native adaptation of the shared-memory computational design of Marouen Ben Guebila's VFFVA. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Scientific boundaries
 
-FluxEMU currently does not provide composite hypothesis testing, test inversion into flux confidence/compatibility regions, Bayesian inference, automatic atom-map inference, natural-abundance correction in the native stationary engine, or transient inverse MFA. Exact p-values are intentionally limited to enumerable genuine-count spaces and never silently fall back to an asymptotic or Monte Carlo procedure.
+FluxEMU currently does not provide continuous/implicitly parameterised composite uncertainty classes, automatic convexification, generic composite p-values, test inversion into flux confidence/compatibility regions, Bayesian inference, automatic atom-map inference, natural-abundance correction in the native stationary engine, or transient inverse MFA. Exact enumerative procedures are intentionally protected by explicit outcome limits and never silently fall back to asymptotic or Monte Carlo substitutes.
 
 See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for the complete current limitations.
