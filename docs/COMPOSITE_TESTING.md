@@ -74,6 +74,8 @@ This is an exact optimisation of the represented finite probability model up to 
 
 Enumeration has an explicit `max_outcomes` cap. If the complete count space is larger, FluxEMU raises `CompositeEnumerationLimitError`. It does not switch to Monte Carlo, asymptotics or a reduced outcome set.
 
+The null LP constraints are scaled by the supplied Type-I budget before solving so HiGHS' absolute feasibility tolerance does not become an implicit statistical tolerance. Worst-case errors are recomputed with accurate floating-point summation after optimisation. Type-I budgets below `MIN_EXACT_COMPOSITE_EPSILON = 1e-12` are rejected explicitly as a numerical-limit condition; FluxEMU does not substitute a larger budget.
+
 The LP requires SciPy and is available through
 
 ```bash
@@ -123,11 +125,12 @@ tau_min = n * [r - (1-lambda) D*] / lambda.
 
 The deterministic upper-threshold test based on the count-weighted score is evaluated by `projected_composite_bound_at_order(...)`. The returned object reports separately:
 
-- the analytical Type-II upper bound;
-- the actual worst-case Type-I error over the declared finite null family;
-- the actual worst-case Type-II error over the declared finite alternative family.
+- `raw_exponential_upper_bound`, the theorem's analytical upper bound for that projected threshold rule, which may be greater than one and therefore vacuous;
+- `actual_worst_type_i_error`, evaluated over the declared finite null family;
+- `actual_worst_type_ii_error`, evaluated over the declared finite alternative family;
+- `type_ii_upper_bound`, the global minimax upper bound obtained by taking the better analytical guarantee between the projected construction and the separate constant randomised test `phi=epsilon`.
 
-The global analytical upper bound is the smaller of the projected exponential expression and the constant randomised-test value `1 - epsilon`.
+The last quantity is **not** asserted to upper-bound the actual Type-II error of the deterministic projected threshold when the constant randomised test is the better construction. These are different tests and are deliberately reported separately.
 
 ## Calibration within the projected score family
 
@@ -154,6 +157,8 @@ Exact reduction to a simple pair requires an additional ordering/optimality resu
 `evaluate_stationary_composite_hypotheses(...)` accepts explicit finite tuples of complete `CanonicalFluxState` records for H0 and H1. Every state is validated by the existing original-model feasibility layer and mapped through native stationary EMU to a genuine-count law.
 
 The bridge currently requires exactly one experiment/target/replicate count block. This is intentional: the implemented finite composite theory is the common i.i.d. categorical problem. FluxEMU does not infer a composite theorem for non-identical independent product blocks from the simple-testing product API.
+
+A finite sampled flux-state family is exactly the class represented to the finite solver. FluxEMU does not claim that the sample exhausts a larger continuous or biological mechanism class, nor does it treat sampling frequency as a prior over mechanisms.
 
 ## Current non-goals
 
