@@ -100,12 +100,13 @@ def test_complete_stage_b2_projection_uses_admissible_domain_direction_activity(
     assert model_fingerprint(model) != model_fingerprint(changed)
 
 
-def test_packaged_frozen_optima_preserve_positive_and_negative_native_oracles():
+def test_packaged_biomass_fixture_and_frozen_acetate_negative_oracle():
+    fixtures = _json_resource("e_coli_core_positive_fixtures.json")["selection"]
     frozen = _json_resource("e_coli_core_frozen_optima.json")
     model = load_ecoli_core_stage_b2_model()
     plan = compile_emu_plan(model, build_r1_acceptance_experiment())
 
-    biomass_data = frozen["biomass"]
+    biomass_data = fixtures["biomass"]
     biomass = CanonicalFluxState(
         biomass_data["sample_id"], tuple(map(tuple, biomass_data["fluxes"]))
     )
