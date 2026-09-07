@@ -6,6 +6,7 @@ import math
 
 import pytest
 
+from fluxemu.exceptions import InputValidationError
 from fluxemu.observation import MultinomialMIDLaw
 from fluxemu.testing import (
     CompositeBinaryTestingProblem,
@@ -48,12 +49,12 @@ def test_composite_family_preserves_declared_members_without_convexifying():
 
 
 def test_composite_problem_requires_common_count_and_mass_class_spaces():
-    with pytest.raises(Exception, match="count total"):
+    with pytest.raises(InputValidationError, match="count total"):
         CompositeBinaryTestingProblem(
             null=_family(2, ((0.8, 0.2),), "P"),
             alternative=_family(3, ((0.2, 0.8),), "Q"),
         )
-    with pytest.raises(Exception, match="mass-class"):
+    with pytest.raises(InputValidationError, match="mass-class"):
         CompositeBinaryTestingProblem(
             null=_family(2, ((0.8, 0.2),), "P"),
             alternative=_family(2, ((0.2, 0.3, 0.5),), "Q"),
@@ -145,13 +146,18 @@ def test_ordered_family_projection_selects_adjacent_pair_and_verifies_uniform_mo
     assert not projection.finite_n_least_favourable_claimed
 
 
-def test_projected_closed_form_rule_obeys_uniform_type_i_constraint():
+def test_projected_closed_form_rule_separates_its_bound_from_constant_test_bound():
     projection = verified_composite_renyi_projection(_ordered_problem(), order=0.5)
     result = projected_composite_bound_at_order(projection, epsilon=0.05)
     assert result.actual_worst_type_i_error <= 0.05 + 1e-12
     assert 0 <= result.actual_worst_type_ii_error <= 1
-    assert 0 <= result.type_ii_upper_bound <= 1
-    assert result.actual_worst_type_ii_error <= result.type_ii_upper_bound + 1e-10
+    # Here r>D_lambda, so the theorem's projected exponential expression is
+    # vacuous (>1) and the deterministic threshold rejects no outcomes. The
+    # separate constant randomized test gives the global 1-epsilon upper bound.
+    assert result.raw_exponential_upper_bound > 1
+    assert result.actual_worst_type_ii_error == 1.0
+    assert result.type_ii_upper_bound == pytest.approx(0.95)
+    assert result.actual_worst_type_ii_error <= result.raw_exponential_upper_bound
     assert result.outcomes == 5
 
 
@@ -192,7 +198,7 @@ def test_nonordered_finite_family_refuses_pairwise_projection_without_uniform_gu
 
 def test_projection_order_and_composite_converse_order_are_distinct_domains():
     problem = _ordered_problem()
-    with pytest.raises(Exception, match="0 < lambda < 1"):
+    with pytest.raises(InputValidationError, match="0 < lambda < 1"):
         verified_composite_renyi_projection(problem, order=2.0)
-    with pytest.raises(Exception, match="strictly greater than 1"):
+    with pytest.raises(InputValidationError, match="strictly greater than 1"):
         composite_renyi_converse_at_order(problem, epsilon=0.05, order=0.5)
