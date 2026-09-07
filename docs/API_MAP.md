@@ -87,16 +87,19 @@ Roles are fixed: H0=P0=null and H1=P1=alternative. The exact p-value is the P0 u
 
 `fluxemu.testing`
 
-- `CompositeMIDLawFamily`: one explicit finite H0 or H1 family; no implicit convex hull;
-- `CompositeBinaryTestingProblem`: aligned finite null/alternative classes with one common genuine count total and mass-class space;
-- `composite_renyi_converse_at_order(...)`: order-specific `lambda>1` minimax Type-II lower bound from the directed finite-family Rényi separation;
-- `exact_finite_composite_minimax(...)`: exact randomised minimax test on the complete count space, using SciPy/HiGHS through the `testing` extra;
-- `VerifiedCompositeRenyiProjection` and `verified_composite_renyi_projection(...)`: order `0<lambda<1` pair selection plus direct verification of both required uniform moment inequalities;
-- `projected_composite_bound_at_order(...)`: closed-form threshold, analytical upper bound and actual worst-case finite-family errors;
-- `calibrate_composite_projected_test(...)`: exact Type-I calibration within the fixed projected-score threshold family;
-- `CompositeFluxHypotheses`, `StationaryCompositeTestingResult`, and `evaluate_stationary_composite_hypotheses(...)`: finite complete flux-state families mapped through native stationary EMU to one genuine-count composite problem.
+- `IndependentMIDProductLaw`: one complete observable law over an explicitly independent ordered set of genuine-count MID blocks;
+- `CompositeMIDLawFamily`: one explicit finite H0 or H1 family of complete product laws; no implicit convex hull or member-frequency prior;
+- `CompositeBinaryTestingProblem`: aligned finite null/alternative classes with the same complete block identities, totals and mass-class spaces;
+- `composite_renyi_converse_at_order(...)`: order-specific `lambda>1` Type-II lower bound from the minimum directed full-product-law Rényi separation;
+- `exact_finite_composite_minimax(...)`: complete joint count-space randomised minimax LP oracle, using SciPy/HiGHS through the `testing` extra and failing at an explicit product-outcome cap;
+- `CompositeRenyiScoreCandidate` and `composite_renyi_score_candidate(...)`: order `0<lambda<1` finite-family vertex-pair minimum plus support/uniform-moment diagnostics;
+- `verified_composite_renyi_score(...)`: returns that candidate only when both uniform composite moment inequalities verify over every represented member;
+- `CompositeScoreBound` and `composite_score_bound_at_order(...)`: analytical threshold, score-construction Type-II bound, constant-randomised-test bound and represented minimax upper bound without joint-outcome enumeration;
+- `evaluate_composite_score_test(...)`: optional small-space exact evaluation of the deterministic analytical threshold rule;
+- `calibrate_composite_score_test(...)`: exact Type-I calibration within the fixed verified upper-score threshold family when the joint count space is enumerable;
+- `CompositeFluxHypotheses`, `StationaryCompositeTestingResult`, and `evaluate_stationary_composite_hypotheses(...)`: finite complete flux-state families mapped through native stationary EMU into one complete product observation law per state. Multiple blocks require explicit `independent_blocks=True`.
 
-The exact minimax value, calibrated projected value, deterministic projected-test error and analytical Rényi bound are distinct quantities. A Rényi-minimising pair is not automatically a finite-sample least-favourable pair.
+The exact represented minimax value, calibrated score-family value, deterministic score error and analytical Rényi bounds are distinct quantities. A finite-family vertex-pair Rényi minimum is a candidate score, not automatically a joint convex-class projection or a finite-sample least-favourable pair.
 
 See `docs/COMPOSITE_TESTING.md` for the statistical contract and current scope.
 
@@ -104,4 +107,4 @@ See `docs/COMPOSITE_TESTING.md` for the statistical contract and current scope.
 
 `fluxemu run --model MODEL.xml --experiment EXPERIMENT.yaml --output DIRECTORY`
 
-runs the public native stationary SBML -> FBA/FVA -> EMU pipeline and writes fluxes, MIDs, diagnostics and a provenance manifest. Composite testing is currently a Python API; the CLI does not infer hypothesis families from model files or FVA ranges.
+runs the public native stationary SBML -> FBA/FVA -> EMU pipeline and writes fluxes, MIDs, diagnostics and a provenance manifest. Composite testing is currently a Python API; the CLI does not infer hypothesis families from model files, FVA ranges or sampling frequencies.
