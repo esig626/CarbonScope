@@ -1,4 +1,4 @@
-"""Finite composite flux hypotheses joined to stationary genuine-count laws."""
+"""Finite composite flux hypotheses joined to joint stationary count laws."""
 
 from __future__ import annotations
 
@@ -7,22 +7,39 @@ from dataclasses import dataclass
 from .. import observation as _observation
 from ..exceptions import FluxEMUError, InputValidationError
 from ..execution import CanonicalFluxState
-from ..observation import StationaryObservationLawResult, StationaryObservationSpecification
+from ..observation import (
+    StationaryObservationLawComponent,
+    StationaryObservationLawResult,
+    StationaryObservationSpecification,
+)
 from ..observation.schema import _validate_state_record
-from .composite import CompositeBinaryTestingProblem, CompositeMIDLawFamily
+from .composite import (
+    CompositeBinaryTestingProblem,
+    CompositeMIDLawFamily,
+    IndependentMIDProductLaw,
+)
 from .simple import _testing_digest
+
+
+def _identity(component: StationaryObservationLawComponent) -> tuple[str, str, str]:
+    return component.experiment_id, component.target_id, component.replicate_id
 
 
 def _state_ids(role: str, states: tuple[CanonicalFluxState, ...]) -> tuple[str, ...]:
     return tuple(
-        f"{role}-{index}:{_testing_digest(('composite-flux-state-v1', state))}"
+        f"{role}-{index}:{_testing_digest(('composite-flux-state-v2', state))}"
         for index, state in enumerate(states)
     )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CompositeFluxHypotheses:
-    """Explicit finite H0/H1 sets of complete canonical flux states."""
+    """Explicit finite H0/H1 sets of complete canonical flux states.
+
+    Member IDs are provenance only. Composite decision rules consume the
+    generated observable laws and never state IDs, flux coordinates or sampling
+    frequencies.
+    """
 
     null_states: tuple[CanonicalFluxState, ...]
     alternative_states: tuple[CanonicalFluxState, ...]
@@ -52,16 +69,54 @@ class CompositeFluxHypotheses:
     def fingerprint(self) -> str:
         return _testing_digest(
             (
-                "composite-flux-hypotheses-v1",
+                "composite-flux-hypotheses-v2",
                 ("H0", self.null_member_ids),
                 ("H1", self.alternative_member_ids),
             )
         )
 
 
+def _product_members(
+    source: StationaryObservationLawResult,
+    states: tuple[CanonicalFluxState, ...],
+    declarations: tuple[tuple[tuple[str, str, str], int], ...],
+    role: str,
+) -> tuple[IndependentMIDProductLaw, ...]:
+    block_count = len(declarations)
+    expected_components = len(states) * block_count
+    if len(source.components) != expected_components:
+        raise InputValidationError(
+            f"{role} composite observation source contains {len(source.components)} blocks; "
+            f"expected {expected_components} from {len(states)} states x {block_count} declarations"
+        )
+    identities = tuple(identity for identity, _ in declarations)
+    products: list[IndependentMIDProductLaw] = []
+    for state_index, state in enumerate(states):
+        start = state_index * block_count
+        chunk = source.components[start : start + block_count]
+        if len(chunk) != block_count:
+            raise InputValidationError(f"{role} composite block grouping is incomplete")
+        actual = tuple((_identity(item), item.law.n) for item in chunk)
+        if actual != declarations:
+            raise InputValidationError(
+                f"{role} composite observation block identity/total order differs from the declaration"
+            )
+        if any(item.state != state for item in chunk):
+            raise InputValidationError(
+                f"{role} composite observation source changed scientific state order"
+            )
+        products.append(
+            IndependentMIDProductLaw(
+                blocks=tuple(item.law for item in chunk),
+                block_identities=identities,
+            )
+        )
+    return tuple(products)
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class StationaryCompositeTestingResult:
-    """Finite flux families and their aligned stationary count-law classes."""
+    """Finite flux families and aligned complete product observation-law classes."""
 
     hypotheses: CompositeFluxHypotheses
     null_observation_laws: StationaryObservationLawResult
@@ -86,25 +141,23 @@ class StationaryCompositeTestingResult:
             or null.specification_fingerprint != alternative.specification_fingerprint
             or null.experiment_fingerprints != alternative.experiment_fingerprints
         ):
-            raise InputValidationError("composite null and alternative observation provenance must align")
-        if tuple(item.law for item in null.components) != self.problem.null.members:
-            raise InputValidationError("composite null family does not retain source laws in state order")
-        if tuple(item.law for item in alternative.components) != self.problem.alternative.members:
             raise InputValidationError(
-                "composite alternative family does not retain source laws in state order"
+                "composite null and alternative observation provenance must align"
             )
         if self.problem.null.member_ids != self.hypotheses.null_member_ids:
-            raise InputValidationError("composite null member provenance is not bound to flux states")
+            raise InputValidationError(
+                "composite null member provenance is not bound to the null flux family"
+            )
         if self.problem.alternative.member_ids != self.hypotheses.alternative_member_ids:
             raise InputValidationError(
-                "composite alternative member provenance is not bound to flux states"
+                "composite alternative member provenance is not bound to the alternative flux family"
             )
 
     @property
     def fingerprint(self) -> str:
         return _testing_digest(
             (
-                "stationary-composite-testing-result-v1",
+                "stationary-composite-testing-result-v2",
                 self.hypotheses.fingerprint,
                 self.problem.fingerprint,
                 self.null_observation_laws.specification_fingerprint,
@@ -117,57 +170,65 @@ def evaluate_stationary_composite_hypotheses(
     *,
     null_states: tuple[CanonicalFluxState, ...],
     alternative_states: tuple[CanonicalFluxState, ...],
+    independent_blocks: bool = False,
 ) -> StationaryCompositeTestingResult:
-    """Map two finite feasible flux-state classes to one-block multinomial laws.
+    """Map finite feasible flux-state classes to joint product count laws.
 
-    The composite theory implemented here is the common-i.i.d.-categorical
-    finite-class problem. The observation specification must therefore declare
-    exactly one experiment/target/replicate count block with one genuine total.
-    No product-block composite theorem is inferred from the simple-testing API.
+    Multiple experiment/target/replicate blocks require explicit
+    ``independent_blocks=True``. The declaration is statistical semantics, not
+    inferred from the appearance of the data. Every complete flux state is
+    validated by the existing observation/EMU chain before its blocks are
+    grouped into one complete observable-law member.
+
+    The returned finite family is exactly the represented class. State IDs,
+    sampling frequencies and flux coordinates are not inputs to any decision
+    rule, and no finite family is treated as a prior or an implicit convex hull.
     """
 
+    if type(independent_blocks) is not bool:
+        raise InputValidationError("independent_blocks must be an explicit bool")
     hypotheses = CompositeFluxHypotheses(
         null_states=null_states, alternative_states=alternative_states
     )
     declarations = tuple(
-        (block.experiment_id, item.target_id, item.replicate_id, item.total_count)
+        ((block.experiment_id, item.target_id, item.replicate_id), item.total_count)
         for block in specification.experiments
         for item in block.specifications
     )
-    if len(declarations) != 1:
+    if not declarations:
         raise InputValidationError(
-            "stationary composite testing currently requires exactly one "
-            "experiment/target/replicate genuine-count block"
+            "stationary composite testing requires at least one genuine-count block"
+        )
+    if len(declarations) > 1 and not independent_blocks:
+        raise InputValidationError(
+            "multiple composite observation blocks require explicit independent_blocks=True"
         )
 
-    sources = []
+    sources: list[StationaryObservationLawResult] = []
+    product_families: list[tuple[IndependentMIDProductLaw, ...]] = []
     for role, states in (
         ("null", hypotheses.null_states),
         ("alternative", hypotheses.alternative_states),
     ):
         try:
-            source = _observation.evaluate_stationary_observation_laws(specification, states)
+            source = _observation.evaluate_stationary_observation_laws(
+                specification, states
+            )
         except FluxEMUError as error:
             raise type(error)(f"{role} composite flux hypothesis: {error}") from error
-        if len(source.components) != len(states):
-            raise InputValidationError(
-                f"{role} composite observation source does not contain one law per state"
-            )
-        for state, component in zip(states, source.components, strict=True):
-            if component.state != state:
-                raise InputValidationError(
-                    f"{role} composite observation source changed scientific state order"
-                )
+        products = _product_members(source, states, declarations, role)
         sources.append(source)
+        product_families.append(products)
 
     null_source, alternative_source = sources
+    null_products, alternative_products = product_families
     problem = CompositeBinaryTestingProblem(
         null=CompositeMIDLawFamily(
-            members=tuple(item.law for item in null_source.components),
+            members=null_products,
             member_ids=hypotheses.null_member_ids,
         ),
         alternative=CompositeMIDLawFamily(
-            members=tuple(item.law for item in alternative_source.components),
+            members=alternative_products,
             member_ids=hypotheses.alternative_member_ids,
         ),
     )
