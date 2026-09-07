@@ -28,8 +28,8 @@ jobs:
           python -m pip check
       - name: Compile retained Python sources
         run: python -m compileall -q src tests examples benchmarks tools
-      - name: Check patch whitespace
-        run: git diff --check HEAD^
+      - name: Check complete branch diff whitespace
+        run: git diff --check origin/main...HEAD
       - name: Check native-only boundaries
         run: |
           ! grep -RInE '(^|[^A-Za-z])(from|import)[[:space:]]+(cobra|mfapy|optlang|nlopt)([.]|[[:space:]]|$)' src tests examples docs
@@ -54,6 +54,8 @@ jobs:
           tests/test_testing_import_isolation.py
           tests/test_native_portability.py
           tests/test_cli.py
+      - name: Verify clean checkout
+        run: test -z "$(git status --porcelain)"
 
   full-native:
     strategy:
@@ -83,3 +85,5 @@ jobs:
         run: |
           python examples/stationary_mfa_recovery.py
           python examples/simple_binary_flux_discrimination.py
+      - name: Verify clean checkout
+        run: test -z "$(git status --porcelain)"
