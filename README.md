@@ -100,9 +100,9 @@ See [docs/SIMPLE_BINARY_RENYI_BOUNDS.md](docs/SIMPLE_BINARY_RENYI_BOUNDS.md) and
 
 ## Finite composite binary testing
 
-FluxEMU also supports explicit finite H0 and H1 families of genuine-count MID laws, including families generated from complete feasible flux states.
+FluxEMU supports explicit finite H0 and H1 families of **complete observable laws**. Each member may be an explicitly independent ordered product of genuine-count MID blocks, including joint panels generated from complete feasible flux states through native stationary EMU.
 
-For a randomised test `phi`, the composite errors are
+For a randomised test `phi`,
 
 ```text
 Type I  = max_{P in H0} E_P[phi]
@@ -111,16 +111,19 @@ Type II = max_{Q in H1} E_Q[1 - phi].
 
 The production API includes:
 
-- `composite_renyi_converse_at_order(...)`: the order-specific `lambda > 1` composite Type-II lower bound obtained from the minimum directed Rényi separation over all declared H0/H1 pairs;
-- `exact_finite_composite_minimax(...)`: complete count-space enumeration and exact randomised minimax linear programming, protected by an explicit outcome cap;
-- `verified_composite_renyi_projection(...)`: an order `0 < lambda < 1` pair-derived score only when both required uniform composite moment inequalities are directly verified over every declared member;
-- `projected_composite_bound_at_order(...)`: the closed-form projected threshold and its actual finite-family errors;
-- `calibrate_composite_projected_test(...)`: exact Type-I calibration within that fixed score family;
-- `evaluate_stationary_composite_hypotheses(...)`: native stationary EMU mapping from finite feasible flux-state families to the testing problem.
+- `IndependentMIDProductLaw`: one complete joint observation law over explicitly independent MID count blocks;
+- `CompositeMIDLawFamily` and `CompositeBinaryTestingProblem`: explicit finite represented H0/H1 classes with aligned block semantics;
+- `composite_renyi_converse_at_order(...)`: the order-specific `lambda > 1` composite Type-II lower bound from the minimum directed **full product-law** Rényi separation;
+- `exact_finite_composite_minimax(...)`: complete joint count-space randomised minimax LP for small represented problems, protected by an explicit product-outcome cap;
+- `composite_renyi_score_candidate(...)`: the finite-family `0 < lambda < 1` vertex-pair minimum plus direct support and uniform-moment diagnostics;
+- `verified_composite_renyi_score(...)`: the same candidate only when both uniform composite moment inequalities verify over every represented member;
+- `composite_score_bound_at_order(...)`: the analytical threshold and Type-II guarantees without joint-outcome enumeration;
+- `evaluate_composite_score_test(...)` and `calibrate_composite_score_test(...)`: small-space exact evaluation and Type-I calibration within the fixed verified score family;
+- `evaluate_stationary_composite_hypotheses(...)`: native stationary EMU mapping from finite feasible flux-state families to complete product observation-law classes, with explicit `independent_blocks=True` for multiple blocks.
 
-Finite families are never silently convexified. A Rényi-minimising pair is not automatically reported as a finite-blocklength least-favourable pair, and calibration of a projected score is not reported as unrestricted minimax equality unless it actually agrees with the exact minimax solution.
+Finite represented families are never silently convexified. A vertex-pair Rényi minimum is a **candidate score**, not automatically a joint convex-class projection and not automatically a finite-blocklength least-favourable pair. State IDs, flux coordinates and sampling frequencies are provenance, not classifier inputs.
 
-The current flux-state bridge supports one genuine-count experiment/target/replicate block. General continuum uncertainty classes, multi-block composite testing, generic composite p-values and test inversion are not inferred from the finite-class API.
+The exact minimax LP is deliberately a bounded small-problem/discretised oracle. The analytical converse and candidate-score moment checks operate directly on full product laws and do not require enumeration of the complete joint count space.
 
 See [docs/COMPOSITE_TESTING.md](docs/COMPOSITE_TESTING.md).
 
@@ -130,12 +133,12 @@ See [docs/COMPOSITE_TESTING.md](docs/COMPOSITE_TESTING.md).
 
 ## Validation
 
-The test suite includes analytical controls, exact finite-count enumeration, independent deterministic-test oracles, exact finite-composite minimax controls, adversarial nonordered composite families, a direct full-isotopomer implementation of the Antoniewicz TCA benchmark, and the packaged E. coli acceptance model. The curated carbon-transition library retains explicit source provenance and atom mappings.
+The test suite includes analytical controls, exact finite-count enumeration, independent deterministic-test oracles, exact finite-composite minimax controls, joint product-law controls, structural-zero score gates, adversarial nonordered composite families, a direct full-isotopomer implementation of the Antoniewicz TCA benchmark, and the packaged E. coli acceptance model. The curated carbon-transition library retains explicit source provenance and atom mappings.
 
 The production FastFVA architecture is a HiGHS-native adaptation of the shared-memory computational design of Marouen Ben Guebila's VFFVA. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Scientific boundaries
 
-FluxEMU currently does not provide continuous/implicitly parameterised composite uncertainty classes, automatic convexification, generic composite p-values, test inversion into flux confidence/compatibility regions, Bayesian inference, automatic atom-map inference, natural-abundance correction in the native stationary engine, or transient inverse MFA. Exact enumerative procedures are intentionally protected by explicit outcome limits and never silently fall back to asymptotic or Monte Carlo substitutes.
+FluxEMU currently does not provide continuous/implicitly parameterised composite uncertainty classes, automatic convexification, scalable exact minimax optimisation over enormous joint count spaces, generic composite p-values, test inversion into flux confidence/compatibility regions, Bayesian inference, automatic atom-map inference, natural-abundance correction in the native stationary engine, or transient inverse MFA. Exact enumerative procedures are intentionally protected by explicit outcome limits and never silently fall back to asymptotic or Monte Carlo substitutes.
 
 See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for the complete current limitations.
