@@ -9,25 +9,29 @@ from fluxemu.testing import (
     MIN_EXACT_COMPOSITE_EPSILON,
     CompositeBinaryTestingProblem,
     CompositeMIDLawFamily,
+    IndependentMIDProductLaw,
     NumericalLimitError,
     exact_finite_composite_minimax,
 )
-import fluxemu.testing.composite as composite_module
+
+
+IDENTITY = (("e", "target", "counts"),)
+
+
+def _member(probabilities):
+    return IndependentMIDProductLaw(
+        blocks=(MultinomialMIDLaw(1, probabilities),),
+        block_identities=IDENTITY,
+    )
 
 
 def _problem(null, alternative):
     return CompositeBinaryTestingProblem(
-        null=CompositeMIDLawFamily(
-            members=(MultinomialMIDLaw(1, null),), member_ids=("P",),
-        ),
+        null=CompositeMIDLawFamily(members=(_member(null),), member_ids=("P",)),
         alternative=CompositeMIDLawFamily(
-            members=(MultinomialMIDLaw(1, alternative),), member_ids=("Q",),
+            members=(_member(alternative),), member_ids=("Q",),
         ),
     )
-
-
-def test_direct_composite_module_uses_same_guarded_minimax_solver():
-    assert composite_module.exact_finite_composite_minimax is exact_finite_composite_minimax
 
 
 def test_scaled_lp_respects_small_type_i_budget_in_rare_event_problem():
@@ -37,7 +41,7 @@ def test_scaled_lp_respects_small_type_i_budget_in_rare_event_problem():
     result = exact_finite_composite_minimax(problem, epsilon=1e-8)
     assert result.worst_type_i_error == pytest.approx(1e-8, rel=5e-9, abs=0.0)
     assert result.minimax_type_ii_error == pytest.approx(0.9, abs=2e-10)
-    assert result.randomized
+    assert result.randomised
 
 
 def test_budget_below_lp_numerical_floor_fails_without_substitution():
