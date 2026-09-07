@@ -26,12 +26,14 @@ def test_stationary_composite_bridge_preserves_flux_family_and_law_order():
     assert result.hypotheses.alternative_states == alternative_states
     assert result.null_observation_laws.states == null_states
     assert result.alternative_observation_laws.states == alternative_states
-    assert tuple(item.predicted_mid for item in result.null_observation_laws.components) == (
-        (0.2, 0.8), (0.3, 0.7),
-    )
-    assert tuple(
+    null_mids = tuple(item.predicted_mid for item in result.null_observation_laws.components)
+    alternative_mids = tuple(
         item.predicted_mid for item in result.alternative_observation_laws.components
-    ) == ((0.6, 0.4), (0.7, 0.3))
+    )
+    assert null_mids[0] == pytest.approx((0.2, 0.8), abs=2e-15)
+    assert null_mids[1] == pytest.approx((0.3, 0.7), abs=2e-15)
+    assert alternative_mids[0] == pytest.approx((0.6, 0.4), abs=2e-15)
+    assert alternative_mids[1] == pytest.approx((0.7, 0.3), abs=2e-15)
     assert tuple(item.law for item in result.null_observation_laws.components) == (
         result.problem.null.members
     )
@@ -97,5 +99,5 @@ def test_composite_flux_roles_may_reuse_sample_id_across_families_without_confla
     assert result.null_observation_laws.components[0].sample_id == "shared"
     assert result.alternative_observation_laws.components[0].sample_id == "shared"
     assert result.problem.null.member_ids != result.problem.alternative.member_ids
-    assert result.problem.null.members[0].probabilities == (0.2, 0.8)
-    assert result.problem.alternative.members[0].probabilities == (0.6, 0.4)
+    assert result.problem.null.members[0].probabilities == pytest.approx((0.2, 0.8), abs=2e-15)
+    assert result.problem.alternative.members[0].probabilities == pytest.approx((0.6, 0.4), abs=2e-15)
