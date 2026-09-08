@@ -13,8 +13,8 @@
 \newcommand{\Palt}{P_1}
 \newcommand{\E}{\mathbb{E}}
 
-\title{Technical Note: p-values, likelihood ratios, and information-theoretic divergence in FluxEMU}
-\author{FluxEMU technical notes}
+\title{Technical Note: p-values, likelihood ratios, and information-theoretic divergence in CarbonScope}
+\author{CarbonScope technical notes}
 \date{6 September 2026}
 
 \begin{document}
@@ -29,7 +29,7 @@ error, and power are much more familiar. The aim of this note is to make the
 relationship precise without treating a divergence as though it were itself a
 p-value.
 
-FluxEMU now distinguishes four related but different objects:
+CarbonScope now distinguishes four related but different objects:
 \begin{enumerate}
     \item a \emph{divergence} between complete observation laws;
     \item the \emph{likelihood-ratio evidence} in one realised data set;
@@ -83,7 +83,7 @@ p_{\mathrm{Wilks}}
 \Pr\!\left\{\chi^2_{m-1}\ge 2n\KL(\widehat p\|p_0)\right\}.
 \end{equation}
 This is one direct bridge from KL divergence to a conventional p-value.
-FluxEMU's exact simple-vs-simple p-value, developed below, does not require this
+CarbonScope's exact simple-vs-simple p-value, developed below, does not require this
 asymptotic approximation.
 
 \section{Two fixed flux hypotheses}
@@ -94,7 +94,7 @@ H_0:v=v_0,
 \qquad
 H_1:v=v_1,
 \end{equation}
-FluxEMU maps each flux state through stationary EMU prediction and the declared
+CarbonScope maps each flux state through stationary EMU prediction and the declared
 observation model to two complete laws,
 \begin{equation}
 \Pnull=P(Y\mid v_0),
@@ -187,7 +187,7 @@ direct conceptual route
 }
 \end{equation}
 The finite-sample Bruno--Vandenbroucque--Esposito result implemented in
-FluxEMU uses both Rényi directions to lower-bound the optimal Type-II error
+CarbonScope uses both Rényi directions to lower-bound the optimal Type-II error
 under a fixed Type-I constraint.
 
 \section{Why the quantities should not be collapsed into one number}
@@ -228,7 +228,7 @@ reliably separate $H_0$ from $H_1$.
 
 \section{Data-versus-model and model-versus-model divergence}
 
-FluxEMU uses divergences in two distinct settings that should not be conflated.
+CarbonScope uses divergences in two distinct settings that should not be conflated.
 
 \subsection*{Data versus model}
 For observed proportions $\widehat p$ and a predicted MID $p_v$,
@@ -265,9 +265,9 @@ but this is not an exact general identity between a p-value and a divergence.
 The event definition, test statistic, finite-sample discreteness, and competing
 hypotheses all matter.
 
-\section{Exact finite-sample implementation in FluxEMU}
+\section{Exact finite-sample implementation in CarbonScope}
 
-For \texttt{likelihood\_ratio\_p\_value}, FluxEMU enumerates the complete
+For \texttt{likelihood\_ratio\_p\_value}, CarbonScope enumerates the complete
 positive-probability null count space and sums
 \begin{equation}
 P_0(y)
@@ -291,7 +291,7 @@ The implementation preserves the following boundaries:
     \item the p-value is reported separately from the Rényi divergences and the Type-II lower bound.
 \end{itemize}
 
-\section{Worked FluxEMU mixer example}
+\section{Worked CarbonScope mixer example}
 
 Take
 \begin{equation}
