@@ -1,6 +1,8 @@
-# FluxEMU scientific workflow
+# CarbonScope scientific workflow
 
-FluxEMU is intended to use isotope tracing as a forward hypothesis testing framework, not primarily as a tool for recovering one supposedly true flux vector.
+CarbonScope is intended to use isotope tracing as a forward hypothesis testing framework, not primarily as a tool for recovering one supposedly true flux vector.
+
+This document describes the intended scientific workflow. The current release already provides the forward modelling, feasible state sampling, genuine count observation laws and simple binary testing pieces. Composite testing over whole hypothesis families is planned and is not yet implemented.
 
 The central question is:
 
@@ -24,7 +26,7 @@ FVA extrema are diagnostics only. They are not assembled into flux states.
 
 Sample complete jointly feasible flux states from the admissible region.
 
-The sampled states are a numerical representation of the composite biological hypothesis. They are not individual scientific hypotheses and they are not estimates of the true flux state.
+The sampled states are a numerical representation of the biological hypothesis family. They are not individual scientific hypotheses and they are not estimates of the true flux state.
 
 ## 4. Push the hypothesis through the forward isotope model
 
@@ -56,7 +58,7 @@ The scientific object of interest is the whole observable family, not the single
 
 If competing biological hypotheses are available, propagate each through the same forward workflow to obtain competing families of observable laws.
 
-Use composite hypothesis testing and finite sample Rényi bounds to ask whether the proposed experiment can distinguish those families at the intended sample size and error constraints.
+The planned composite testing layer will use finite sample Rényi bounds to ask whether the proposed experiment can distinguish those families at the intended sample size and error constraints.
 
 If reliable discrimination is impossible at the proposed sample size, redesign the experiment before collecting data. Possible changes include the tracer, measured targets, biological constraints or sample size.
 
@@ -68,13 +70,13 @@ Collect experimental isotope tracing measurements under the same declared tracer
 
 The observation model used for inference must match the semantics of the measurement. Genuine counts may support an explicit count law. Continuous corrected MIDs require a separately justified observation model.
 
-## 7. Test the experimental data against the composite hypothesis family
+## 7. Test the experimental data against the hypothesis family
 
 Do not select the single simulated MID closest to the experimental data and call its flux vector the answer.
 
 Instead, test whether the experimental observations are compatible with the entire family of observable outcomes implied by the biological hypothesis.
 
-With two competing hypotheses, compare the corresponding composite families directly.
+With two competing hypotheses, compare the corresponding families directly.
 
 ## 8. Interpret the result
 
@@ -104,7 +106,7 @@ A new family constructed using the experimental data must not then be tested nai
 
 ## 10. Core principle
 
-FluxEMU should preserve the uncertainty that the experiment genuinely leaves unresolved.
+CarbonScope should preserve the uncertainty that the experiment genuinely leaves unresolved.
 
 The objective is not:
 
@@ -130,4 +132,4 @@ experimental data
 which biological possibilities survive?
 ```
 
-MFA can assist the search. The forward model and composite hypothesis test provide the scientific inference.
+MFA can assist the search. The forward model and hypothesis testing framework provide the scientific inference.
