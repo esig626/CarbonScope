@@ -20,14 +20,20 @@ SBML/FBC model
   -> stationary MFA when required
   -> explicit observation laws for genuine counts
   -> simple binary likelihood ratio evidence
-  -> finite sample Rényi Type II lower bounds
+  -> finite sample Rényi bounds
+  -> finite class composite tests
+  -> exact minimax LP for tractable finite composite problems
 ```
 
-Composite hypothesis testing over whole families of metabolic possibilities is the next planned inference layer. It is **not yet implemented** in the current release.
+Composite testing is currently implemented for explicitly finite classes of genuine count observation laws. This includes an explicit projected Rényi threshold test, order specific composite converse bounds, and the unrestricted minimax optimum for enumerable finite problems.
+
+A sampled flux ensemble is still only a numerical representation of a larger continuous hypothesis family. CarbonScope does not claim that testing the sampled laws certifies the full continuous feasible flux region unless the corresponding worst case optimisation has itself been solved or bounded.
+
+See [docs/COMPOSITE_TESTING.md](docs/COMPOSITE_TESTING.md).
 
 ## Runtime interface
 
-The project has been renamed CarbonScope. The existing Python package and command line interface remain `fluxemu` for compatibility, and no runtime API was changed as part of the repository rename.
+The project has been renamed CarbonScope. The existing Python package and command line interface remain `fluxemu` for compatibility.
 
 CarbonScope does not depend on COBRApy or mfapy at runtime.
 
@@ -88,9 +94,9 @@ with declared count totals, exact structural zero support, reproducible sampling
 
 See [docs/STATIONARY_OBSERVATION_LAW.md](docs/STATIONARY_OBSERVATION_LAW.md).
 
-## Current simple binary inference
+## Simple binary inference
 
-For two fixed feasible flux states, CarbonScope currently supports:
+For two fixed feasible flux states, CarbonScope supports:
 
 * `log_likelihood_ratio(...)`, with `LLR(y)=log P1(y)-log P0(y)`;
 * `likelihood_ratio_p_value(...)`, the exact simple null tail `P0{LLR(Y) >= LLR(y_obs)}` when the null count space is enumerable within the explicit limit;
@@ -113,13 +119,33 @@ CarbonScope evaluates any supplied finite real `lambda > 1` subject to explicit 
 
 See [docs/SIMPLE_BINARY_RENYI_BOUNDS.md](docs/SIMPLE_BINARY_RENYI_BOUNDS.md) and [docs/technical_notes/P_VALUES_AND_INFORMATION_DIVERGENCE.tex](docs/technical_notes/P_VALUES_AND_INFORMATION_DIVERGENCE.tex).
 
+## Composite inference
+
+For explicitly finite null and alternative law classes, `fluxemu.testing` now provides three complementary calculations:
+
+* `projected_renyi_test(...)` constructs a projected Rényi score at a supplied order `0 < lambda < 1`, verifies its uniform exponential moments over the declared classes, and calibrates the best threshold test within that score family;
+* `composite_renyi_converse_at_order(...)` gives an order specific lower bound on the unrestricted minimax Type II error;
+* `solve_finite_minimax_test(...)` enumerates the complete finite observation space and solves the unrestricted randomised minimax test as a linear programme.
+
+For a tractable finite problem this gives the useful sandwich
+
+```text
+Rényi converse lower bound <= beta* <= achieved projected test error
+```
+
+while the LP directly computes `beta*` for the explicitly supplied finite classes.
+
+The LP formulation is exact, while the numerical optimum is subject to declared HiGHS feasibility tolerances and independent validation. Positive probability mass below the retained solver resolution is rejected rather than silently discarded.
+
+See [docs/COMPOSITE_TESTING.md](docs/COMPOSITE_TESTING.md).
+
 ## Transient forward EMU
 
 `fluxemu.emu` contains a native fixed flux transient EMU integrator with explicit pool quantities, time points and initial unlabelled internal state. This is forward simulation only; transient inverse MFA is not implemented.
 
 ## Validation
 
-The test suite includes analytical controls, exact finite count enumeration, independent deterministic test oracles, a direct full isotopomer implementation of the Antoniewicz TCA benchmark, and the packaged E. coli acceptance model. The curated carbon transition library retains explicit source provenance and atom mappings.
+The test suite includes analytical controls, exact finite count enumeration, independent deterministic test oracles, a direct full isotopomer implementation of the Antoniewicz TCA benchmark, and the packaged E. coli acceptance model. Composite testing includes singleton reductions to the randomised Neyman Pearson optimum, worst case class controls, structural zero cases, enumeration limits, and direct comparison of projected tests, converse bounds, and the unrestricted minimax LP.
 
 The production FastFVA architecture is a HiGHS native adaptation of the shared memory computational design of Marouen Ben Guebila's VFFVA. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
