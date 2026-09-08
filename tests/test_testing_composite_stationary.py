@@ -28,10 +28,10 @@ def test_stationary_bridge_maps_each_supplied_flux_state_to_one_finite_law():
     assert len(result.hypotheses.null) == 2
     assert len(result.hypotheses.alternative) == 2
     assert result.block_identities == (("fixed-tracer", "O-mid", "genuine-counts"),)
-    assert result.hypotheses.null[0].blocks[0].probabilities == (0.25, 0.75)
-    assert result.hypotheses.null[1].blocks[0].probabilities == (0.3, 0.7)
-    assert result.hypotheses.alternative[0].blocks[0].probabilities == (0.5, 0.5)
-    assert result.hypotheses.alternative[1].blocks[0].probabilities == (0.6, 0.4)
+    assert result.hypotheses.null[0].blocks[0].probabilities == pytest.approx((0.25, 0.75))
+    assert result.hypotheses.null[1].blocks[0].probabilities == pytest.approx((0.3, 0.7))
+    assert result.hypotheses.alternative[0].blocks[0].probabilities == pytest.approx((0.5, 0.5))
+    assert result.hypotheses.alternative[1].blocks[0].probabilities == pytest.approx((0.6, 0.4))
     assert result.hypotheses.null[0].label == "H0[0]:n0"
     assert result.hypotheses.alternative[1].label == "H1[1]:a1"
     assert result.observation_specification_fingerprint == _specification(1).fingerprint
