@@ -1,7 +1,8 @@
-"""Simple binary bounds and realised-data evidence for declared observation laws.
+"""Finite-sample testing for declared observation laws.
 
-H0 is the fixed null law P0; H1 is the fixed alternative law P1. Type I is
-P0(decide H1), and Type II is P1(decide H0). MFA fitting remains separate.
+Simple testing keeps fixed H0=P0 and H1=P1 roles. Composite testing extends
+those conventions to explicit finite law classes, with a projected Rényi test
+and an unrestricted finite minimax LP. MFA fitting remains separate.
 """
 
 from .simple import (
@@ -27,6 +28,20 @@ from .likelihood import (
     likelihood_ratio_p_value,
     log_likelihood_ratio,
 )
+from .composite import (
+    DEFAULT_COMPOSITE_MAX_OUTCOMES,
+    CompositeAchievabilityConditionError,
+    CompositeMinimaxSolverError,
+    CompositeRenyiConverse,
+    FiniteCompositeEnumerationLimitError,
+    FiniteCompositeHypotheses,
+    FiniteMinimaxTestResult,
+    FiniteObservationLaw,
+    ProjectedRenyiTestResult,
+    composite_renyi_converse_at_order,
+    projected_renyi_test,
+    solve_finite_minimax_test,
+)
 
 __all__ = [
     "BrunoOrderBound", "BrunoTheoremAssumptionError", "NumericalLimitError",
@@ -37,4 +52,10 @@ __all__ = [
     "bruno_converse_at_order", "evaluate_stationary_simple_hypotheses",
     "likelihood_ratio_p_value", "log_likelihood_ratio",
     "validate_bruno_assumptions", "validate_renyi_order",
+    "DEFAULT_COMPOSITE_MAX_OUTCOMES", "CompositeAchievabilityConditionError",
+    "CompositeMinimaxSolverError", "CompositeRenyiConverse",
+    "FiniteCompositeEnumerationLimitError", "FiniteCompositeHypotheses",
+    "FiniteMinimaxTestResult", "FiniteObservationLaw", "ProjectedRenyiTestResult",
+    "composite_renyi_converse_at_order", "projected_renyi_test",
+    "solve_finite_minimax_test",
 ]
