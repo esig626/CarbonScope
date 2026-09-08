@@ -1,6 +1,6 @@
 # Native stationary experiment format
 
-The public CLI reads an SBML Level 3 FBC physical model and a separate FluxEMU YAML file. The YAML declares isotope-visible metabolites, authoritative transition assignments, tracers and targets; FluxEMU never infers atom mappings.
+The public CLI reads an SBML Level 3 FBC physical model and a separate CarbonScope YAML file. The YAML declares isotope visible metabolites, authoritative transition assignments, tracers and targets; CarbonScope never infers atom mappings.
 
 A minimal structure is:
 
@@ -41,7 +41,7 @@ fva_fraction_of_optimum: 1.0
 
 ## Authoritative assignments
 
-Each assignment names a physical reaction, an entry in the packaged carbon-transition library, the physical direction represented by the isotope reaction, and an explicit one-to-one mapping from canonical transition participants to model metabolite IDs.
+Each assignment names a physical reaction, an entry in the packaged carbon transition library, the physical direction represented by the isotope reaction, and an explicit one to one mapping from canonical transition participants to model metabolite IDs.
 
 The transition participants, carbon counts and physical stoichiometric direction must agree exactly. Missing or ambiguous assignments fail.
 
@@ -51,14 +51,14 @@ Tracer isotopomers use `#` followed by one binary digit per carbon atom, in the 
 
 ## Targets
 
-Targets declare an ID, isotope metabolite, one-based atom positions, analytical-method metadata, formula metadata and correction policy. Atom positions are ordered and are preserved exactly.
+Targets declare an ID, isotope metabolite, one based atom positions, analytical method metadata, formula metadata and correction policy. Atom positions are ordered and are preserved exactly.
 
 Observation targets that combine explicit precursor fragments may also be declared when required by the native model.
 
 ## FVA fraction
 
-`fva_fraction_of_optimum` must lie in `(0, 1]`. It controls the retained biological-objective constraint for FVA/ensemble geometry. It does not turn FVA endpoints into a flux state.
+`fva_fraction_of_optimum` must lie in `(0, 1]`. It controls the retained biological objective constraint for FVA and ensemble geometry. It does not turn FVA endpoints into a flux state.
 
 ## Genuine counts are separate
 
-This stationary experiment file defines isotope prediction. Genuine-count observation totals used by `fluxemu.observation` are separate explicit declarations. FluxEMU never infers a count total from a normalised MID or intensity vector.
+This stationary experiment file defines isotope prediction. Genuine count observation totals used by `fluxemu.observation` are separate explicit declarations. CarbonScope never infers a count total from a normalised MID or intensity vector.
