@@ -1,8 +1,8 @@
-# Third-party notices
+# Third party notices
 
 ## VFFVA
 
-FluxEMU's reusable/shared-memory FastFVA computational architecture is a native HiGHS port/adaptation of ideas from Marouen Ben Guebila's VFFVA, audited at commit `7cf7b82505bf99aed38a2073e3ed308f79e95802`.
+CarbonScope's reusable shared memory FastFVA computational architecture is a native HiGHS port and adaptation of ideas from Marouen Ben Guebila's VFFVA, audited at commit `7cf7b82505bf99aed38a2073e3ed308f79e95802`.
 
 VFFVA is distributed under the MIT License:
 
@@ -28,4 +28,4 @@ VFFVA is distributed under the MIT License:
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
 
-FluxEMU does not require the VFFVA executable, CPLEX, GLPK, or MPI/OpenMPI.
+CarbonScope does not require the VFFVA executable, CPLEX, GLPK, or MPI/OpenMPI.
