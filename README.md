@@ -13,7 +13,7 @@ The current release provides the numerical and statistical foundations for that 
 ```text
 SBML/FBC model
   -> canonical metabolic and isotope model
-  -> HiGHS FBA / FVA
+  -> HiGHS FBA / veryfastFVA
   -> complete jointly feasible flux states
   -> stationary or transient EMU prediction
   -> MID ensembles
