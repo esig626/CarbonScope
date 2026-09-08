@@ -91,6 +91,8 @@ Roles are fixed: H0=P0=null and H1=P1=alternative. The exact p value is the P0 u
 
 - `FiniteObservationLaw` for one complete genuine count law, including explicitly independent products;
 - `FiniteCompositeHypotheses` for explicit finite null and alternative law classes on one common observation geometry;
+- `evaluate_stationary_finite_composite_hypotheses(...)` to map two explicitly supplied finite tuples of complete feasible flux states through stationary EMU and the observation layer into those law classes;
+- `StationaryFiniteCompositeResult` to retain both flux families, both stationary observation sources, and the aligned finite hypotheses;
 - `projected_renyi_test(...)` for a supplied `0 < lambda < 1`, including direct uniform moment checks and finite threshold calibration;
 - `composite_renyi_converse_at_order(...)` for an order specific class lower bound at `lambda > 1`;
 - `solve_finite_minimax_test(...)` for the unrestricted randomised minimax optimum on an enumerable finite observation space;
