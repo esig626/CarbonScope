@@ -1,6 +1,12 @@
 # Composite testing in CarbonScope
 
-CarbonScope now separates two different objects that should not be conflated.
+CarbonScope separates two different objects that should not be conflated.
+
+## From finite flux families to observation law classes
+
+`evaluate_stationary_finite_composite_hypotheses(...)` takes two explicitly supplied tuples of complete feasible flux states, maps every state through the existing stationary EMU and genuine count observation layer, and returns aligned finite null and alternative law classes.
+
+This is an integration bridge, not a mathematical sleight of hand. If the supplied states came from a finite sampler, the resulting law classes remain finite numerical approximations to the underlying continuous flux families.
 
 ## 1. A principled explicit test from Rényi projection
 
@@ -75,11 +81,13 @@ for the explicitly supplied finite law classes. This optimisation is over all ra
 
 The LP characterisation is exact. The numerical solution uses HiGHS and is independently checked against explicit feasibility tolerances. CarbonScope fails rather than dropping positive support below the declared solver resolution.
 
+For a singleton null and singleton alternative, this finite LP reduces numerically to the randomised Neyman Pearson optimum. For genuinely composite finite classes it solves the minimax problem directly, so no composite analogue of the Neyman Pearson lemma is assumed.
+
 ## Why both are useful
 
 The minimax LP answers the finite problem exactly when the problem is small enough to enumerate. It is therefore a benchmark and, for small experiments, the actual optimal test.
 
-The Rényi construction scales conceptually beyond direct enumeration and connects directly to finite sample achievability, converse bounds, error exponents and experimental design. It gives a single interpretable statistic rather than an arbitrary table of optimal decision probabilities.
+The Rényi construction connects directly to finite sample achievability, converse bounds, error exponents and experimental design. It gives a single interpretable statistic rather than an arbitrary table of optimal decision probabilities.
 
 The two should be used together when possible:
 
@@ -105,9 +113,13 @@ Likewise, minimising Rényi divergence over the sampled laws does not certify th
 
 To make a statement about the full continuous family, the corresponding worst case or projection optimisation over that family must itself be solved or rigorously bounded. Sampling is useful for discovery and numerical approximation, not for quietly manufacturing a theorem.
 
-## Current observation semantics
+## Current observation semantics and the meaning of sample size
 
 The current implementation operates on `MultinomialMIDLaw` blocks with genuine fixed total count semantics. Multiple blocks require an explicit independence declaration. Percentages, peak areas, normalised MIDs and arbitrary intensities are not converted into pseudo counts.
+
+A law `MultinomialMIDLaw(n, p)` is already the complete distribution of a count vector with total `n`. Consequently, its Rényi divergence already contains the factor `n`. The composite routines operate on that complete law and do not multiply by `n` again.
+
+This is equivalent to using the count vector as the sufficient statistic for `n` genuinely i.i.d. categorical observations. It is **not** permission to reinterpret the number of biological replicates, a normalised MID, or an instrument intensity as a multinomial count total. Those require an observation law matching their actual measurement semantics.
 
 Exact structural zeros are retained. No pseudocounts, clipping, hidden normalisation or inferred effective sample sizes are introduced.
 
@@ -117,6 +129,7 @@ Exact structural zeros are retained. No pseudocounts, clipping, hidden normalisa
 from fluxemu.testing import (
     FiniteObservationLaw,
     FiniteCompositeHypotheses,
+    evaluate_stationary_finite_composite_hypotheses,
     projected_renyi_test,
     composite_renyi_converse_at_order,
     solve_finite_minimax_test,
