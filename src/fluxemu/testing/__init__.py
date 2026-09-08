@@ -42,6 +42,10 @@ from .composite import (
     projected_renyi_test,
     solve_finite_minimax_test,
 )
+from .composite_stationary import (
+    StationaryFiniteCompositeResult,
+    evaluate_stationary_finite_composite_hypotheses,
+)
 
 __all__ = [
     "BrunoOrderBound", "BrunoTheoremAssumptionError", "NumericalLimitError",
@@ -56,6 +60,7 @@ __all__ = [
     "CompositeMinimaxSolverError", "CompositeRenyiConverse",
     "FiniteCompositeEnumerationLimitError", "FiniteCompositeHypotheses",
     "FiniteMinimaxTestResult", "FiniteObservationLaw", "ProjectedRenyiTestResult",
-    "composite_renyi_converse_at_order", "projected_renyi_test",
+    "StationaryFiniteCompositeResult", "composite_renyi_converse_at_order",
+    "evaluate_stationary_finite_composite_hypotheses", "projected_renyi_test",
     "solve_finite_minimax_test",
 ]
