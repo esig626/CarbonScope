@@ -1,49 +1,49 @@
 # Known limitations
 
-This page describes the current native FluxEMU implementation.
+This page describes the current native CarbonScope implementation. The runtime Python package and CLI are still named `fluxemu`.
 
 ## Stationary MFA
 
-Stationary MFA uses constrained multistart SLSQP over native feasible flux geometry. Successful multistart optimisation does not prove a global optimum, stationarity of every rejected start, or unique flux identifiability. Distinct flux states may produce indistinguishable MIDs, including scale non-identifiability in suitable networks.
+Stationary MFA uses constrained multistart SLSQP over native feasible flux geometry. Successful multistart optimisation does not prove a global optimum, stationarity of every rejected start, or unique flux identifiability. Distinct flux states may produce indistinguishable MIDs, including scale nonidentifiability in suitable networks.
 
-Exact support is preserved. If a predicted MID assigns zero mass where the observed MID is positive, the relevant divergence may be infinite; FluxEMU does not add pseudocounts or clip support to make optimisation easier.
+Exact support is preserved. If a predicted MID assigns zero mass where the observed MID is positive, the relevant divergence may be infinite; CarbonScope does not add pseudocounts or clip support to make optimisation easier.
 
-Soft measured-flux likelihood terms, global optimisation, Bayesian inference and uncertainty/confidence regions are not implemented.
+Soft measured flux likelihood terms, global optimisation, Bayesian inference and uncertainty or confidence regions are not implemented.
 
-## Observation laws and exact p-values
+## Observation laws and exact p values
 
-The multinomial observation layer is valid only when the measurements genuinely have fixed-total isotopologue-count semantics. Normalised MIDs, percentages, peak areas and arbitrary intensities do not define a count total and are not converted to pseudo-counts.
+The multinomial observation layer is valid only when the measurements genuinely have fixed total isotopologue count semantics. Normalised MIDs, percentages, peak areas and arbitrary intensities do not define a count total and are not converted to pseudo counts.
 
-The exact simple-null likelihood-ratio p-value enumerates the positive-probability null count space. Enumeration is protected by an explicit outcome limit. If the limit is exceeded, FluxEMU raises an error; it does not silently substitute chi-square, Monte Carlo, saddlepoint or another approximation.
+The exact simple null likelihood ratio p value enumerates the positive probability null count space. Enumeration is protected by an explicit outcome limit. If the limit is exceeded, CarbonScope raises an error; it does not silently substitute chi square, Monte Carlo, saddlepoint or another approximation.
 
-Current testing is simple-vs-simple only. Composite hypotheses, nuisance-parameter calibration and test inversion into flux compatibility/confidence regions are not implemented in this standalone package.
+Current testing is simple versus simple only. Composite hypotheses, nuisance parameter calibration and test inversion into flux compatibility regions are not implemented in the current release.
 
-## Rényi Type-II lower bounds
+## Rényi Type II lower bounds
 
-`bruno_converse_at_order(...)` evaluates the published lower bound at one caller-supplied finite real order `lambda > 1`. FluxEMU does not perform an order search and does not claim that a finite order grid equals the continuous-order envelope.
+`bruno_converse_at_order(...)` evaluates the published lower bound at one caller supplied finite real order `lambda > 1`. CarbonScope does not perform an order search and does not claim that a finite order grid equals the continuous order envelope.
 
-The Bruno theorem path requires exact mutual absolute continuity of the fixed observation-law pair. Support mismatch is rejected rather than smoothed.
+The Bruno theorem path requires exact mutual absolute continuity of the fixed observation law pair. Support mismatch is rejected rather than smoothed.
 
 ## Stationary and transient EMU scope
 
-Atom transitions must be supplied explicitly through the authoritative mappings/model representation. FluxEMU does not infer mappings from stoichiometry, names, molecular formulae or an external database.
+Atom transitions must be supplied explicitly through the authoritative mappings and model representation. CarbonScope does not infer mappings from stoichiometry, names, molecular formulae or an external database.
 
-The native stationary path does not implement natural-abundance correction; experiments requiring that capability must be preprocessed by a scientifically justified external procedure before entering the current native model.
+The native stationary path does not implement natural abundance correction; experiments requiring that capability must be preprocessed by a scientifically justified external procedure before entering the current native model.
 
-The transient implementation is fixed-flux forward simulation with explicit pool quantities, requested time points and an initial unlabelled internal state. Transient inverse MFA is not implemented.
+The transient implementation is fixed flux forward simulation with explicit pool quantities, requested time points and an initial unlabelled internal state. Transient inverse MFA is not implemented.
 
 ## Flux sampling
 
-Native feasible-state sampling uses hit-and-run on a numerically reduced affine polytope. Every returned state is checked for bounds, mass balance and retained-objective feasibility. FVA endpoints are never independently sampled or assembled into a state.
+Native feasible state sampling uses hit and run on a numerically reduced affine polytope. Every returned state is checked for bounds, mass balance and retained objective feasibility. FVA endpoints are never independently sampled or assembled into a state.
 
-A finite burn-in/thinned Markov chain is still correlated. FluxEMU does not claim that a particular finite sample proves convergence, independence, biological probability, or adequate mixing for every genome-scale geometry.
+A finite burn in and thinned Markov chain is still correlated. CarbonScope does not claim that a particular finite sample proves convergence, independence, biological probability or adequate mixing for every genome scale geometry.
 
 ## Numerical and scalability limits
 
 HiGHS, NumPy and SciPy computations are subject to finite binary64 precision. Numerically singular EMU systems, ambiguous reduced geometry and unrepresentable testing inputs fail explicitly rather than being silently repaired.
 
-The packaged real-model acceptance suite provides substantial software evidence, but it is not a proof that every genome-scale model, tracer experiment or biological interpretation is valid.
+The packaged real model acceptance suite provides substantial software evidence, but it is not a proof that every genome scale model, tracer experiment or biological interpretation is valid.
 
 ## Model interchange
 
-FluxEMU loads the physical flux model from SBML Level 3 FBC and keeps isotope semantics in explicit FluxEMU data. The current metadata conventions are FluxEMU-specific rather than a standardised SBML isotope package. External SBML tools therefore cannot be assumed to preserve FluxEMU-specific isotope semantics unless those semantics are carried separately.
+CarbonScope loads the physical flux model from SBML Level 3 FBC and keeps isotope semantics in explicit project data. The current isotope metadata conventions are project specific rather than a standardised SBML isotope package. External SBML tools therefore cannot be assumed to preserve those isotope semantics unless they are carried separately.
