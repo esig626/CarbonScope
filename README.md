@@ -123,8 +123,4 @@ The test suite includes analytical controls, exact finite count enumeration, ind
 
 The production FastFVA architecture is a HiGHS native adaptation of the shared memory computational design of Marouen Ben Guebila's VFFVA. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## Scientific boundaries
-
-CarbonScope currently does not provide composite hypothesis testing, test inversion into flux compatibility regions, Bayesian inference, automatic atom map inference, natural abundance correction in the native stationary engine, or transient inverse MFA. Exact p values are intentionally limited to enumerable genuine count spaces and never silently fall back to an asymptotic or Monte Carlo procedure.
-
 See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for the complete current limitations.
