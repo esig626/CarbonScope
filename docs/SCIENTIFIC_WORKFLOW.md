@@ -2,7 +2,7 @@
 
 CarbonScope is intended to use isotope tracing as a forward hypothesis testing framework, not primarily as a tool for recovering one supposedly true flux vector.
 
-This document describes the intended scientific workflow. The current release already provides the forward modelling, feasible state sampling, genuine count observation laws and simple binary testing pieces. Composite testing over whole hypothesis families is planned and is not yet implemented.
+The current release provides the forward modelling, feasible state sampling, genuine count observation laws, simple binary testing, and a finite class composite testing core. The composite core can test explicitly supplied finite law classes and solve the unrestricted minimax test when the complete observation space is enumerable. Certification over an entire continuous feasible flux family remains a separate optimisation problem and is not yet implemented.
 
 The central question is:
 
@@ -27,6 +27,8 @@ FVA extrema are diagnostics only. They are not assembled into flux states.
 Sample complete jointly feasible flux states from the admissible region.
 
 The sampled states are a numerical representation of the biological hypothesis family. They are not individual scientific hypotheses and they are not estimates of the true flux state.
+
+A finite sampled ensemble must not be silently identified with the complete feasible family. Any inference computed only on the sampled states is exact only for that finite numerical problem unless the missing optimisation over the full family has separately been solved or bounded.
 
 ## 4. Push the hypothesis through the forward isotope model
 
@@ -58,11 +60,19 @@ The scientific object of interest is the whole observable family, not the single
 
 If competing biological hypotheses are available, propagate each through the same forward workflow to obtain competing families of observable laws.
 
-The planned composite testing layer will use finite sample Rényi bounds to ask whether the proposed experiment can distinguish those families at the intended sample size and error constraints.
+For explicitly finite law classes, CarbonScope can construct a projected Rényi test, compute finite sample converse bounds, and, when the complete observation space is tractable, solve the exact minimax linear programme for those supplied laws.
+
+This gives a finite problem sandwich
+
+```text
+Rényi converse lower bound <= beta* <= achieved projected test error.
+```
 
 If reliable discrimination is impossible at the proposed sample size, redesign the experiment before collecting data. Possible changes include the tracer, measured targets, biological constraints or sample size.
 
-A converse bound can establish that a given sample size is insufficient. Sufficiency requires an achievable testing procedure or corresponding upper guarantee.
+A converse bound can establish that a given sample size is insufficient. Sufficiency requires an achieved test or corresponding upper guarantee. For the finite class problem, the minimax LP supplies the actual optimum when enumeration is tractable.
+
+For a continuous flux family, the finite sampled calculation is not by itself a certificate. Full family experimental design requires the corresponding worst case or projection optimisation over the continuous family.
 
 ## 6. Perform the experiment
 
@@ -74,9 +84,11 @@ The observation model used for inference must match the semantics of the measure
 
 Do not select the single simulated MID closest to the experimental data and call its flux vector the answer.
 
-Instead, test whether the experimental observations are compatible with the entire family of observable outcomes implied by the biological hypothesis.
+Instead, test whether the experimental observations are compatible with the family of observable outcomes implied by the biological hypothesis.
 
-With two competing hypotheses, compare the corresponding families directly.
+With two competing finite law families, the minimax formulation controls Type I error uniformly over the supplied null family and minimises the worst Type II error over the supplied alternative family. The projected Rényi construction supplies an explicit interpretable test even when it is not the unrestricted minimax test.
+
+For continuous biological families, the same scientific target remains, but numerical sampling alone does not certify the required suprema and infima.
 
 ## 8. Interpret the result
 
