@@ -143,3 +143,13 @@ def test_failed_moment_conditions_still_allow_direct_score_calibration():
     assert calibrated.worst_type_i_error == pytest.approx(0.2, abs=2e-14)
     assert calibrated.worst_type_ii_error == pytest.approx(8 / 9, abs=2e-14)
     assert not calibrated.candidate.uniform_moment_bounds_verified
+
+
+def test_positive_achieved_error_below_float_resolution_is_explicitly_refused():
+    from fluxemu.testing import NumericalLimitError
+    problem = _problem(((1.0, 0.0),), ((1e-320, 1.0),))
+    candidate = verified_composite_renyi_score(problem, order=0.5)
+    # The exact achieved beta is about 1e-330. Returning zero would claim
+    # perfect separation of laws that share positive support.
+    with pytest.raises(NumericalLimitError, match='underflow|resolution'):
+        calibrate_composite_score_test(candidate, epsilon=1.0 - 1e-10)

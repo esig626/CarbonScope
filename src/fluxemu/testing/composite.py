@@ -456,13 +456,20 @@ def _family_mass_matrix(
 
 
 def _accurate_expectations(matrix: np.ndarray, decision: np.ndarray) -> tuple[float, ...]:
-    return tuple(
-        math.fsum(
-            float(probability) * float(value)
-            for probability, value in zip(row, decision, strict=True)
-        )
-        for row in matrix
-    )
+    results = []
+    for row in matrix:
+        terms = []
+        for probability, value in zip(row, decision, strict=True):
+            probability, value = float(probability), float(value)
+            term = probability * value
+            if probability != 0.0 and value != 0.0 and term == 0.0:
+                raise NumericalLimitError(
+                    "nonzero expectation contribution underflowed floating-point resolution; "
+                    "no positive error or support was replaced by zero"
+                )
+            terms.append(term)
+        results.append(math.fsum(terms))
+    return tuple(results)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -613,8 +620,11 @@ def exact_finite_composite_minimax(
             "exact finite composite minimax LP failed: "
             + (result.message or "unknown HiGHS failure")
         )
-    phi = np.asarray(result.x[:outcome_count], dtype=float)
-    beta_variable = float(result.x[-1])
+    solution = np.asarray(result.x, dtype=float)
+    if solution.shape != (variable_count,):
+        raise CompositeOptimizationError("LP returned a decision vector with invalid shape")
+    phi = solution[:outcome_count]
+    beta_variable = float(solution[-1])
     if not np.isfinite(phi).all() or np.any(phi < 0) or np.any(phi > 1):
         raise CompositeOptimizationError(
             "exact composite minimax LP returned invalid rejection probabilities"

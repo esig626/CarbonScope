@@ -58,3 +58,16 @@ def test_lp_does_not_clip_invalid_rejection_probabilities(monkeypatch, bad_phi):
                         SimpleNamespace(success=True, x=np.array([bad_phi, 0.1, 0.9]), fun=0.9))
     with pytest.raises(CompositeOptimizationError, match='rejection probabilities'):
         exact_finite_composite_minimax(problem(), epsilon=0.1)
+
+
+@pytest.mark.parametrize('bad_x', [np.array([0.1, 0.1, 0.9, 0.9]), np.array([[0.1], [0.1], [0.9]])])
+def test_malformed_solver_vector_is_an_explicit_optimization_refusal(monkeypatch, bad_x):
+    import scipy.optimize
+    original = scipy.optimize.linprog
+    def corrupt(*args, **kwargs):
+        result = original(*args, **kwargs)
+        result.x = bad_x
+        return result
+    monkeypatch.setattr(scipy.optimize, 'linprog', corrupt)
+    with pytest.raises(CompositeOptimizationError):
+        exact_finite_composite_minimax(problem(), epsilon=0.1)
