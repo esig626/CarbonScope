@@ -87,5 +87,13 @@ jobs:
           python examples/stationary_mfa_recovery.py
           python examples/simple_binary_flux_discrimination.py
           python examples/composite_binary_mid_discrimination.py
+          python examples/hypothesis_testing_workflow.py
+      - name: Replay declarative workflow from clean checkout
+        run: |
+          task_outputs=$(mktemp -d)
+          fluxemu test-hypotheses --specification tests/fixtures/hypothesis_workflow/workflow.yaml --output "$task_outputs/first"
+          fluxemu test-hypotheses --specification tests/fixtures/hypothesis_workflow/workflow.yaml --output "$task_outputs/second"
+          cmp "$task_outputs/first/report.json" "$task_outputs/second/report.json"
+          cmp "$task_outputs/first/summary.txt" "$task_outputs/second/summary.txt"
       - name: Verify clean checkout
         run: test -z "$(git status --porcelain)"

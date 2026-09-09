@@ -13,6 +13,7 @@ from .analysis import (
 )
 from .model import load_sbml_flux_model
 from .mfa import evaluate_stationary_mfa, fit_stationary_mfa, normalise_mid
+from .workflow import load_hypothesis_testing_spec, run_hypothesis_testing_workflow
 
 __all__ = [
     "NativeStationaryEnsembleAnalysisResult",
@@ -21,6 +22,8 @@ __all__ = [
     "fit_stationary_mfa",
     "load_sbml_flux_model",
     "normalise_mid",
+    "load_hypothesis_testing_spec",
+    "run_hypothesis_testing_workflow",
     "run_native_fba",
     "run_native_fva",
     "run_native_stationary_analysis",

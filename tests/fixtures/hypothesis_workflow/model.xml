@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core"
+      xmlns:fbc="http://www.sbml.org/sbml/level3/version1/fbc/version2"
+      level="3" version="1" fbc:required="false">
+  <model id="two_glucose_feeds" fbc:strict="true">
+    <listOfCompartments>
+      <compartment id="c" constant="true"/>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species id="glucose_unlabelled" compartment="c" boundaryCondition="true"
+               hasOnlySubstanceUnits="false" constant="false"/>
+      <species id="glucose_labelled" compartment="c" boundaryCondition="true"
+               hasOnlySubstanceUnits="false" constant="false"/>
+      <species id="g6p" compartment="c" boundaryCondition="false"
+               hasOnlySubstanceUnits="false" constant="false"/>
+    </listOfSpecies>
+    <listOfParameters>
+      <parameter id="zero" value="0" constant="true"/>
+      <parameter id="ten" value="10" constant="true"/>
+    </listOfParameters>
+    <listOfReactions>
+      <reaction id="HX_U" reversible="false" fast="false"
+                fbc:lowerFluxBound="zero" fbc:upperFluxBound="ten">
+        <listOfReactants>
+          <speciesReference species="glucose_unlabelled" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="g6p" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="HX_L" reversible="false" fast="false"
+                fbc:lowerFluxBound="zero" fbc:upperFluxBound="ten">
+        <listOfReactants>
+          <speciesReference species="glucose_labelled" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="g6p" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+      </reaction>
+      <reaction id="SINK" reversible="false" fast="false"
+                fbc:lowerFluxBound="ten" fbc:upperFluxBound="ten">
+        <listOfReactants>
+          <speciesReference species="g6p" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+      </reaction>
+    </listOfReactions>
+    <fbc:listOfObjectives fbc:activeObjective="drain">
+      <fbc:objective fbc:id="drain" fbc:type="maximize">
+        <fbc:listOfFluxObjectives>
+          <fbc:fluxObjective fbc:reaction="SINK" fbc:coefficient="1"/>
+        </fbc:listOfFluxObjectives>
+      </fbc:objective>
+    </fbc:listOfObjectives>
+  </model>
+</sbml>

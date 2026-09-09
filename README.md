@@ -8,7 +8,7 @@ See [docs/SCIENTIFIC_WORKFLOW.md](docs/SCIENTIFIC_WORKFLOW.md) for the intended 
 
 ## Current scope
 
-The current release provides the numerical and statistical foundations for that programme:
+The current release provides native numerical and statistical layers and a declarative stationary hypothesis-testing workflow:
 
 ```text
 SBML/FBC model
@@ -23,6 +23,8 @@ SBML/FBC model
 ```
 
 Finite composite testing is implemented for explicit finite H0 and H1 families of complete observable laws. CarbonScope does not silently promote a represented finite family to a continuous mechanism class, convexify it, or claim that a finite family Rényi minimising pair is automatically finite sample least favourable.
+
+The public workflow constructs those finite families from one common SBML/FBC model, explicit H0/H1 reaction constraints, native isotope experiment files and genuine-count declarations. Users do not need to construct flux-state tuples or probability laws by hand.
 
 ## Runtime interface
 
@@ -59,6 +61,34 @@ The public Python orchestration API includes `run_native_fba`, `run_native_fva`,
 FVA endpoints are diagnostics only. CarbonScope never combines independently optimised FVA coordinates into a flux vector. Ensemble calculations use complete jointly feasible states.
 
 See [docs/STAGE1_NATIVE_WORKFLOW.md](docs/STAGE1_NATIVE_WORKFLOW.md) and [docs/EXPERIMENT_FORMAT.md](docs/EXPERIMENT_FORMAT.md).
+
+## Hypothesis-testing workflow
+
+Run the compact end-to-end acceptance example from the repository root:
+
+```bash
+python -m pip install '.[testing]'
+fluxemu test-hypotheses \
+  --specification tests/fixtures/hypothesis_workflow/workflow.yaml \
+  --output results/hypothesis_workflow
+```
+
+The specification refers to one physical model and ordered native experiment files, declares separate H0/H1 reaction-bound restrictions, and supplies each family's hit-and-run state count and seed. The workflow validates the constrained regions, samples complete jointly feasible states, evaluates stationary EMU and constructs complete genuine-count observation laws. It writes deterministic `report.json` and `summary.txt` files with scientific identities, ordered states and observation blocks, testing results and explicit refusals.
+
+The equivalent public Python entry point is:
+
+```python
+from fluxemu import run_hypothesis_testing_workflow
+
+result = run_hypothesis_testing_workflow(
+    "tests/fixtures/hypothesis_workflow/workflow.yaml",
+    output_directory="results/hypothesis_workflow",
+)
+```
+
+Converse bounds, unrestricted represented finite minimax values, candidate scores, verified analytical score bounds and achieved test errors retain separate labels. A valid workflow with a refused optional statistical procedure exits successfully and records the reason; invalid input or failed model/state/observation construction exits with code 2. Exact minimax remains a small-problem numerical oracle and can refuse even within its enumeration cap.
+
+These results concern the generated **represented finite classes**. They do not certify the complete continuous feasible flux families or identify a true mechanism. Counts and multi-block independence must be declared explicitly; normalised MIDs and intensities cannot be reinterpreted as counts. See [docs/HYPOTHESIS_WORKFLOW.md](docs/HYPOTHESIS_WORKFLOW.md) for the complete files-to-report example, YAML contract, API and failure semantics.
 
 ## Stationary MFA
 
