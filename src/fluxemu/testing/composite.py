@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from decimal import Decimal, localcontext
 from itertools import product
 import math
+import warnings
 from numbers import Integral, Real
 from typing import Iterable
 
@@ -43,6 +44,8 @@ from .simple import (
 DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES = 1_000_000
 MIN_EXACT_COMPOSITE_EPSILON = 1e-12
 COMPOSITE_NUMERICAL_TOLERANCE = 1e-10
+COMPOSITE_LP_CERTIFICATION_TOLERANCE = 5e-10
+COMPOSITE_LP_SMALL_MATRIX_VALUE = 1e-12
 _SCORE_VERIFICATION_TOLERANCE = 1e-10
 _DECIMAL_PRECISION = 60
 
@@ -464,7 +467,11 @@ def _accurate_expectations(matrix: np.ndarray, decision: np.ndarray) -> tuple[fl
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FiniteCompositeMinimaxResult:
-    """Exact represented finite-class randomised minimax solution."""
+    """Numerically checked solution of the exact represented finite-class LP.
+
+    The achieved errors and primal/dual gap describe this floating-point solve;
+    they are not a symbolic certificate or a continuous-family optimum.
+    """
 
     problem: CompositeBinaryTestingProblem
     constraint: SimpleBinaryTestingConstraint
@@ -476,6 +483,12 @@ class FiniteCompositeMinimaxResult:
     minimax_type_ii_error: float
     active_null_members: tuple[int, ...]
     active_alternative_members: tuple[int, ...]
+    solver_objective: float
+    epigraph_variable: float
+    dual_lower_bound: float
+    optimality_gap: float
+    numerical_tolerance: float
+    minimum_nonzero_coefficient: float
 
     @property
     def randomised(self) -> bool:
@@ -513,6 +526,10 @@ def exact_finite_composite_minimax(
     Null constraints are divided by epsilon before being passed to HiGHS so an
     absolute LP feasibility tolerance cannot become the statistical Type-I
     tolerance. Budgets below ``MIN_EXACT_COMPOSITE_EPSILON`` fail explicitly.
+    Nonzero scaled matrix coefficients at or below 1e-12 are refused before
+    HiGHS can discard them. Acceptance additionally requires primal feasibility,
+    objective/epigraph agreement, and a recomputed Lagrangian dual gap within
+    5e-10 plus explicitly accounted binary64 roundoff. No solver output is clipped.
     """
 
     if not isinstance(problem, CompositeBinaryTestingProblem):
@@ -528,7 +545,7 @@ def exact_finite_composite_minimax(
     alternative_mass = _family_mass_matrix(problem.alternative, outcomes)
 
     try:
-        from scipy.optimize import linprog
+        from scipy.optimize import OptimizeWarning, linprog
     except ImportError as error:  # pragma: no cover - full CI installs testing extra
         raise CompositeOptimizationError(
             "exact composite minimax testing requires the 'testing' SciPy extra"
@@ -561,18 +578,36 @@ def exact_finite_composite_minimax(
         rows.append(row)
         rhs.append(-1.0)
 
-    result = linprog(
-        objective,
-        A_ub=np.vstack(rows),
-        b_ub=np.asarray(rhs, dtype=float),
-        bounds=[(0.0, 1.0)] * variable_count,
-        method="highs",
-        options={
-            "primal_feasibility_tolerance": 1e-10,
-            "dual_feasibility_tolerance": 1e-10,
-            "ipm_optimality_tolerance": 1e-12,
-        },
-    )
+    matrix = np.vstack(rows)
+    right_hand_side = np.asarray(rhs, dtype=float)
+    nonzero = np.abs(matrix[matrix != 0.0])
+    minimum_coefficient = float(np.min(nonzero))
+    if minimum_coefficient <= COMPOSITE_LP_SMALL_MATRIX_VALUE:
+        raise NumericalLimitError(
+            "positive probability coefficient is at or below HiGHS matrix "
+            f"resolution {COMPOSITE_LP_SMALL_MATRIX_VALUE:g}; "
+            f"minimum scaled coefficient={minimum_coefficient:.17g}; no support was dropped"
+        )
+    # SciPy forwards this supported HiGHS option but does not list it in its
+    # own option schema. Suppress only that forwarding notice.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", message="Unrecognized options detected:.*small_matrix_value",
+            category=OptimizeWarning,
+        )
+        result = linprog(
+            objective,
+            A_ub=matrix,
+            b_ub=right_hand_side,
+            bounds=[(0.0, 1.0)] * variable_count,
+            method="highs",
+            options={
+                "primal_feasibility_tolerance": 1e-10,
+                "dual_feasibility_tolerance": 1e-10,
+                "ipm_optimality_tolerance": 1e-12,
+                "small_matrix_value": COMPOSITE_LP_SMALL_MATRIX_VALUE,
+            },
+        )
     if not result.success or result.x is None:
         raise CompositeOptimizationError(
             "exact finite composite minimax LP failed: "
@@ -590,8 +625,7 @@ def exact_finite_composite_minimax(
         )
 
     null_errors = _accurate_expectations(null_mass, phi)
-    alternative_power = _accurate_expectations(alternative_mass, phi)
-    alternative_errors = tuple(1.0 - value for value in alternative_power)
+    alternative_errors = _accurate_expectations(alternative_mass, 1.0 - phi)
     worst_alpha = max(null_errors)
     worst_beta = max(alternative_errors)
     alpha_tolerance = 5e-10 * constraint.epsilon
@@ -604,6 +638,52 @@ def exact_finite_composite_minimax(
         raise CompositeOptimizationError(
             "exact composite minimax LP objective disagrees with evaluated worst-case Type II"
         )
+    # A feasible primal alone does not establish minimax optimality. For
+    # A x <= b and x in [0,1], every u >= 0 gives the rigorous algebraic bound
+    # min_x c.x >= -u.b + sum_j min(0, c_j + (A.T u)_j).
+    # The minimum chooses the optimizing endpoint of each unit interval; it
+    # does not clip a probability, decision, divergence or solver output.
+    try:
+        solver_objective = float(result.fun)
+        dual = -np.asarray(result.ineqlin.marginals, dtype=float)
+    except (AttributeError, TypeError, ValueError) as error:
+        raise CompositeOptimizationError("LP lacks objective or dual diagnostics") from error
+    if (dual.shape != (len(rows),) or not np.isfinite(dual).all()
+            or np.any(dual < 0)):
+        raise CompositeOptimizationError("LP returned invalid dual multipliers")
+    endpoints = []
+    for j in range(variable_count):
+        terms = (float(objective[j]), *(float(matrix[i, j]) * float(dual[i])
+                                       for i in range(len(rows))))
+        reduced = math.fsum(terms)
+        reduction_error = 16 * np.finfo(float).eps * math.fsum(abs(v) for v in terms)
+        # Positive reduced costs safely above their rounding bound contribute
+        # exactly zero. Large inactive coefficients must not make an otherwise
+        # well-conditioned lower bound uncertifiable.
+        endpoints.append(min(0.0, reduced - reduction_error))
+    dual_terms = tuple(-float(u) * float(b) for u, b in zip(dual, right_hand_side, strict=True))
+    dual_value = math.fsum((*dual_terms, *endpoints))
+    operation_scale = math.fsum((1.0, *(abs(v) for v in dual_terms),
+                                 *(abs(v) for v in endpoints)))
+    roundoff = 16 * np.finfo(float).eps * operation_scale
+    tolerance = COMPOSITE_LP_CERTIFICATION_TOLERANCE
+    if not math.isfinite(roundoff) or roundoff > tolerance:
+        raise CompositeOptimizationError("LP dual bound is below certifiable floating-point resolution")
+    dual_lower = dual_value - roundoff
+    gap = worst_beta - dual_lower
+    if (not math.isfinite(solver_objective)
+            or abs(solver_objective - beta_variable) > tolerance):
+        raise CompositeOptimizationError("LP solver objective disagrees with epigraph variable")
+    if (not math.isfinite(gap) or gap < -tolerance or gap > tolerance + roundoff):
+        raise CompositeOptimizationError(
+            f"LP primal/dual optimality gap cannot be certified: gap={gap:.17g}"
+        )
+    primal_rows = _accurate_expectations(matrix, np.asarray(result.x, dtype=float))
+    if any(value - bound > tolerance
+           for value, bound in zip(primal_rows, right_hand_side, strict=True)):
+        raise CompositeOptimizationError("LP scaled primal feasibility check failed")
+    if any(not 0 <= value <= 1 for value in (*null_errors, *alternative_errors)):
+        raise CompositeOptimizationError("LP direct error recomputation left [0, 1]")
     active_null = tuple(
         index for index, value in enumerate(null_errors)
         if abs(value - worst_alpha) <= 1e-9
@@ -623,6 +703,12 @@ def exact_finite_composite_minimax(
         minimax_type_ii_error=worst_beta,
         active_null_members=active_null,
         active_alternative_members=active_alternative,
+        solver_objective=solver_objective,
+        epigraph_variable=beta_variable,
+        dual_lower_bound=dual_lower,
+        optimality_gap=gap,
+        numerical_tolerance=tolerance + roundoff,
+        minimum_nonzero_coefficient=minimum_coefficient,
     )
 
 
