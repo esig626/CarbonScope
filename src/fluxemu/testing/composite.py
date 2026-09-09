@@ -11,8 +11,8 @@ The module provides four deliberately separate objects:
 * a bounded exact randomised minimax LP oracle on the complete joint count space;
 * a finite-family Rényi-minimising *candidate score* for 0<lambda<1, together
   with direct uniform-moment/support verification; and
-* analytical or exactly enumerated threshold/calibration results for a verified
-  candidate score.
+* analytical thresholds for verified moment bounds and enumerated calibration
+  of any score that is well-defined on the represented support.
 
 A vertex-pair Rényi minimum in a finite non-convex family is not called a joint
 Rényi projection and is never advertised as a finite-n least-favourable pair.
@@ -721,7 +721,7 @@ def _score_blocks(
         values: list[float] = []
         for p, q in zip(p_block.probabilities, q_block.probabilities, strict=True):
             if p > 0 and q > 0:
-                values.append(math.log(q / p))
+                values.append(math.log(q) - math.log(p))
             elif p == 0 and q > 0:
                 values.append(math.inf)
             elif p > 0 and q == 0:
@@ -844,6 +844,101 @@ class CompositeRenyiScoreCandidate:
         return False
 
 
+def _undefined_product_score_failures(
+    problem: CompositeBinaryTestingProblem,
+    score_blocks: tuple[tuple[float, ...], ...],
+) -> tuple[str, ...]:
+    """Check that opposite infinite scores cannot occur in one supported outcome."""
+
+    failures = []
+    for family in (problem.null, problem.alternative):
+        for member_index, member in enumerate(family.members):
+            positive_blocks = []
+            negative_blocks = []
+            for block_index, (block, scores) in enumerate(
+                zip(member.blocks, score_blocks, strict=True)
+            ):
+                positive = any(p > 0 and score == math.inf for p, score in
+                               zip(block.probabilities, scores, strict=True))
+                negative = any(p > 0 and score == -math.inf for p, score in
+                               zip(block.probabilities, scores, strict=True))
+                if positive:
+                    positive_blocks.append(block_index)
+                if negative:
+                    negative_blocks.append(block_index)
+                if positive and negative and block.n >= 2:
+                    failures.append(
+                        f"score is undefined on positive support of member {member_index}: "
+                        f"opposite infinite contributions in block {block_index}"
+                    )
+            if any(left != right for left in positive_blocks for right in negative_blocks):
+                failures.append(
+                    f"score is undefined on positive product support of member {member_index}: "
+                    "opposite infinite contributions across independent blocks"
+                )
+    return tuple(failures)
+
+
+def _decimal_candidate_moments(
+    problem: CompositeBinaryTestingProblem,
+    null_index: int,
+    alternative_index: int,
+    order: float,
+) -> tuple[Decimal, tuple[Decimal, ...], tuple[Decimal, ...]]:
+    """Evaluate the declared-law moments without a float-sized acceptance slack."""
+
+    p_star = problem.null.members[null_index]
+    q_star = problem.alternative.members[alternative_index]
+    with localcontext() as context:
+        context.prec = 80
+        lam = Decimal.from_float(order)
+        log_z = Decimal(0)
+        null_weights = []
+        alternative_weights = []
+        for p_block, q_block in zip(p_star.blocks, q_star.blocks, strict=True):
+            z_block = Decimal(0)
+            p_weights = []
+            q_weights = []
+            for p, q in zip(p_block.probabilities, q_block.probabilities, strict=True):
+                if p > 0 and q > 0:
+                    lp, lq = Decimal.from_float(p).ln(), Decimal.from_float(q).ln()
+                    z_block += ((1 - lam) * lp + lam * lq).exp()
+                    p_weights.append((lam * (lq - lp)).exp())
+                    q_weights.append(((lam - 1) * (lq - lp)).exp())
+                elif p == 0 and q > 0:
+                    p_weights.append(Decimal("Infinity"))
+                    q_weights.append(Decimal(0))
+                elif p > 0 and q == 0:
+                    p_weights.append(Decimal(0))
+                    q_weights.append(Decimal("Infinity"))
+                else:
+                    p_weights.append(Decimal(1))
+                    q_weights.append(Decimal(1))
+            log_z += Decimal(p_block.n) * z_block.ln()
+            null_weights.append(p_weights)
+            alternative_weights.append(q_weights)
+
+        def moment(member, weights):
+            block_logs = []
+            for block, block_weights in zip(member.blocks, weights, strict=True):
+                value = sum((Decimal.from_float(p) * weight
+                             for p, weight in zip(block.probabilities, block_weights, strict=True)
+                             if p > 0), Decimal(0))
+                block_logs.append(Decimal(block.n) * value.ln())
+            if Decimal("Infinity") in block_logs and Decimal("-Infinity") in block_logs:
+                return Decimal("NaN")
+            return sum(block_logs, Decimal(0))
+
+        # These equalities hold algebraically, avoiding roundoff from evaluating
+        # the selected law through two different exponential expressions.
+        null = tuple(log_z if member.blocks == p_star.blocks else moment(member, null_weights)
+                     for member in problem.null.members)
+        alternative = tuple(log_z if member.blocks == q_star.blocks
+                            else moment(member, alternative_weights)
+                            for member in problem.alternative.members)
+        return log_z, null, alternative
+
+
 def _candidate_for_pair(
     problem: CompositeBinaryTestingProblem,
     order: float,
@@ -856,27 +951,40 @@ def _candidate_for_pair(
         problem.null.members[null_index], problem.alternative.members[alternative_index]
     )
     failures = list(_shared_zero_support_failures(problem, null_index, alternative_index))
-    log_z = -math.inf if divergence == math.inf else (order - 1.0) * divergence
-    null_moments = tuple(
-        _member_log_moment(member, score_blocks, order)
-        for member in problem.null.members
+    failures.extend(_undefined_product_score_failures(problem, score_blocks))
+    log_z_decimal, null_moments, alternative_moments = _decimal_candidate_moments(
+        problem, null_index, alternative_index, order
     )
-    alternative_moments = tuple(
-        _member_log_moment(member, score_blocks, order - 1.0)
-        for member in problem.alternative.members
-    )
-    max_null = max(null_moments)
-    max_alternative = max(alternative_moments)
-    if max_null > log_z + tolerance:
-        failures.append(
-            "null-side uniform exponential-moment inequality fails: "
-            f"max_log_moment={max_null:g}, log_z={log_z:g}"
-        )
-    if max_alternative > log_z + tolerance:
-        failures.append(
-            "alternative-side uniform exponential-moment inequality fails: "
-            f"max_log_moment={max_alternative:g}, log_z={log_z:g}"
-        )
+    maxima = []
+    for side, moments in (("null", null_moments), ("alternative", alternative_moments)):
+        if any(value.is_nan() for value in moments):
+            maximum = Decimal("Infinity")
+            failures.append(f"{side}-side moment is undefined on represented support")
+        else:
+            maximum = max(moments)
+            if maximum > log_z_decimal:
+                failures.append(
+                    f"{side}-side uniform exponential-moment inequality fails: "
+                    f"max_log_moment={maximum}, log_z={log_z_decimal}"
+                )
+            # Equality of selected/duplicate laws is algebraic. For other laws,
+            # an unresolved high-precision near-equality is refused, not rounded
+            # into a stronger mathematical moment certificate.
+            selected = problem.null.members[null_index] if side == "null" else problem.alternative.members[alternative_index]
+            family = problem.null if side == "null" else problem.alternative
+            for member, value in zip(family.members, moments, strict=True):
+                if (member.blocks != selected.blocks and value.is_finite()
+                        and log_z_decimal.is_finite()
+                        and abs(value - log_z_decimal) <= Decimal("1e-65")
+                        * max(Decimal(1), abs(log_z_decimal))):
+                    failures.append(f"{side}-side uniform moment equality is numerically unresolved")
+                    break
+        maxima.append(float(maximum))
+    log_z = float(log_z_decimal)
+    if math.isfinite(log_z):
+        # A common upper enclosure supports the analytical Markov bounds even
+        # when converting the high-precision log moment to a public float.
+        log_z = math.nextafter(log_z, math.inf)
     return CompositeRenyiScoreCandidate(
         problem=problem,
         order=order,
@@ -885,8 +993,8 @@ def _candidate_for_pair(
         renyi=divergence,
         score_blocks=score_blocks,
         log_hellinger_integral=log_z,
-        maximum_log_null_moment=max_null,
-        maximum_log_alternative_moment=max_alternative,
+        maximum_log_null_moment=maxima[0],
+        maximum_log_alternative_moment=maxima[1],
         uniform_moment_bounds_verified=not failures,
         verification_failures=tuple(failures),
     )
@@ -904,6 +1012,8 @@ def composite_renyi_score_candidate(
     pair is therefore only a candidate score. Among tied minimum-divergence
     pairs, a pair satisfying the two uniform moment inequalities is preferred;
     otherwise the first declared minimiser is returned with explicit failures.
+    ``tolerance`` only identifies numerical pairwise ties; it never relaxes the
+    uniform moment inequalities. Unresolved moment comparisons refuse certification.
     """
 
     if not isinstance(problem, CompositeBinaryTestingProblem):
@@ -989,22 +1099,29 @@ def composite_score_bound_at_order(
         )
     constraint = SimpleBinaryTestingConstraint(epsilon=epsilon)
     lam = candidate.order
-    divergence = candidate.renyi
-    if divergence == math.inf:
-        threshold = -math.inf
+    log_z = candidate.log_hellinger_integral
+    if log_z == -math.inf:
+        # Any finite threshold separates the verified disjoint supports;
+        # -infinity would also reject null-exclusive scores equal to -infinity.
+        threshold = 0.0
         raw = 0.0
     else:
-        threshold = (
-            -math.log(constraint.epsilon) - (1.0 - lam) * divergence
-        ) / lam
-        log_raw = -(1.0 - lam) / lam * math.fsum(
-            (divergence, math.log(constraint.epsilon))
-        )
-        raw = (
-            math.exp(log_raw)
-            if log_raw <= math.log(np.finfo(float).max)
-            else math.inf
-        )
+        with localcontext() as context:
+            context.prec = 80
+            decimal_lam = Decimal.from_float(lam)
+            decimal_z = Decimal.from_float(log_z)
+            decimal_threshold = (decimal_z - Decimal.from_float(constraint.epsilon).ln()) / decimal_lam
+            threshold = math.nextafter(float(decimal_threshold), math.inf)
+            if not math.isfinite(threshold):
+                raise NumericalLimitError("analytical score threshold exceeds floating-point resolution")
+            log_raw = decimal_z + (1 - decimal_lam) * Decimal.from_float(threshold)
+            if log_raw > Decimal.from_float(math.log(np.finfo(float).max)):
+                raw = math.inf
+            else:
+                raw = float(log_raw.exp())
+                if raw == 0:
+                    raise NumericalLimitError("positive analytical score bound underflows floating-point resolution")
+                raw = math.nextafter(raw, math.inf)
     constant = 1.0 - constraint.epsilon
     minimax_upper = min(constant, raw)
     if not math.isfinite(minimax_upper) or not 0 <= minimax_upper <= 1:
@@ -1115,8 +1232,7 @@ def evaluate_composite_score_test(
         outcomes, bound.candidate, bound.threshold, null_mass, alternative_mass
     )
     null_errors = _accurate_expectations(null_mass, decision)
-    alternative_power = _accurate_expectations(alternative_mass, decision)
-    alternative_errors = tuple(1.0 - value for value in alternative_power)
+    alternative_errors = _accurate_expectations(alternative_mass, 1.0 - decision)
     worst_alpha = max(null_errors)
     worst_beta = max(alternative_errors)
     tolerance = max(1e-15, 5e-10 * bound.constraint.epsilon)
@@ -1145,7 +1261,7 @@ def evaluate_composite_score_test(
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CalibratedCompositeScoreTest:
-    """Exact represented-family calibration within one verified score family."""
+    """Enumerated achieved errors within one well-defined candidate score family."""
 
     candidate: CompositeRenyiScoreCandidate
     constraint: SimpleBinaryTestingConstraint
@@ -1175,14 +1291,15 @@ def calibrate_composite_score_test(
     epsilon: Real,
     max_outcomes: int = DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES,
 ) -> CalibratedCompositeScoreTest:
-    """Exhaust Type-I budget within the fixed verified upper-score family."""
+    """Calibrate a well-defined candidate score on every represented null law.
+
+    Calibration enumerates the actual Type-I constraints, so it remains valid
+    when the stronger analytical uniform-moment conditions fail. Its Type-II
+    error is achieved by this score family and need not equal finite minimax.
+    """
 
     if not isinstance(candidate, CompositeRenyiScoreCandidate):
         raise InputValidationError("candidate must be CompositeRenyiScoreCandidate")
-    if not candidate.uniform_moment_bounds_verified:
-        raise CompositeScoreVerificationError(
-            "candidate score lacks verified uniform composite moment bounds"
-        )
     constraint = SimpleBinaryTestingConstraint(epsilon=epsilon)
     problem = candidate.problem
     outcomes = _enumerate_joint_outcomes(problem, max_outcomes)
@@ -1226,12 +1343,10 @@ def calibrate_composite_score_test(
                 "calibration encountered a positive-score boundary with no null mass"
             )
         eta = min(limits)
-        tolerance = max(1e-15, 5e-10 * constraint.epsilon)
-        if eta < -tolerance or eta > 1.0 + tolerance or not math.isfinite(eta):
+        if not math.isfinite(eta) or not 0.0 <= eta <= 1.0:
             raise CompositeScoreVerificationError(
                 "calibration boundary randomisation left [0, 1]"
             )
-        eta = min(1.0, max(0.0, eta))
         rejection[indices] = eta
         above_null = above_null + eta * boundary_null
         chosen_score = score
@@ -1243,8 +1358,7 @@ def calibrate_composite_score_test(
         )
 
     null_errors = _accurate_expectations(null_mass, rejection)
-    alternative_power = _accurate_expectations(alternative_mass, rejection)
-    alternative_errors = tuple(1.0 - value for value in alternative_power)
+    alternative_errors = _accurate_expectations(alternative_mass, 1.0 - rejection)
     worst_alpha = max(null_errors)
     worst_beta = max(alternative_errors)
     tolerance = max(1e-15, 5e-10 * constraint.epsilon)
