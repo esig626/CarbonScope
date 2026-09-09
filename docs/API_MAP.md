@@ -105,9 +105,32 @@ The LP is a mathematically exact characterisation of the represented finite mini
 
 These APIs cover the supplied finite lists only. Rigorous optimisation or bounds over a complete continuous feasible flux family, generic composite p-values and compatibility-region inversion are not implemented. See [COMPOSITE_TESTING.md](COMPOSITE_TESTING.md) for numerical policies and count semantics.
 
+## Declarative hypothesis-testing workflow
+
+`fluxemu.workflow`
+
+- `WorkflowSpecification`, `HypothesisSpecification`, `ReactionBoundConstraint`, `StateGenerationSpecification` and `TestingSpecification`: immutable validated declarations for the scientific design;
+- `load_hypothesis_testing_spec(path, *, model_path=None)` loads the schema-version-1 YAML and validates the common physical/isotope model, ordered experiments, genuine-count declarations, H0/H1 constraints and numerical settings;
+- `generate_hypothesis_state_families(...)` returns ordered H0/H1 `HypothesisStateFamily` records after native feasibility, region-distinction, sampling and complete-state checks;
+- `run_hypothesis_testing_workflow(specification, *, model_path=None, output_directory=None)` accepts the validated specification or its YAML path, constructs and validates both constrained state families, evaluates native stationary EMU and count laws, evaluates requested finite procedures and optionally persists the report;
+- `HypothesisTestingWorkflowResult` is an immutable record exposing `.specification`, `.null_family`, `.alternative_family`, `.stationary`, `.problem`, `.null_observation_family`, `.alternative_observation_family`, `.testing_results`, `.relationship_checks`, `.refusals`, `.provenance`, `.output_paths` and `.summary`;
+- `ProcedureEvaluation` keeps the procedure, supplied order, whether it was explicitly requested, its evaluated/refused/not-requested status, a typed testing result or `TestingRefusal`;
+- `WorkflowProvenance` binds the model, experiment, hypothesis, represented state-family, observation-family and testing-problem identities and records software provenance separately.
+
+The orchestration entry points are also available from `fluxemu`. Passing `model_path` overrides only a file specification; a validated specification already contains its model. An explicit `output_directory` overrides the specification's output setting. With neither output setting, the Python API returns its structured result without persistence.
+
+V1 hypothesis constraints intersect reaction bounds with the common model and use the full constrained steady-state region without retaining an objective fraction. Complete hit-and-run states retain declared H0/H1 and canonical reaction ordering. Scientific constraints are distinct from generated finite representations; the latter alone define the classes passed to the testing engine.
+
+The runner preserves the existing numerical contracts. It reports optional enumeration, numerical certification, optimisation/dependency and score-verification refusals as first-class outcomes. Invalid scientific input or failed modelling, state generation or observation construction raises an error. Available converse/minimax/achieved comparisons are checked using the documented `2e-9` reporting comparison allowance; this does not relax any primitive's solver or certification tolerance.
+
+See [HYPOTHESIS_WORKFLOW.md](HYPOTHESIS_WORKFLOW.md) for the complete schema and result contract.
 
 ## CLI
 
 `fluxemu run --model MODEL.xml --experiment EXPERIMENT.yaml --output DIRECTORY`
 
-runs the public native stationary SBML -> FBA/FVA -> EMU pipeline and writes fluxes, MIDs, diagnostics and a provenance manifest. Composite testing is currently a Python API; the CLI does not infer hypothesis families from model files, FVA ranges or sampling frequencies.
+runs the public native stationary SBML -> FBA/FVA -> EMU pipeline and writes fluxes, MIDs, diagnostics and a provenance manifest.
+
+`fluxemu test-hypotheses --specification WORKFLOW.yaml [--model MODEL.xml] [--output DIRECTORY]`
+
+runs the declarative stationary finite hypothesis workflow and writes `report.json` and `summary.txt` to the declared output directory. The CLI requires an output destination either in the specification or through `--output`. Exit 0 means the workflow completed, possibly with explicit optional statistical refusals; exit 2 means invalid input, failed workflow construction or failed persistence. Hypotheses are declared explicitly rather than inferred from FVA ranges or sampling frequencies. See [HYPOTHESIS_WORKFLOW.md](HYPOTHESIS_WORKFLOW.md).

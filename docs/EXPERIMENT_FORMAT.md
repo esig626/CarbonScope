@@ -27,14 +27,14 @@ experiment:
     - metabolite_id: glucose_c
       isotopomers:
         "#111111": 1.0
-      correction: no
+      correction: 'no'
   targets:
     - target_id: pyruvate
       metabolite_id: pyruvate_c
       atom_positions: [1, 2, 3]
       analytical_method: native
       formula: C3H3O3
-      correction: no
+      correction: 'no'
 
 fva_fraction_of_optimum: 1.0
 ```
@@ -47,7 +47,7 @@ The transition participants, carbon counts and physical stoichiometric direction
 
 ## Tracers
 
-Tracer isotopomers use `#` followed by one binary digit per carbon atom, in the declared canonical atom order. Fractions must form a valid probability distribution. Native stationary correction currently requires `correction: no`.
+Tracer isotopomers use `#` followed by one binary digit per carbon atom, in the declared canonical atom order. Fractions must form a valid probability distribution. Native stationary correction currently requires `correction: 'no'`. Quote the string so YAML does not interpret `no` as a boolean.
 
 ## Targets
 
@@ -57,8 +57,16 @@ Observation targets that combine explicit precursor fragments may also be declar
 
 ## FVA fraction
 
-`fva_fraction_of_optimum` must lie in `(0, 1]`. It controls the retained biological objective constraint for FVA and ensemble geometry. It does not turn FVA endpoints into a flux state.
+`fva_fraction_of_optimum` must lie in `(0, 1]`. It controls the retained biological objective constraint in native forward FVA and ensemble analysis. It does not turn FVA endpoints into a flux state. The hypothesis-testing workflow validates this experiment field but samples the entire H0/H1 constrained steady-state regions without retaining an objective fraction; it does not reuse this field as a hypothesis constraint.
 
 ## Genuine counts are separate
 
 This stationary experiment file defines isotope prediction. Genuine count observation totals used by `fluxemu.observation` are separate explicit declarations. CarbonScope never infers a count total from a normalised MID or intensity vector.
+
+## Hypothesis-testing specification
+
+The `fluxemu test-hypotheses` command consumes a separate schema-version-1 workflow YAML that refers to these native experiment files. The experiment file continues to define tracers, authoritative mappings, targets and mass-class order. The workflow file defines the common physical model, H0/H1 reaction-bound restrictions, finite-state sampling policy, ordered experiment/target/replicate count blocks, independence and testing procedures.
+
+All experiments in one workflow must use the same canonical isotope model. Each observation block references a declared target and supplies its own genuine integer `total_count`; measured fractions and intensities are not accepted as count specifications. Multiple blocks require explicit `independent_blocks: true`.
+
+See [HYPOTHESIS_WORKFLOW.md](HYPOTHESIS_WORKFLOW.md) for the complete YAML and a runnable example using [the committed native experiment fixture](../tests/fixtures/hypothesis_workflow/experiment.yaml). Count declarations and flux constraints remain separate from isotope prediction semantics.

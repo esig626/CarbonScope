@@ -2,7 +2,9 @@
 
 CarbonScope is intended to use isotope tracing as a forward hypothesis testing framework, not primarily as a tool for recovering one supposedly true flux vector.
 
-This document describes the intended scientific workflow and distinguishes it from the implemented finite testing scope. The current release provides forward modelling, feasible state sampling, genuine count observation laws, simple binary testing and composite testing for explicitly supplied finite H0/H1 classes. Testing over a complete continuous feasible flux family remains unsolved in this implementation: rigorous optimisation or bounds over that entire family are not provided.
+This document describes the intended scientific workflow and distinguishes it from the implemented finite testing scope. The current release provides forward modelling, feasible state sampling, genuine count observation laws, simple binary testing and composite testing for represented finite H0/H1 classes. The public `run_hypothesis_testing_workflow(...)` API and `fluxemu test-hypotheses` command now construct those classes from one common SBML/FBC model and explicit hypothesis and experiment files. Testing over a complete continuous feasible flux family remains unsolved in this implementation: rigorous optimisation or bounds over that entire family are not provided.
+
+See [HYPOTHESIS_WORKFLOW.md](HYPOTHESIS_WORKFLOW.md) for a complete reproducible files-to-report example. The implemented workflow evaluates a declared experiment's finite-class testing performance. It does not accept observed data to produce a generic composite p-value or invert a test into compatibility regions.
 
 The central question is:
 
@@ -14,6 +16,8 @@ The experimentalist proposes a metabolic network hypothesis describing the biolo
 
 This hypothesis should define a family of biologically admissible metabolic states rather than a single preferred flux vector.
 
+The V1 workflow requires separate H0 and H1 reaction-bound constraints on the same physical model. Restrictions intersect the original bounds; equal lower and upper bounds fix a reaction, and a zero interval excludes its flux. Hypotheses are never inferred from reaction names, observed MIDs, sample clusters or FVA ranges. Overlap between the two regions is permitted, but declarations that define the same feasible region are rejected.
+
 ## 2. Define the feasible flux region
 
 Run FBA to establish that the proposed network can support the required biological behaviour.
@@ -22,11 +26,15 @@ Run FVA to characterise the feasible flux region under the chosen constraints.
 
 FVA extrema are diagnostics only. They are not assembled into flux states.
 
+For the hypothesis workflow, each region contains all steady-state fluxes satisfying the common physical bounds and its declared reaction restrictions. No retained objective fraction is added. The native experiment file's `fva_fraction_of_optimum` remains a forward-analysis setting and does not define H0 or H1.
+
 ## 3. Sample complete feasible flux states
 
 Sample complete jointly feasible flux states from the admissible region.
 
 The sampled states provide a finite representation of the biological hypothesis family. When passed to the finite composite engine, those explicitly listed states define its uncertainty class. Sampling alone does not prove that the list covers the full feasible region or controls errors uniformly over states outside the list. State sampling frequencies are not priors or weights in the testing problem.
+
+V1 uses the native hit-and-run sampler with explicit family sizes and seeds. It checks every returned complete state against its constrained model, preserves canonical reaction and state order, and records the policy, seed, requested/actual size and state identities. A finite chain does not establish independent samples, convergence or adequate mixing.
 
 ## 4. Push the hypothesis through the forward isotope model
 
@@ -63,6 +71,8 @@ The finite composite layer compares explicitly supplied families of complete gen
 If reliable discrimination is impossible at the proposed sample size, redesign the experiment before collecting data. Possible changes include the tracer, measured targets, biological constraints or sample size.
 
 A converse lower bound can establish that a given count total is insufficient for the represented classes. Sufficiency requires an achieved testing procedure or a corresponding upper guarantee. The relevant ordering is `converse <= beta_star <= achieved Type II error` under the same Type I budget. A calibrated score test need not attain the unrestricted minimax optimum. The LP is a mathematically exact characterisation of the finite problem; its floating-point solution remains subject to numerical validation and explicit refusal. These finite-class results do not certify distinguishability over the complete continuous flux family.
+
+The workflow report keeps six quantities separate: order-specific composite converse, unrestricted represented finite minimax, finite-family Rényi candidate score, verified analytical score bound, deterministic analytical-score achieved errors, and calibrated score-family achieved errors. Every requested procedure has an evaluated or refused outcome with its reason. A failed analytical moment certificate does not turn a candidate into a verified projected score; direct calibration may still be available for a well-defined candidate.
 
 ## 6. Perform the experiment
 
