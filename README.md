@@ -38,7 +38,7 @@ From the repository root:
 python -m pip install .
 ```
 
-Stationary MFA, transient integration, and exact finite composite minimax optimisation use SciPy through optional extras:
+Stationary MFA, transient integration, and the finite composite minimax LP use SciPy through optional extras:
 
 ```bash
 python -m pip install '.[mfa]'
@@ -133,12 +133,15 @@ The production API includes:
 * `composite_renyi_score_candidate(...)`: the finite family `0 < lambda < 1` vertex pair minimum plus direct support and uniform moment diagnostics;
 * `verified_composite_renyi_score(...)`: the same candidate only when both uniform composite moment inequalities verify over every represented member;
 * `composite_score_bound_at_order(...)`: the analytical threshold and Type II guarantees without joint outcome enumeration;
-* `evaluate_composite_score_test(...)` and `calibrate_composite_score_test(...)`: small space exact evaluation and Type I calibration within the fixed verified score family;
+* `evaluate_composite_score_test(...)`: complete small-space enumeration of the achieved errors of a verified analytical score rule;
+* `calibrate_composite_score_test(...)`: direct Type I calibration and achieved errors for a fixed, well-defined candidate score, including candidates whose analytical moment gates fail;
 * `evaluate_stationary_composite_hypotheses(...)`: native stationary EMU mapping from finite feasible flux state families to complete product observation law classes, with explicit `independent_blocks=True` for multiple blocks.
 
 Finite represented families are never silently convexified. A vertex pair Rényi minimum is a candidate score, not automatically a joint convex class projection and not automatically a finite blocklength least favourable pair. State IDs, flux coordinates and sampling frequencies are provenance, not classifier inputs.
 
-The exact minimax LP is deliberately a bounded small problem or discretised oracle. The analytical converse and candidate score moment checks operate directly on full product laws and do not require enumeration of the complete joint count space.
+The finite LP exactly characterises the unrestricted minimax problem mathematically. Its floating-point solver returns a result only after numerical feasibility, objective and optimality checks, and explicitly refuses problems outside its coefficient-resolution or enumeration limits. This is a small-problem or finite-grid oracle; a supplied grid does not certify the complete continuous feasible flux family.
+
+A calibrated score test is an achieved procedure whose worst-case Type II error upper-bounds the finite minimax optimum. A converse lower-bounds that optimum: `converse <= beta_star <= achieved score-test error`. Candidate moment checks and analytical bounds operate directly on full product laws without joint outcome enumeration. See the [validation report](results/composite_testing_validation/VALIDATION_REPORT.md) for tested cases, numerical refusals and remaining limitations.
 
 See [docs/COMPOSITE_TESTING.md](docs/COMPOSITE_TESTING.md).
 
