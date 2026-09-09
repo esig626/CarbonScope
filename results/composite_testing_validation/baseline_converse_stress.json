@@ -1,0 +1,110 @@
+{
+  "audited_base_sha": "4f457d2afd75ad1bdffdbe0e9eea25fcaf8a9ad4",
+  "seed": 5302026,
+  "problems": 8000,
+  "precision_decimal_digits": 80,
+  "oracle": "explicit binary multinomial Decimal masses and randomized Neyman-Pearson",
+  "absolute_comparison_tolerance": 2e-12,
+  "tolerance_reason": "2e-12 absolute allowance covers accumulated float log/exp roundoff for the largest count 100 and represented simplex residuals; actual maximum excess is reported separately and no values are clipped",
+  "orders": [
+    1.0000000000000002,
+    1.00000001,
+    1.001,
+    1.1,
+    2.0,
+    10.0,
+    1000000.0,
+    1e+300
+  ],
+  "count_totals": [
+    1,
+    2,
+    5,
+    10,
+    40,
+    100
+  ],
+  "epsilons": [
+    5e-324,
+    1e-12,
+    0.001,
+    0.1,
+    0.8,
+    0.9999999999999999
+  ],
+  "input_categories": [
+    "dyadic binary probabilities",
+    "positive probabilities down to 1e-323",
+    "adjacent-float nearly identical laws"
+  ],
+  "accepted_both_apis": 5809,
+  "at_least_one_explicit_refusal": 2191,
+  "accepted_by_api": {
+    "composite": 6948,
+    "simple": 5809
+  },
+  "refusals_by_api": {
+    "composite": {
+      "NumericalLimitError": 1043,
+      "ValidationError": 9
+    },
+    "simple": {
+      "NumericalLimitError": 2191
+    }
+  },
+  "np_beta_minus_bound_gap_ranges": {
+    "composite": [
+      -2.220446049250313e-16,
+      1.0000000000000022
+    ],
+    "simple": [
+      -2.220446049250313e-16,
+      0.9999999999989939
+    ]
+  },
+  "maximum_excess_cases": {
+    "composite": {
+      "index": 5271,
+      "null": [
+        0.4443359375,
+        0.5556640625
+      ],
+      "alternative": [
+        0.056640625,
+        0.943359375
+      ],
+      "n": 10,
+      "epsilon": 0.001,
+      "order": 1e+300,
+      "np_beta": 0.8010936718954494,
+      "lower_bound": 0.8010936718954497,
+      "excess": 2.220446049250313e-16
+    },
+    "simple": {
+      "index": 5271,
+      "null": [
+        0.4443359375,
+        0.5556640625
+      ],
+      "alternative": [
+        0.056640625,
+        0.943359375
+      ],
+      "n": 10,
+      "epsilon": 0.001,
+      "order": 1e+300,
+      "np_beta": 0.8010936718954494,
+      "lower_bound": 0.8010936718954497,
+      "excess": 2.220446049250313e-16
+    }
+  },
+  "violations": 0,
+  "historical_false_converse_reproduced": false,
+  "limits": "Decimal PMFs use stored floats without normalization; allowed represented mass residuals can move a near-one NP result a few ulps above one. Singleton binary stress; finite multiclass, structural-zero, ternary and independent-product controls are tested separately. No continuous-family claim or order optimization.",
+  "derivation": [
+    "For 0<=phi<=1, Holder gives E_Q phi <= epsilon^((lambda-1)/lambda) exp((lambda-1) D_lambda(Q||P)/lambda).",
+    "Thus worst-case Type II >= max(0, 1-exp((lambda-1)/lambda*(log(epsilon)+min_{P,Q} D_lambda(Q||P)))).",
+    "The simple forward component follows from Holder on 1-phi: beta >= (1-epsilon)^(lambda/(lambda-1)) exp(-D_lambda(P||Q)).",
+    "Reverse and forward vertex minimizers need not agree: H0 Bernoulli first-cell probabilities (1/16,1/2), H1 (1/4,3/4), lambda=2 gives reverse pair (1,0) and forward pair (0,0). Composite API intentionally uses only its documented reverse component."
+  ]
+}

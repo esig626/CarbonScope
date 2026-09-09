@@ -44,6 +44,11 @@ The main campaign uses seed `20260909`, 400 random finite categorical classes,
 support, positive probabilities down to approximately `1e-300`, nearly equal
 laws, small budgets, supplied Rényi orders near one and as large as 1000,
 binary counts `n=1..64`, ternary counts `n=1..40`, and independent product blocks.
+Eight additional uniform-law cases probe binary totals 38–41 and ternary totals
+24–27. Uniform binary laws are accepted through 39 and refused at 40; uniform
+ternary laws are accepted through 25 and refused at 26 under the current
+`1e-12` coefficient-resolution policy. The asymmetric sweep refuses earlier:
+binary from 18 and ternary from 13.
 The count sweep's acceptance pattern is specific to its stated probabilities,
 epsilon and numerical policy; it is not a universal cutoff in the count total.
 

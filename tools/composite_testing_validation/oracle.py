@@ -78,7 +78,7 @@ class OracleResult:
 
 
 def neyman_pearson(null, alternative, epsilon):
-    """Exact Decimal greedy fractional-knapsack solution for singleton laws."""
+    """High-precision greedy fractional-knapsack solution for singleton laws."""
     with localcontext() as context:
         context.prec = PRECISION
         p, q = tuple(map(decimal, null)), tuple(map(decimal, alternative))
