@@ -11,8 +11,8 @@ The module provides four deliberately separate objects:
 * a bounded exact randomised minimax LP oracle on the complete joint count space;
 * a finite-family Rényi-minimising *candidate score* for 0<lambda<1, together
   with direct uniform-moment/support verification; and
-* analytical or exactly enumerated threshold/calibration results for a verified
-  candidate score.
+* analytical thresholds for verified moment bounds and enumerated calibration
+  of any score that is well-defined on the represented support.
 
 A vertex-pair Rényi minimum in a finite non-convex family is not called a joint
 Rényi projection and is never advertised as a finite-n least-favourable pair.
@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from decimal import Decimal, localcontext
 from itertools import product
 import math
+import warnings
 from numbers import Integral, Real
 from typing import Iterable
 
@@ -43,6 +44,8 @@ from .simple import (
 DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES = 1_000_000
 MIN_EXACT_COMPOSITE_EPSILON = 1e-12
 COMPOSITE_NUMERICAL_TOLERANCE = 1e-10
+COMPOSITE_LP_CERTIFICATION_TOLERANCE = 5e-10
+COMPOSITE_LP_SMALL_MATRIX_VALUE = 1e-12
 _SCORE_VERIFICATION_TOLERANCE = 1e-10
 _DECIMAL_PRECISION = 60
 
@@ -453,18 +456,29 @@ def _family_mass_matrix(
 
 
 def _accurate_expectations(matrix: np.ndarray, decision: np.ndarray) -> tuple[float, ...]:
-    return tuple(
-        math.fsum(
-            float(probability) * float(value)
-            for probability, value in zip(row, decision, strict=True)
-        )
-        for row in matrix
-    )
+    results = []
+    for row in matrix:
+        terms = []
+        for probability, value in zip(row, decision, strict=True):
+            probability, value = float(probability), float(value)
+            term = probability * value
+            if probability != 0.0 and value != 0.0 and term == 0.0:
+                raise NumericalLimitError(
+                    "nonzero expectation contribution underflowed floating-point resolution; "
+                    "no positive error or support was replaced by zero"
+                )
+            terms.append(term)
+        results.append(math.fsum(terms))
+    return tuple(results)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FiniteCompositeMinimaxResult:
-    """Exact represented finite-class randomised minimax solution."""
+    """Numerically checked solution of the exact represented finite-class LP.
+
+    The achieved errors and primal/dual gap describe this floating-point solve;
+    they are not a symbolic certificate or a continuous-family optimum.
+    """
 
     problem: CompositeBinaryTestingProblem
     constraint: SimpleBinaryTestingConstraint
@@ -476,6 +490,12 @@ class FiniteCompositeMinimaxResult:
     minimax_type_ii_error: float
     active_null_members: tuple[int, ...]
     active_alternative_members: tuple[int, ...]
+    solver_objective: float
+    epigraph_variable: float
+    dual_lower_bound: float
+    optimality_gap: float
+    numerical_tolerance: float
+    minimum_nonzero_coefficient: float
 
     @property
     def randomised(self) -> bool:
@@ -513,6 +533,10 @@ def exact_finite_composite_minimax(
     Null constraints are divided by epsilon before being passed to HiGHS so an
     absolute LP feasibility tolerance cannot become the statistical Type-I
     tolerance. Budgets below ``MIN_EXACT_COMPOSITE_EPSILON`` fail explicitly.
+    Nonzero scaled matrix coefficients at or below 1e-12 are refused before
+    HiGHS can discard them. Acceptance additionally requires primal feasibility,
+    objective/epigraph agreement, and a recomputed Lagrangian dual gap within
+    5e-10 plus explicitly accounted binary64 roundoff. No solver output is clipped.
     """
 
     if not isinstance(problem, CompositeBinaryTestingProblem):
@@ -528,7 +552,7 @@ def exact_finite_composite_minimax(
     alternative_mass = _family_mass_matrix(problem.alternative, outcomes)
 
     try:
-        from scipy.optimize import linprog
+        from scipy.optimize import OptimizeWarning, linprog
     except ImportError as error:  # pragma: no cover - full CI installs testing extra
         raise CompositeOptimizationError(
             "exact composite minimax testing requires the 'testing' SciPy extra"
@@ -561,25 +585,46 @@ def exact_finite_composite_minimax(
         rows.append(row)
         rhs.append(-1.0)
 
-    result = linprog(
-        objective,
-        A_ub=np.vstack(rows),
-        b_ub=np.asarray(rhs, dtype=float),
-        bounds=[(0.0, 1.0)] * variable_count,
-        method="highs",
-        options={
-            "primal_feasibility_tolerance": 1e-10,
-            "dual_feasibility_tolerance": 1e-10,
-            "ipm_optimality_tolerance": 1e-12,
-        },
-    )
+    matrix = np.vstack(rows)
+    right_hand_side = np.asarray(rhs, dtype=float)
+    nonzero = np.abs(matrix[matrix != 0.0])
+    minimum_coefficient = float(np.min(nonzero))
+    if minimum_coefficient <= COMPOSITE_LP_SMALL_MATRIX_VALUE:
+        raise NumericalLimitError(
+            "positive probability coefficient is at or below HiGHS matrix "
+            f"resolution {COMPOSITE_LP_SMALL_MATRIX_VALUE:g}; "
+            f"minimum scaled coefficient={minimum_coefficient:.17g}; no support was dropped"
+        )
+    # SciPy forwards this supported HiGHS option but does not list it in its
+    # own option schema. Suppress only that forwarding notice.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", message="Unrecognized options detected:.*small_matrix_value",
+            category=OptimizeWarning,
+        )
+        result = linprog(
+            objective,
+            A_ub=matrix,
+            b_ub=right_hand_side,
+            bounds=[(0.0, 1.0)] * variable_count,
+            method="highs",
+            options={
+                "primal_feasibility_tolerance": 1e-10,
+                "dual_feasibility_tolerance": 1e-10,
+                "ipm_optimality_tolerance": 1e-12,
+                "small_matrix_value": COMPOSITE_LP_SMALL_MATRIX_VALUE,
+            },
+        )
     if not result.success or result.x is None:
         raise CompositeOptimizationError(
             "exact finite composite minimax LP failed: "
             + (result.message or "unknown HiGHS failure")
         )
-    phi = np.asarray(result.x[:outcome_count], dtype=float)
-    beta_variable = float(result.x[-1])
+    solution = np.asarray(result.x, dtype=float)
+    if solution.shape != (variable_count,):
+        raise CompositeOptimizationError("LP returned a decision vector with invalid shape")
+    phi = solution[:outcome_count]
+    beta_variable = float(solution[-1])
     if not np.isfinite(phi).all() or np.any(phi < 0) or np.any(phi > 1):
         raise CompositeOptimizationError(
             "exact composite minimax LP returned invalid rejection probabilities"
@@ -590,8 +635,7 @@ def exact_finite_composite_minimax(
         )
 
     null_errors = _accurate_expectations(null_mass, phi)
-    alternative_power = _accurate_expectations(alternative_mass, phi)
-    alternative_errors = tuple(1.0 - value for value in alternative_power)
+    alternative_errors = _accurate_expectations(alternative_mass, 1.0 - phi)
     worst_alpha = max(null_errors)
     worst_beta = max(alternative_errors)
     alpha_tolerance = 5e-10 * constraint.epsilon
@@ -604,6 +648,52 @@ def exact_finite_composite_minimax(
         raise CompositeOptimizationError(
             "exact composite minimax LP objective disagrees with evaluated worst-case Type II"
         )
+    # A feasible primal alone does not establish minimax optimality. For
+    # A x <= b and x in [0,1], every u >= 0 gives the rigorous algebraic bound
+    # min_x c.x >= -u.b + sum_j min(0, c_j + (A.T u)_j).
+    # The minimum chooses the optimizing endpoint of each unit interval; it
+    # does not clip a probability, decision, divergence or solver output.
+    try:
+        solver_objective = float(result.fun)
+        dual = -np.asarray(result.ineqlin.marginals, dtype=float)
+    except (AttributeError, TypeError, ValueError) as error:
+        raise CompositeOptimizationError("LP lacks objective or dual diagnostics") from error
+    if (dual.shape != (len(rows),) or not np.isfinite(dual).all()
+            or np.any(dual < 0)):
+        raise CompositeOptimizationError("LP returned invalid dual multipliers")
+    endpoints = []
+    for j in range(variable_count):
+        terms = (float(objective[j]), *(float(matrix[i, j]) * float(dual[i])
+                                       for i in range(len(rows))))
+        reduced = math.fsum(terms)
+        reduction_error = 16 * np.finfo(float).eps * math.fsum(abs(v) for v in terms)
+        # Positive reduced costs safely above their rounding bound contribute
+        # exactly zero. Large inactive coefficients must not make an otherwise
+        # well-conditioned lower bound uncertifiable.
+        endpoints.append(min(0.0, reduced - reduction_error))
+    dual_terms = tuple(-float(u) * float(b) for u, b in zip(dual, right_hand_side, strict=True))
+    dual_value = math.fsum((*dual_terms, *endpoints))
+    operation_scale = math.fsum((1.0, *(abs(v) for v in dual_terms),
+                                 *(abs(v) for v in endpoints)))
+    roundoff = 16 * np.finfo(float).eps * operation_scale
+    tolerance = COMPOSITE_LP_CERTIFICATION_TOLERANCE
+    if not math.isfinite(roundoff) or roundoff > tolerance:
+        raise CompositeOptimizationError("LP dual bound is below certifiable floating-point resolution")
+    dual_lower = dual_value - roundoff
+    gap = worst_beta - dual_lower
+    if (not math.isfinite(solver_objective)
+            or abs(solver_objective - beta_variable) > tolerance):
+        raise CompositeOptimizationError("LP solver objective disagrees with epigraph variable")
+    if (not math.isfinite(gap) or gap < -tolerance or gap > tolerance + roundoff):
+        raise CompositeOptimizationError(
+            f"LP primal/dual optimality gap cannot be certified: gap={gap:.17g}"
+        )
+    primal_rows = _accurate_expectations(matrix, np.asarray(result.x, dtype=float))
+    if any(value - bound > tolerance
+           for value, bound in zip(primal_rows, right_hand_side, strict=True)):
+        raise CompositeOptimizationError("LP scaled primal feasibility check failed")
+    if any(not 0 <= value <= 1 for value in (*null_errors, *alternative_errors)):
+        raise CompositeOptimizationError("LP direct error recomputation left [0, 1]")
     active_null = tuple(
         index for index, value in enumerate(null_errors)
         if abs(value - worst_alpha) <= 1e-9
@@ -623,6 +713,12 @@ def exact_finite_composite_minimax(
         minimax_type_ii_error=worst_beta,
         active_null_members=active_null,
         active_alternative_members=active_alternative,
+        solver_objective=solver_objective,
+        epigraph_variable=beta_variable,
+        dual_lower_bound=dual_lower,
+        optimality_gap=gap,
+        numerical_tolerance=tolerance + roundoff,
+        minimum_nonzero_coefficient=minimum_coefficient,
     )
 
 
@@ -635,7 +731,7 @@ def _score_blocks(
         values: list[float] = []
         for p, q in zip(p_block.probabilities, q_block.probabilities, strict=True):
             if p > 0 and q > 0:
-                values.append(math.log(q / p))
+                values.append(math.log(q) - math.log(p))
             elif p == 0 and q > 0:
                 values.append(math.inf)
             elif p > 0 and q == 0:
@@ -758,6 +854,101 @@ class CompositeRenyiScoreCandidate:
         return False
 
 
+def _undefined_product_score_failures(
+    problem: CompositeBinaryTestingProblem,
+    score_blocks: tuple[tuple[float, ...], ...],
+) -> tuple[str, ...]:
+    """Check that opposite infinite scores cannot occur in one supported outcome."""
+
+    failures = []
+    for family in (problem.null, problem.alternative):
+        for member_index, member in enumerate(family.members):
+            positive_blocks = []
+            negative_blocks = []
+            for block_index, (block, scores) in enumerate(
+                zip(member.blocks, score_blocks, strict=True)
+            ):
+                positive = any(p > 0 and score == math.inf for p, score in
+                               zip(block.probabilities, scores, strict=True))
+                negative = any(p > 0 and score == -math.inf for p, score in
+                               zip(block.probabilities, scores, strict=True))
+                if positive:
+                    positive_blocks.append(block_index)
+                if negative:
+                    negative_blocks.append(block_index)
+                if positive and negative and block.n >= 2:
+                    failures.append(
+                        f"score is undefined on positive support of member {member_index}: "
+                        f"opposite infinite contributions in block {block_index}"
+                    )
+            if any(left != right for left in positive_blocks for right in negative_blocks):
+                failures.append(
+                    f"score is undefined on positive product support of member {member_index}: "
+                    "opposite infinite contributions across independent blocks"
+                )
+    return tuple(failures)
+
+
+def _decimal_candidate_moments(
+    problem: CompositeBinaryTestingProblem,
+    null_index: int,
+    alternative_index: int,
+    order: float,
+) -> tuple[Decimal, tuple[Decimal, ...], tuple[Decimal, ...]]:
+    """Evaluate the declared-law moments without a float-sized acceptance slack."""
+
+    p_star = problem.null.members[null_index]
+    q_star = problem.alternative.members[alternative_index]
+    with localcontext() as context:
+        context.prec = 80
+        lam = Decimal.from_float(order)
+        log_z = Decimal(0)
+        null_weights = []
+        alternative_weights = []
+        for p_block, q_block in zip(p_star.blocks, q_star.blocks, strict=True):
+            z_block = Decimal(0)
+            p_weights = []
+            q_weights = []
+            for p, q in zip(p_block.probabilities, q_block.probabilities, strict=True):
+                if p > 0 and q > 0:
+                    lp, lq = Decimal.from_float(p).ln(), Decimal.from_float(q).ln()
+                    z_block += ((1 - lam) * lp + lam * lq).exp()
+                    p_weights.append((lam * (lq - lp)).exp())
+                    q_weights.append(((lam - 1) * (lq - lp)).exp())
+                elif p == 0 and q > 0:
+                    p_weights.append(Decimal("Infinity"))
+                    q_weights.append(Decimal(0))
+                elif p > 0 and q == 0:
+                    p_weights.append(Decimal(0))
+                    q_weights.append(Decimal("Infinity"))
+                else:
+                    p_weights.append(Decimal(1))
+                    q_weights.append(Decimal(1))
+            log_z += Decimal(p_block.n) * z_block.ln()
+            null_weights.append(p_weights)
+            alternative_weights.append(q_weights)
+
+        def moment(member, weights):
+            block_logs = []
+            for block, block_weights in zip(member.blocks, weights, strict=True):
+                value = sum((Decimal.from_float(p) * weight
+                             for p, weight in zip(block.probabilities, block_weights, strict=True)
+                             if p > 0), Decimal(0))
+                block_logs.append(Decimal(block.n) * value.ln())
+            if Decimal("Infinity") in block_logs and Decimal("-Infinity") in block_logs:
+                return Decimal("NaN")
+            return sum(block_logs, Decimal(0))
+
+        # These equalities hold algebraically, avoiding roundoff from evaluating
+        # the selected law through two different exponential expressions.
+        null = tuple(log_z if member.blocks == p_star.blocks else moment(member, null_weights)
+                     for member in problem.null.members)
+        alternative = tuple(log_z if member.blocks == q_star.blocks
+                            else moment(member, alternative_weights)
+                            for member in problem.alternative.members)
+        return log_z, null, alternative
+
+
 def _candidate_for_pair(
     problem: CompositeBinaryTestingProblem,
     order: float,
@@ -770,27 +961,40 @@ def _candidate_for_pair(
         problem.null.members[null_index], problem.alternative.members[alternative_index]
     )
     failures = list(_shared_zero_support_failures(problem, null_index, alternative_index))
-    log_z = -math.inf if divergence == math.inf else (order - 1.0) * divergence
-    null_moments = tuple(
-        _member_log_moment(member, score_blocks, order)
-        for member in problem.null.members
+    failures.extend(_undefined_product_score_failures(problem, score_blocks))
+    log_z_decimal, null_moments, alternative_moments = _decimal_candidate_moments(
+        problem, null_index, alternative_index, order
     )
-    alternative_moments = tuple(
-        _member_log_moment(member, score_blocks, order - 1.0)
-        for member in problem.alternative.members
-    )
-    max_null = max(null_moments)
-    max_alternative = max(alternative_moments)
-    if max_null > log_z + tolerance:
-        failures.append(
-            "null-side uniform exponential-moment inequality fails: "
-            f"max_log_moment={max_null:g}, log_z={log_z:g}"
-        )
-    if max_alternative > log_z + tolerance:
-        failures.append(
-            "alternative-side uniform exponential-moment inequality fails: "
-            f"max_log_moment={max_alternative:g}, log_z={log_z:g}"
-        )
+    maxima = []
+    for side, moments in (("null", null_moments), ("alternative", alternative_moments)):
+        if any(value.is_nan() for value in moments):
+            maximum = Decimal("Infinity")
+            failures.append(f"{side}-side moment is undefined on represented support")
+        else:
+            maximum = max(moments)
+            if maximum > log_z_decimal:
+                failures.append(
+                    f"{side}-side uniform exponential-moment inequality fails: "
+                    f"max_log_moment={maximum}, log_z={log_z_decimal}"
+                )
+            # Equality of selected/duplicate laws is algebraic. For other laws,
+            # an unresolved high-precision near-equality is refused, not rounded
+            # into a stronger mathematical moment certificate.
+            selected = problem.null.members[null_index] if side == "null" else problem.alternative.members[alternative_index]
+            family = problem.null if side == "null" else problem.alternative
+            for member, value in zip(family.members, moments, strict=True):
+                if (member.blocks != selected.blocks and value.is_finite()
+                        and log_z_decimal.is_finite()
+                        and abs(value - log_z_decimal) <= Decimal("1e-65")
+                        * max(Decimal(1), abs(log_z_decimal))):
+                    failures.append(f"{side}-side uniform moment equality is numerically unresolved")
+                    break
+        maxima.append(float(maximum))
+    log_z = float(log_z_decimal)
+    if math.isfinite(log_z):
+        # A common upper enclosure supports the analytical Markov bounds even
+        # when converting the high-precision log moment to a public float.
+        log_z = math.nextafter(log_z, math.inf)
     return CompositeRenyiScoreCandidate(
         problem=problem,
         order=order,
@@ -799,8 +1003,8 @@ def _candidate_for_pair(
         renyi=divergence,
         score_blocks=score_blocks,
         log_hellinger_integral=log_z,
-        maximum_log_null_moment=max_null,
-        maximum_log_alternative_moment=max_alternative,
+        maximum_log_null_moment=maxima[0],
+        maximum_log_alternative_moment=maxima[1],
         uniform_moment_bounds_verified=not failures,
         verification_failures=tuple(failures),
     )
@@ -818,6 +1022,8 @@ def composite_renyi_score_candidate(
     pair is therefore only a candidate score. Among tied minimum-divergence
     pairs, a pair satisfying the two uniform moment inequalities is preferred;
     otherwise the first declared minimiser is returned with explicit failures.
+    ``tolerance`` only identifies numerical pairwise ties; it never relaxes the
+    uniform moment inequalities. Unresolved moment comparisons refuse certification.
     """
 
     if not isinstance(problem, CompositeBinaryTestingProblem):
@@ -903,22 +1109,29 @@ def composite_score_bound_at_order(
         )
     constraint = SimpleBinaryTestingConstraint(epsilon=epsilon)
     lam = candidate.order
-    divergence = candidate.renyi
-    if divergence == math.inf:
-        threshold = -math.inf
+    log_z = candidate.log_hellinger_integral
+    if log_z == -math.inf:
+        # Any finite threshold separates the verified disjoint supports;
+        # -infinity would also reject null-exclusive scores equal to -infinity.
+        threshold = 0.0
         raw = 0.0
     else:
-        threshold = (
-            -math.log(constraint.epsilon) - (1.0 - lam) * divergence
-        ) / lam
-        log_raw = -(1.0 - lam) / lam * math.fsum(
-            (divergence, math.log(constraint.epsilon))
-        )
-        raw = (
-            math.exp(log_raw)
-            if log_raw <= math.log(np.finfo(float).max)
-            else math.inf
-        )
+        with localcontext() as context:
+            context.prec = 80
+            decimal_lam = Decimal.from_float(lam)
+            decimal_z = Decimal.from_float(log_z)
+            decimal_threshold = (decimal_z - Decimal.from_float(constraint.epsilon).ln()) / decimal_lam
+            threshold = math.nextafter(float(decimal_threshold), math.inf)
+            if not math.isfinite(threshold):
+                raise NumericalLimitError("analytical score threshold exceeds floating-point resolution")
+            log_raw = decimal_z + (1 - decimal_lam) * Decimal.from_float(threshold)
+            if log_raw > Decimal.from_float(math.log(np.finfo(float).max)):
+                raw = math.inf
+            else:
+                raw = float(log_raw.exp())
+                if raw == 0:
+                    raise NumericalLimitError("positive analytical score bound underflows floating-point resolution")
+                raw = math.nextafter(raw, math.inf)
     constant = 1.0 - constraint.epsilon
     minimax_upper = min(constant, raw)
     if not math.isfinite(minimax_upper) or not 0 <= minimax_upper <= 1:
@@ -1029,8 +1242,7 @@ def evaluate_composite_score_test(
         outcomes, bound.candidate, bound.threshold, null_mass, alternative_mass
     )
     null_errors = _accurate_expectations(null_mass, decision)
-    alternative_power = _accurate_expectations(alternative_mass, decision)
-    alternative_errors = tuple(1.0 - value for value in alternative_power)
+    alternative_errors = _accurate_expectations(alternative_mass, 1.0 - decision)
     worst_alpha = max(null_errors)
     worst_beta = max(alternative_errors)
     tolerance = max(1e-15, 5e-10 * bound.constraint.epsilon)
@@ -1059,7 +1271,7 @@ def evaluate_composite_score_test(
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CalibratedCompositeScoreTest:
-    """Exact represented-family calibration within one verified score family."""
+    """Enumerated achieved errors within one well-defined candidate score family."""
 
     candidate: CompositeRenyiScoreCandidate
     constraint: SimpleBinaryTestingConstraint
@@ -1089,14 +1301,15 @@ def calibrate_composite_score_test(
     epsilon: Real,
     max_outcomes: int = DEFAULT_EXACT_COMPOSITE_MAX_OUTCOMES,
 ) -> CalibratedCompositeScoreTest:
-    """Exhaust Type-I budget within the fixed verified upper-score family."""
+    """Calibrate a well-defined candidate score on every represented null law.
+
+    Calibration enumerates the actual Type-I constraints, so it remains valid
+    when the stronger analytical uniform-moment conditions fail. Its Type-II
+    error is achieved by this score family and need not equal finite minimax.
+    """
 
     if not isinstance(candidate, CompositeRenyiScoreCandidate):
         raise InputValidationError("candidate must be CompositeRenyiScoreCandidate")
-    if not candidate.uniform_moment_bounds_verified:
-        raise CompositeScoreVerificationError(
-            "candidate score lacks verified uniform composite moment bounds"
-        )
     constraint = SimpleBinaryTestingConstraint(epsilon=epsilon)
     problem = candidate.problem
     outcomes = _enumerate_joint_outcomes(problem, max_outcomes)
@@ -1140,12 +1353,10 @@ def calibrate_composite_score_test(
                 "calibration encountered a positive-score boundary with no null mass"
             )
         eta = min(limits)
-        tolerance = max(1e-15, 5e-10 * constraint.epsilon)
-        if eta < -tolerance or eta > 1.0 + tolerance or not math.isfinite(eta):
+        if not math.isfinite(eta) or not 0.0 <= eta <= 1.0:
             raise CompositeScoreVerificationError(
                 "calibration boundary randomisation left [0, 1]"
             )
-        eta = min(1.0, max(0.0, eta))
         rejection[indices] = eta
         above_null = above_null + eta * boundary_null
         chosen_score = score
@@ -1157,8 +1368,7 @@ def calibrate_composite_score_test(
         )
 
     null_errors = _accurate_expectations(null_mass, rejection)
-    alternative_power = _accurate_expectations(alternative_mass, rejection)
-    alternative_errors = tuple(1.0 - value for value in alternative_power)
+    alternative_errors = _accurate_expectations(alternative_mass, 1.0 - rejection)
     worst_alpha = max(null_errors)
     worst_beta = max(alternative_errors)
     tolerance = max(1e-15, 5e-10 * constraint.epsilon)

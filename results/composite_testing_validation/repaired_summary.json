@@ -1,0 +1,662 @@
+{
+  "label": "repaired",
+  "seed": 20260909,
+  "base_sha": "4f457d2afd75ad1bdffdbe0e9eea25fcaf8a9ad4",
+  "executed_head": "efa13222b2e24e7ceb021df8d4badd8b4ec5f511",
+  "audited_source_sha256": {
+    "fluxemu.observation.schema": "be7a70490cf9fde7255790265e36f2928d7666cbab8b3c5a9e1c59dc0fa608f6",
+    "fluxemu.observation.multinomial": "77ed4a17920aae491069a1d5d611c89ecd21a13b50dd6074304a6292ddc31ae8",
+    "fluxemu.observation.stationary": "400fae949cd8fa74d625d9b4f2b081e3c1327810ceb214ae010345f6fb255f3d",
+    "fluxemu.testing.simple": "82652b9a40b6fb9a8bd8ca7e55aa0b51c51b4cb5bec52423097f4b7d7ec1dbe0",
+    "fluxemu.testing.bruno": "3d21a4077c32d60b74900f5ea3700076df04c722a60a9166492e35f2ebfb9eae",
+    "fluxemu.testing.stationary": "322b6ad58ac1a72c5a84202c8b9665d1e442133c4d59572cc959c91006d00919",
+    "fluxemu.testing.likelihood": "b4fd0505cf655fe86a879ca2185d0fdb8eec5f5d17ae5e786b07c41310844356",
+    "fluxemu.testing.composite": "9568d49df79543e2a42156f622977eea548856e2b8a0d0a8bd2fd86f4188fc08",
+    "fluxemu.testing.composite_stationary": "16e5036152d2a7e82fbbafa30ad303a143ba28b913ec00bd72cebf1dc39bc10c"
+  },
+  "python": "3.12.14",
+  "numpy": "2.5.3",
+  "scipy": "1.18.1",
+  "value_tolerance": 2e-09,
+  "exact_oracle_tolerance": 5e-10,
+  "counts": {
+    "random": 400,
+    "decimal-vertex-enumeration": 40,
+    "lp_accepted": 7457,
+    "lp_result_certificate_checked": 7457,
+    "independently_optimality_certified": 7457,
+    "converse_compared": 8890,
+    "candidate_verified": 944,
+    "projected_accepted": 1407,
+    "central_invariant_compared": 1091,
+    "candidate_refused": 463,
+    "independent-dual-lp-feasible-bound": 2941,
+    "stress": 10000,
+    "decimal-neyman-pearson": 7508,
+    "lp_refused": 3064,
+    "vertex_oracle_fallback": 38,
+    "targeted": 121
+  },
+  "failure_counts": {},
+  "failure_examples": {},
+  "refusal_counts": {
+    "converse:NumericalLimitError:composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision": 909,
+    "lp:CompositeOptimizationError:LP returned invalid dual multipliers": 33,
+    "lp:NumericalLimitError:positive probability coefficient is at or below HiGHS matrix resolution 1e-12": 2620,
+    "lp:CompositeOptimizationError:exact composite minimax LP violates the declared Type-I constraint": 392,
+    "oracle:ArithmeticError:independent dual oracle cannot certify multipliers": 32,
+    "score:NumericalLimitError:composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision": 22,
+    "lp:CompositeOptimizationError:LP primal/dual optimality gap cannot be certified": 18,
+    "lp:CompositeOptimizationError:exact composite minimax LP returned invalid rejection probabilities": 1
+  },
+  "refusal_examples": {
+    "converse:NumericalLimitError:composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision": [
+      "composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision"
+    ],
+    "lp:CompositeOptimizationError:LP returned invalid dual multipliers": [
+      "LP returned invalid dual multipliers"
+    ],
+    "lp:NumericalLimitError:positive probability coefficient is at or below HiGHS matrix resolution 1e-12": [
+      "positive probability coefficient is at or below HiGHS matrix resolution 1e-12; minimum scaled coefficient=2.2559248763093361e-198; no support was dropped",
+      "positive probability coefficient is at or below HiGHS matrix resolution 1e-12; minimum scaled coefficient=3.2074260857359171e-93; no support was dropped",
+      "positive probability coefficient is at or below HiGHS matrix resolution 1e-12; minimum scaled coefficient=1.3686766916271338e-224; no support was dropped"
+    ],
+    "lp:CompositeOptimizationError:exact composite minimax LP violates the declared Type-I constraint": [
+      "exact composite minimax LP violates the declared Type-I constraint: worst alpha=5.8059579781759887e-08, epsilon=5.8059579691380684e-08",
+      "exact composite minimax LP violates the declared Type-I constraint: worst alpha=1.0082062939625872e-07, epsilon=1.0082062879999461e-07",
+      "exact composite minimax LP violates the declared Type-I constraint: worst alpha=1.4811921213351163e-11, epsilon=1.4811402035471434e-11"
+    ],
+    "oracle:ArithmeticError:independent dual oracle cannot certify multipliers": [
+      "independent dual oracle cannot certify multipliers"
+    ],
+    "score:NumericalLimitError:composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision": [
+      "composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision"
+    ],
+    "lp:CompositeOptimizationError:LP primal/dual optimality gap cannot be certified": [
+      "LP primal/dual optimality gap cannot be certified: gap=4.0306751254075834e-09",
+      "LP primal/dual optimality gap cannot be certified: gap=5.8414639791948275e-10",
+      "LP primal/dual optimality gap cannot be certified: gap=2.3838946372478631e-09"
+    ],
+    "lp:CompositeOptimizationError:exact composite minimax LP returned invalid rejection probabilities": [
+      "exact composite minimax LP returned invalid rejection probabilities"
+    ]
+  },
+  "metrics": {
+    "max_oracle_gap": 4.725968505425726e-10,
+    "max_direct_error_discrepancy": 2.220446049250313e-16,
+    "max_projected_optimality_gap": 0.8654864295286583,
+    "min_converse_gap": -3.5828007227678427e-12,
+    "max_converse_gap": 0.9999999999989921
+  },
+  "extremal_witnesses": {
+    "min_converse_gap": {
+      "epsilon": 8.271380117727133e-12,
+      "totals": [
+        1
+      ],
+      "null": [
+        [
+          [
+            2.2421084242606913e-05,
+            0.5433731903678921,
+            0.4566043885478652
+          ]
+        ],
+        [
+          [
+            0.42239239611573093,
+            2.088168113357087e-05,
+            0.5775867222031356
+          ]
+        ]
+      ],
+      "alternative": [
+        [
+          [
+            0.009851796385578841,
+            0.004075294180573571,
+            0.9860729094338475
+          ]
+        ],
+        [
+          [
+            2.6095509206152032e-06,
+            0.9999973904286965,
+            2.038300709579462e-11
+          ]
+        ]
+      ],
+      "case": "stress-6383",
+      "gap": -3.5828007227678427e-12,
+      "order": 1000.0
+    },
+    "max_converse_gap": {
+      "epsilon": 1.0017885792544721e-12,
+      "totals": [
+        1
+      ],
+      "null": [
+        [
+          [
+            0.5,
+            0.5
+          ]
+        ]
+      ],
+      "alternative": [
+        [
+          [
+            0.5000051968896922,
+            0.49999480311030775
+          ]
+        ]
+      ],
+      "case": "stress-7651",
+      "gap": 0.9999999999989921,
+      "order": 1.0000000000000002
+    },
+    "max_projected_optimality_gap": {
+      "epsilon": 0.8277874168104449,
+      "totals": [
+        1
+      ],
+      "null": [
+        [
+          [
+            0.4365227125851091,
+            0.538809560323939,
+            0.02466772709095189
+          ]
+        ],
+        [
+          [
+            0.021836456241563027,
+            0.008876601635563428,
+            0.9692869421228735
+          ]
+        ]
+      ],
+      "alternative": [
+        [
+          [
+            0.7037457308182737,
+            0.23742040787206237,
+            0.058833861309664025
+          ]
+        ],
+        [
+          [
+            0.7470078976433696,
+            0.1316491778861218,
+            0.12134292447050854
+          ]
+        ]
+      ],
+      "case": "random-253",
+      "gap": 0.8654864295286583,
+      "score_order": 0.9,
+      "minimax_beta": 0.08426845939221521,
+      "projected_beta": 0.9497548889208735,
+      "uniform_moments_verified": false
+    }
+  },
+  "count_law_refusal_curves": {
+    "2": [
+      {
+        "n": 1,
+        "accepted": true
+      },
+      {
+        "n": 2,
+        "accepted": true
+      },
+      {
+        "n": 3,
+        "accepted": true
+      },
+      {
+        "n": 4,
+        "accepted": true
+      },
+      {
+        "n": 5,
+        "accepted": true
+      },
+      {
+        "n": 6,
+        "accepted": true
+      },
+      {
+        "n": 7,
+        "accepted": true
+      },
+      {
+        "n": 8,
+        "accepted": true
+      },
+      {
+        "n": 9,
+        "accepted": true
+      },
+      {
+        "n": 10,
+        "accepted": true
+      },
+      {
+        "n": 11,
+        "accepted": true
+      },
+      {
+        "n": 12,
+        "accepted": true
+      },
+      {
+        "n": 13,
+        "accepted": true
+      },
+      {
+        "n": 14,
+        "accepted": true
+      },
+      {
+        "n": 15,
+        "accepted": true
+      },
+      {
+        "n": 16,
+        "accepted": true
+      },
+      {
+        "n": 17,
+        "accepted": true
+      },
+      {
+        "n": 18,
+        "accepted": false
+      },
+      {
+        "n": 19,
+        "accepted": false
+      },
+      {
+        "n": 20,
+        "accepted": false
+      },
+      {
+        "n": 21,
+        "accepted": false
+      },
+      {
+        "n": 22,
+        "accepted": false
+      },
+      {
+        "n": 23,
+        "accepted": false
+      },
+      {
+        "n": 24,
+        "accepted": false
+      },
+      {
+        "n": 25,
+        "accepted": false
+      },
+      {
+        "n": 26,
+        "accepted": false
+      },
+      {
+        "n": 27,
+        "accepted": false
+      },
+      {
+        "n": 28,
+        "accepted": false
+      },
+      {
+        "n": 29,
+        "accepted": false
+      },
+      {
+        "n": 30,
+        "accepted": false
+      },
+      {
+        "n": 31,
+        "accepted": false
+      },
+      {
+        "n": 32,
+        "accepted": false
+      },
+      {
+        "n": 33,
+        "accepted": false
+      },
+      {
+        "n": 34,
+        "accepted": false
+      },
+      {
+        "n": 35,
+        "accepted": false
+      },
+      {
+        "n": 36,
+        "accepted": false
+      },
+      {
+        "n": 37,
+        "accepted": false
+      },
+      {
+        "n": 38,
+        "accepted": false
+      },
+      {
+        "n": 39,
+        "accepted": false
+      },
+      {
+        "n": 40,
+        "accepted": false
+      },
+      {
+        "n": 41,
+        "accepted": false
+      },
+      {
+        "n": 42,
+        "accepted": false
+      },
+      {
+        "n": 43,
+        "accepted": false
+      },
+      {
+        "n": 44,
+        "accepted": false
+      },
+      {
+        "n": 45,
+        "accepted": false
+      },
+      {
+        "n": 46,
+        "accepted": false
+      },
+      {
+        "n": 47,
+        "accepted": false
+      },
+      {
+        "n": 48,
+        "accepted": false
+      },
+      {
+        "n": 49,
+        "accepted": false
+      },
+      {
+        "n": 50,
+        "accepted": false
+      },
+      {
+        "n": 51,
+        "accepted": false
+      },
+      {
+        "n": 52,
+        "accepted": false
+      },
+      {
+        "n": 53,
+        "accepted": false
+      },
+      {
+        "n": 54,
+        "accepted": false
+      },
+      {
+        "n": 55,
+        "accepted": false
+      },
+      {
+        "n": 56,
+        "accepted": false
+      },
+      {
+        "n": 57,
+        "accepted": false
+      },
+      {
+        "n": 58,
+        "accepted": false
+      },
+      {
+        "n": 59,
+        "accepted": false
+      },
+      {
+        "n": 60,
+        "accepted": false
+      },
+      {
+        "n": 61,
+        "accepted": false
+      },
+      {
+        "n": 62,
+        "accepted": false
+      },
+      {
+        "n": 63,
+        "accepted": false
+      },
+      {
+        "n": 64,
+        "accepted": false
+      }
+    ],
+    "3": [
+      {
+        "n": 1,
+        "accepted": true
+      },
+      {
+        "n": 2,
+        "accepted": true
+      },
+      {
+        "n": 3,
+        "accepted": true
+      },
+      {
+        "n": 4,
+        "accepted": true
+      },
+      {
+        "n": 5,
+        "accepted": true
+      },
+      {
+        "n": 6,
+        "accepted": true
+      },
+      {
+        "n": 7,
+        "accepted": true
+      },
+      {
+        "n": 8,
+        "accepted": true
+      },
+      {
+        "n": 9,
+        "accepted": true
+      },
+      {
+        "n": 10,
+        "accepted": true
+      },
+      {
+        "n": 11,
+        "accepted": true
+      },
+      {
+        "n": 12,
+        "accepted": true
+      },
+      {
+        "n": 13,
+        "accepted": false
+      },
+      {
+        "n": 14,
+        "accepted": false
+      },
+      {
+        "n": 15,
+        "accepted": false
+      },
+      {
+        "n": 16,
+        "accepted": false
+      },
+      {
+        "n": 17,
+        "accepted": false
+      },
+      {
+        "n": 18,
+        "accepted": false
+      },
+      {
+        "n": 19,
+        "accepted": false
+      },
+      {
+        "n": 20,
+        "accepted": false
+      },
+      {
+        "n": 21,
+        "accepted": false
+      },
+      {
+        "n": 22,
+        "accepted": false
+      },
+      {
+        "n": 23,
+        "accepted": false
+      },
+      {
+        "n": 24,
+        "accepted": false
+      },
+      {
+        "n": 25,
+        "accepted": false
+      },
+      {
+        "n": 26,
+        "accepted": false
+      },
+      {
+        "n": 27,
+        "accepted": false
+      },
+      {
+        "n": 28,
+        "accepted": false
+      },
+      {
+        "n": 29,
+        "accepted": false
+      },
+      {
+        "n": 30,
+        "accepted": false
+      },
+      {
+        "n": 31,
+        "accepted": false
+      },
+      {
+        "n": 32,
+        "accepted": false
+      },
+      {
+        "n": 33,
+        "accepted": false
+      },
+      {
+        "n": 34,
+        "accepted": false
+      },
+      {
+        "n": 35,
+        "accepted": false
+      },
+      {
+        "n": 36,
+        "accepted": false
+      },
+      {
+        "n": 37,
+        "accepted": false
+      },
+      {
+        "n": 38,
+        "accepted": false
+      },
+      {
+        "n": 39,
+        "accepted": false
+      },
+      {
+        "n": 40,
+        "accepted": false
+      }
+    ],
+    "uniform-2": [
+      {
+        "n": 38,
+        "accepted": true
+      },
+      {
+        "n": 39,
+        "accepted": true
+      },
+      {
+        "n": 40,
+        "accepted": false
+      },
+      {
+        "n": 41,
+        "accepted": false
+      }
+    ],
+    "uniform-3": [
+      {
+        "n": 24,
+        "accepted": true
+      },
+      {
+        "n": 25,
+        "accepted": true
+      },
+      {
+        "n": 26,
+        "accepted": false
+      },
+      {
+        "n": 27,
+        "accepted": false
+      }
+    ]
+  },
+  "affine_control": "New explicit finite grids p(t)=(.6-.2t,.3-.1t,.1+.3t), H0 t=(0,.25,.5), H1 t=(.6,.8,1); historical parameterisation unavailable."
+}

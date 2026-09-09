@@ -114,9 +114,55 @@ def _product_members(
     return tuple(products)
 
 
+def _validate_source(
+    source: StationaryObservationLawResult,
+    states: tuple[CanonicalFluxState, ...],
+    family: CompositeMIDLawFamily,
+    role: str,
+) -> None:
+    """Bind every ordered source block to its state and observable family law."""
+
+    if not isinstance(source, StationaryObservationLawResult):
+        raise InputValidationError(f"{role} source must be StationaryObservationLawResult")
+    if source.states != states:
+        raise InputValidationError(
+            f"{role} observation source does not retain the {role} state family"
+        )
+    experiments = dict(source.experiment_fingerprints)
+    if len(experiments) != len(source.experiment_fingerprints):
+        raise InputValidationError(f"{role} source contains duplicate experiment fingerprints")
+    for component in source.components:
+        if (
+            component.model_fingerprint != source.model_fingerprint
+            or component.specification_fingerprint != source.specification_fingerprint
+            or component.experiment_fingerprint != experiments.get(component.experiment_id)
+        ):
+            raise InputValidationError(
+                f"{role} observation component provenance differs from its source"
+            )
+    member = family.members[0]
+    declarations = tuple(
+        (identity, block.n)
+        for identity, block in zip(member.block_identities, member.blocks, strict=True)
+    )
+    declared_experiments = tuple(dict.fromkeys(identity[0] for identity, _ in declarations))
+    if declared_experiments != tuple(experiments):
+        raise InputValidationError(f"{role} observation experiment provenance order differs from its laws")
+    products = _product_members(source, states, declarations, role)
+    if products != family.members:
+        raise InputValidationError(
+            f"{role} composite family must retain the exact ordered source laws"
+        )
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class StationaryCompositeTestingResult:
-    """Finite flux families and aligned complete product observation-law classes."""
+    """Finite flux families bound to their exact ordered native observation laws.
+
+    Member IDs supplement the component/state/law consistency checks; they do
+    not replace them. Both source provenance records contribute to the result
+    fingerprint, while testing rules continue to consume observable laws only.
+    """
 
     hypotheses: CompositeFluxHypotheses
     null_observation_laws: StationaryObservationLawResult
@@ -130,12 +176,10 @@ class StationaryCompositeTestingResult:
             raise InputValidationError("problem must be CompositeBinaryTestingProblem")
         null = self.null_observation_laws
         alternative = self.alternative_observation_laws
-        if null.states != self.hypotheses.null_states:
-            raise InputValidationError("null observation source does not retain the null state family")
-        if alternative.states != self.hypotheses.alternative_states:
-            raise InputValidationError(
-                "alternative observation source does not retain the alternative state family"
-            )
+        _validate_source(null, self.hypotheses.null_states, self.problem.null, "null")
+        _validate_source(
+            alternative, self.hypotheses.alternative_states, self.problem.alternative, "alternative"
+        )
         if (
             null.model_fingerprint != alternative.model_fingerprint
             or null.specification_fingerprint != alternative.specification_fingerprint
@@ -157,10 +201,18 @@ class StationaryCompositeTestingResult:
     def fingerprint(self) -> str:
         return _testing_digest(
             (
-                "stationary-composite-testing-result-v2",
+                "stationary-composite-testing-result-v3",
                 self.hypotheses.fingerprint,
                 self.problem.fingerprint,
-                self.null_observation_laws.specification_fingerprint,
+                tuple(
+                    (
+                        source.model_fingerprint,
+                        source.experiment_fingerprints,
+                        source.specification_fingerprint,
+                        tuple(component.fingerprint for component in source.components),
+                    )
+                    for source in (self.null_observation_laws, self.alternative_observation_laws)
+                ),
             )
         )
 
@@ -190,6 +242,7 @@ def evaluate_stationary_composite_hypotheses(
     hypotheses = CompositeFluxHypotheses(
         null_states=null_states, alternative_states=alternative_states
     )
+    _observation.validate_stationary_observation_specification(specification)
     declarations = tuple(
         ((block.experiment_id, item.target_id, item.replicate_id), item.total_count)
         for block in specification.experiments

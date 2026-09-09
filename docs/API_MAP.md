@@ -93,17 +93,18 @@ Roles are fixed: H0=P0=null and H1=P1=alternative. The exact p value is the P0 u
 - `CompositeMIDLawFamily`: one explicit finite H0 or H1 family of complete product laws, with no implicit convex hull or member frequency prior;
 - `CompositeBinaryTestingProblem`: aligned finite null and alternative classes with the same complete block identities, totals and mass class spaces;
 - `composite_renyi_converse_at_order(...)`: order specific `lambda > 1` Type II lower bound from the minimum directed full product law Rényi separation;
-- `exact_finite_composite_minimax(...)`: complete joint count space randomised minimax LP oracle, using SciPy and HiGHS through the `testing` extra and failing at an explicit product outcome cap;
+- `exact_finite_composite_minimax(...)`: unrestricted complete joint count-space randomised minimax LP, using SciPy and HiGHS through the `testing` extra, with numerical feasibility/optimality validation and explicit enumeration or numerical refusals;
 - `CompositeRenyiScoreCandidate` and `composite_renyi_score_candidate(...)`: order `0 < lambda < 1` finite family vertex pair minimum plus support and uniform moment diagnostics;
 - `verified_composite_renyi_score(...)`: returns that candidate only when both uniform composite moment inequalities verify over every represented member;
 - `CompositeScoreBound` and `composite_score_bound_at_order(...)`: analytical threshold, score construction Type II bound, constant randomised test bound and represented minimax upper bound without joint outcome enumeration;
-- `evaluate_composite_score_test(...)`: optional small space exact evaluation of the deterministic analytical threshold rule;
-- `calibrate_composite_score_test(...)`: exact Type I calibration within the fixed verified upper score threshold family when the joint count space is enumerable;
+- `evaluate_composite_score_test(...)`: optional complete small-space enumeration of the deterministic analytical threshold rule and its achieved errors;
+- `calibrate_composite_score_test(...)`: enumerated Type I calibration within a fixed, well-defined candidate upper-score threshold family, returning achieved worst-case errors even when the analytical moment certificate fails;
 - `CompositeFluxHypotheses`, `StationaryCompositeTestingResult`, and `evaluate_stationary_composite_hypotheses(...)`: finite complete flux state families mapped through native stationary EMU into one complete product observation law per state. Multiple blocks require explicit `independent_blocks=True`.
 
-The exact represented minimax value, calibrated score family value, deterministic score error and analytical Rényi bounds are distinct quantities. A finite family vertex pair Rényi minimum is a candidate score, not automatically a joint convex class projection or a finite sample least favourable pair.
+The LP is a mathematically exact characterisation of the represented finite minimax value; its solution is validated numerically in floating-point arithmetic. A calibrated score returns an achieved error, which may strictly exceed the unrestricted minimax optimum. A valid converse is a lower bound: `converse <= beta_star <= achieved score error`. These quantities and the analytical score upper bounds remain distinct. A finite-family vertex-pair Rényi minimum does not by itself prove the uniform projected-moment inequalities or finite-sample least favourability.
 
-See `docs/COMPOSITE_TESTING.md` for the statistical contract and current scope.
+These APIs cover the supplied finite lists only. Rigorous optimisation or bounds over a complete continuous feasible flux family, generic composite p-values and compatibility-region inversion are not implemented. See [COMPOSITE_TESTING.md](COMPOSITE_TESTING.md) for numerical policies and count semantics.
+
 
 ## CLI
 

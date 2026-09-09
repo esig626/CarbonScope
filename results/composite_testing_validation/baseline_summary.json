@@ -1,0 +1,832 @@
+{
+  "label": "baseline",
+  "seed": 20260909,
+  "base_sha": "4f457d2afd75ad1bdffdbe0e9eea25fcaf8a9ad4",
+  "executed_head": "efa13222b2e24e7ceb021df8d4badd8b4ec5f511",
+  "audited_source_sha256": {
+    "fluxemu.observation.schema": "be7a70490cf9fde7255790265e36f2928d7666cbab8b3c5a9e1c59dc0fa608f6",
+    "fluxemu.observation.multinomial": "77ed4a17920aae491069a1d5d611c89ecd21a13b50dd6074304a6292ddc31ae8",
+    "fluxemu.observation.stationary": "400fae949cd8fa74d625d9b4f2b081e3c1327810ceb214ae010345f6fb255f3d",
+    "fluxemu.testing.simple": "82652b9a40b6fb9a8bd8ca7e55aa0b51c51b4cb5bec52423097f4b7d7ec1dbe0",
+    "fluxemu.testing.bruno": "3d21a4077c32d60b74900f5ea3700076df04c722a60a9166492e35f2ebfb9eae",
+    "fluxemu.testing.stationary": "322b6ad58ac1a72c5a84202c8b9665d1e442133c4d59572cc959c91006d00919",
+    "fluxemu.testing.likelihood": "b4fd0505cf655fe86a879ca2185d0fdb8eec5f5d17ae5e786b07c41310844356",
+    "fluxemu.testing.composite": "cd2f1c50c25ec8dd76734ce4302bb943a26c22e1d1a55cde14967ada07a040ea",
+    "fluxemu.testing.composite_stationary": "15e2ef43470b8511d3aa58d30c7c88245f0531fbdde9d81ffe3307a1a29d946e"
+  },
+  "python": "3.12.14",
+  "numpy": "2.5.3",
+  "scipy": "1.18.1",
+  "value_tolerance": 2e-09,
+  "exact_oracle_tolerance": 5e-10,
+  "counts": {
+    "random": 400,
+    "decimal-vertex-enumeration": 40,
+    "lp_accepted": 10014,
+    "independently_optimality_certified": 10012,
+    "converse_compared": 9250,
+    "candidate_verified": 1091,
+    "projected_accepted": 1091,
+    "central_invariant_compared": 945,
+    "candidate_refused": 316,
+    "independent-dual-lp-feasible-bound": 2941,
+    "stress": 10000,
+    "decimal-neyman-pearson": 7508,
+    "lp_refused": 507,
+    "vertex_oracle_fallback": 41,
+    "targeted": 121
+  },
+  "failure_counts": {
+    "false_uniform_moment_certification": 3,
+    "accepted_optimality_uncertified": 2
+  },
+  "failure_examples": {
+    "false_uniform_moment_certification": [
+      {
+        "case": "random-124",
+        "epsilon": 0.7764419011763919,
+        "totals": [
+          1
+        ],
+        "null": [
+          [
+            [
+              0.32497799742120254,
+              0.6750220025787974
+            ]
+          ],
+          [
+            [
+              0.23451080667330576,
+              0.7654891933266943
+            ]
+          ]
+        ],
+        "alternative": [
+          [
+            [
+              0.38724623142125997,
+              0.61275376857874
+            ]
+          ],
+          [
+            [
+              0.22927891532419564,
+              0.7707210846758042
+            ]
+          ]
+        ],
+        "score_order": 0.99999999,
+        "excess": 4.6401201132922933e-11
+      },
+      {
+        "case": "random-360",
+        "epsilon": 0.665957874081248,
+        "totals": [
+          1
+        ],
+        "null": [
+          [
+            [
+              0.0053292560203410545,
+              0.994670743979659
+            ]
+          ],
+          [
+            [
+              0.005987322537872422,
+              0.9940126774621275
+            ]
+          ]
+        ],
+        "alternative": [
+          [
+            [
+              0.12260289321148231,
+              0.8773971067885178
+            ]
+          ],
+          [
+            [
+              0.9555007175043757,
+              0.04449928249562422
+            ]
+          ]
+        ],
+        "score_order": 1e-08,
+        "excess": 2.1460643681680227e-11
+      },
+      {
+        "case": "random-379",
+        "epsilon": 0.282096856444662,
+        "totals": [
+          1
+        ],
+        "null": [
+          [
+            [
+              0.7611110664830865,
+              0.07914152161602458,
+              0.15974741190088895
+            ]
+          ],
+          [
+            [
+              0.1313098584112834,
+              0.16080716377747217,
+              0.7078829778112443
+            ]
+          ]
+        ],
+        "alternative": [
+          [
+            [
+              0.217870340963925,
+              0.5827106820951201,
+              0.19941897694095506
+            ]
+          ],
+          [
+            [
+              0.10112173759592069,
+              0.6169807143775008,
+              0.28189754802657857
+            ]
+          ]
+        ],
+        "score_order": 0.99999999,
+        "excess": 6.3846475328076545e-12
+      }
+    ],
+    "accepted_optimality_uncertified": [
+      {
+        "case": "stress-1496",
+        "epsilon": 0.39542481278532665,
+        "totals": [
+          1
+        ],
+        "null": [
+          [
+            [
+              2.4584366475093418e-14,
+              0.9999999999999755
+            ]
+          ]
+        ],
+        "alternative": [
+          [
+            [
+              7.583662395957528e-10,
+              0.9999999992416337
+            ]
+          ]
+        ],
+        "beta": 0.6045751875145404,
+        "oracle": {
+          "beta": 0.6045751867561988,
+          "rejection": [
+            0.3954248127853118,
+            1.0
+          ],
+          "method": "decimal-neyman-pearson"
+        }
+      },
+      {
+        "case": "stress-9128",
+        "epsilon": 0.6985446913288124,
+        "totals": [
+          1
+        ],
+        "null": [
+          [
+            [
+              1.6847478613508015e-18,
+              1.0
+            ]
+          ]
+        ],
+        "alternative": [
+          [
+            [
+              5.089931857333033e-10,
+              0.9999999994910068
+            ]
+          ]
+        ],
+        "beta": 0.3014553090267421,
+        "oracle": {
+          "beta": 0.30145530851774893,
+          "rejection": [
+            0.6985446913288124,
+            1.0
+          ],
+          "method": "decimal-neyman-pearson"
+        }
+      }
+    ]
+  },
+  "refusal_counts": {
+    "score:CompositeScoreVerificationError:candidate score lacks verified uniform composite moment bounds": 316,
+    "converse:NumericalLimitError:composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision": 909,
+    "lp:CompositeOptimizationError:exact composite minimax LP violates the declared Type-I constraint": 506,
+    "oracle:ArithmeticError:independent dual oracle cannot certify multipliers": 32,
+    "score:NumericalLimitError:composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision": 22,
+    "lp:CompositeOptimizationError:exact composite minimax LP objective disagrees with evaluated worst-case Type II": 1
+  },
+  "refusal_examples": {
+    "score:CompositeScoreVerificationError:candidate score lacks verified uniform composite moment bounds": [
+      "candidate score lacks verified uniform composite moment bounds"
+    ],
+    "converse:NumericalLimitError:composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision": [
+      "composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision"
+    ],
+    "lp:CompositeOptimizationError:exact composite minimax LP violates the declared Type-I constraint": [
+      "exact composite minimax LP violates the declared Type-I constraint: worst alpha=5.8059579781759887e-08, epsilon=5.8059579691380684e-08",
+      "exact composite minimax LP violates the declared Type-I constraint: worst alpha=1.0082063305580737e-07, epsilon=1.0082062879999461e-07",
+      "exact composite minimax LP violates the declared Type-I constraint: worst alpha=1.4811921213351163e-11, epsilon=1.4811402035471434e-11"
+    ],
+    "oracle:ArithmeticError:independent dual oracle cannot certify multipliers": [
+      "independent dual oracle cannot certify multipliers"
+    ],
+    "score:NumericalLimitError:composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision": [
+      "composite product R\u00e9nyi divergence is nonfinite or negative at numerical precision"
+    ],
+    "lp:CompositeOptimizationError:exact composite minimax LP objective disagrees with evaluated worst-case Type II": [
+      "exact composite minimax LP objective disagrees with evaluated worst-case Type II"
+    ]
+  },
+  "metrics": {
+    "max_oracle_gap": 7.583416117284969e-10,
+    "max_direct_error_discrepancy": 3.510797559819525e-15,
+    "max_projected_optimality_gap": 0.34986502596504776,
+    "min_converse_gap": -2.1195756261249699e-10,
+    "max_converse_gap": 0.9999999999989921
+  },
+  "extremal_witnesses": {
+    "min_converse_gap": {
+      "epsilon": 2.205706154783856e-12,
+      "totals": [
+        1
+      ],
+      "null": [
+        [
+          [
+            0.00022386226035950486,
+            0.8756047843696105,
+            0.12417135337002998
+          ]
+        ],
+        [
+          [
+            0.573608976436792,
+            0.03743332032505216,
+            0.388957703238156
+          ]
+        ]
+      ],
+      "alternative": [
+        [
+          [
+            0.9999477565636896,
+            5.224343630721442e-05,
+            3.2869032430792653e-15
+          ]
+        ],
+        [
+          [
+            2.380081640646122e-10,
+            0.8079140791299791,
+            0.19208592063201269
+          ]
+        ]
+      ],
+      "case": "stress-7111",
+      "gap": -2.1195756261249699e-10,
+      "order": 1000.0
+    },
+    "max_converse_gap": {
+      "epsilon": 1.0017885792544721e-12,
+      "totals": [
+        1
+      ],
+      "null": [
+        [
+          [
+            0.5,
+            0.5
+          ]
+        ]
+      ],
+      "alternative": [
+        [
+          [
+            0.5000051968896922,
+            0.49999480311030775
+          ]
+        ]
+      ],
+      "case": "stress-7651",
+      "gap": 0.9999999999989921,
+      "order": 1.0000000000000002
+    },
+    "max_projected_optimality_gap": {
+      "epsilon": 0.4804689452609885,
+      "totals": [
+        1
+      ],
+      "null": [
+        [
+          [
+            0.4493316068145679,
+            0.550668393185432
+          ]
+        ],
+        [
+          [
+            0.8503140538931376,
+            0.14968594610686242
+          ]
+        ]
+      ],
+      "alternative": [
+        [
+          [
+            0.449331602337245,
+            0.5506683976627549
+          ]
+        ],
+        [
+          [
+            0.8503140502798797,
+            0.14968594972012025
+          ]
+        ]
+      ],
+      "case": "stress-900",
+      "gap": 0.34986502596504776,
+      "score_order": 1e-08,
+      "minimax_beta": 0.5195310547390115,
+      "projected_beta": 0.8693960807040593,
+      "uniform_moments_verified": true
+    }
+  },
+  "count_law_refusal_curves": {
+    "2": [
+      {
+        "n": 1,
+        "accepted": true
+      },
+      {
+        "n": 2,
+        "accepted": true
+      },
+      {
+        "n": 3,
+        "accepted": true
+      },
+      {
+        "n": 4,
+        "accepted": true
+      },
+      {
+        "n": 5,
+        "accepted": true
+      },
+      {
+        "n": 6,
+        "accepted": true
+      },
+      {
+        "n": 7,
+        "accepted": true
+      },
+      {
+        "n": 8,
+        "accepted": true
+      },
+      {
+        "n": 9,
+        "accepted": true
+      },
+      {
+        "n": 10,
+        "accepted": true
+      },
+      {
+        "n": 11,
+        "accepted": true
+      },
+      {
+        "n": 12,
+        "accepted": true
+      },
+      {
+        "n": 13,
+        "accepted": true
+      },
+      {
+        "n": 14,
+        "accepted": true
+      },
+      {
+        "n": 15,
+        "accepted": true
+      },
+      {
+        "n": 16,
+        "accepted": true
+      },
+      {
+        "n": 17,
+        "accepted": true
+      },
+      {
+        "n": 18,
+        "accepted": true
+      },
+      {
+        "n": 19,
+        "accepted": true
+      },
+      {
+        "n": 20,
+        "accepted": false
+      },
+      {
+        "n": 21,
+        "accepted": true
+      },
+      {
+        "n": 22,
+        "accepted": true
+      },
+      {
+        "n": 23,
+        "accepted": true
+      },
+      {
+        "n": 24,
+        "accepted": true
+      },
+      {
+        "n": 25,
+        "accepted": true
+      },
+      {
+        "n": 26,
+        "accepted": false
+      },
+      {
+        "n": 27,
+        "accepted": true
+      },
+      {
+        "n": 28,
+        "accepted": true
+      },
+      {
+        "n": 29,
+        "accepted": false
+      },
+      {
+        "n": 30,
+        "accepted": true
+      },
+      {
+        "n": 31,
+        "accepted": true
+      },
+      {
+        "n": 32,
+        "accepted": true
+      },
+      {
+        "n": 33,
+        "accepted": true
+      },
+      {
+        "n": 34,
+        "accepted": false
+      },
+      {
+        "n": 35,
+        "accepted": true
+      },
+      {
+        "n": 36,
+        "accepted": false
+      },
+      {
+        "n": 37,
+        "accepted": true
+      },
+      {
+        "n": 38,
+        "accepted": true
+      },
+      {
+        "n": 39,
+        "accepted": false
+      },
+      {
+        "n": 40,
+        "accepted": true
+      },
+      {
+        "n": 41,
+        "accepted": false
+      },
+      {
+        "n": 42,
+        "accepted": true
+      },
+      {
+        "n": 43,
+        "accepted": false
+      },
+      {
+        "n": 44,
+        "accepted": true
+      },
+      {
+        "n": 45,
+        "accepted": false
+      },
+      {
+        "n": 46,
+        "accepted": true
+      },
+      {
+        "n": 47,
+        "accepted": true
+      },
+      {
+        "n": 48,
+        "accepted": true
+      },
+      {
+        "n": 49,
+        "accepted": true
+      },
+      {
+        "n": 50,
+        "accepted": false
+      },
+      {
+        "n": 51,
+        "accepted": true
+      },
+      {
+        "n": 52,
+        "accepted": false
+      },
+      {
+        "n": 53,
+        "accepted": true
+      },
+      {
+        "n": 54,
+        "accepted": false
+      },
+      {
+        "n": 55,
+        "accepted": true
+      },
+      {
+        "n": 56,
+        "accepted": false
+      },
+      {
+        "n": 57,
+        "accepted": true
+      },
+      {
+        "n": 58,
+        "accepted": false
+      },
+      {
+        "n": 59,
+        "accepted": false
+      },
+      {
+        "n": 60,
+        "accepted": false
+      },
+      {
+        "n": 61,
+        "accepted": true
+      },
+      {
+        "n": 62,
+        "accepted": false
+      },
+      {
+        "n": 63,
+        "accepted": true
+      },
+      {
+        "n": 64,
+        "accepted": false
+      }
+    ],
+    "3": [
+      {
+        "n": 1,
+        "accepted": true
+      },
+      {
+        "n": 2,
+        "accepted": true
+      },
+      {
+        "n": 3,
+        "accepted": true
+      },
+      {
+        "n": 4,
+        "accepted": true
+      },
+      {
+        "n": 5,
+        "accepted": true
+      },
+      {
+        "n": 6,
+        "accepted": true
+      },
+      {
+        "n": 7,
+        "accepted": true
+      },
+      {
+        "n": 8,
+        "accepted": true
+      },
+      {
+        "n": 9,
+        "accepted": true
+      },
+      {
+        "n": 10,
+        "accepted": true
+      },
+      {
+        "n": 11,
+        "accepted": true
+      },
+      {
+        "n": 12,
+        "accepted": true
+      },
+      {
+        "n": 13,
+        "accepted": true
+      },
+      {
+        "n": 14,
+        "accepted": true
+      },
+      {
+        "n": 15,
+        "accepted": false
+      },
+      {
+        "n": 16,
+        "accepted": true
+      },
+      {
+        "n": 17,
+        "accepted": false
+      },
+      {
+        "n": 18,
+        "accepted": true
+      },
+      {
+        "n": 19,
+        "accepted": true
+      },
+      {
+        "n": 20,
+        "accepted": false
+      },
+      {
+        "n": 21,
+        "accepted": false
+      },
+      {
+        "n": 22,
+        "accepted": false
+      },
+      {
+        "n": 23,
+        "accepted": false
+      },
+      {
+        "n": 24,
+        "accepted": false
+      },
+      {
+        "n": 25,
+        "accepted": false
+      },
+      {
+        "n": 26,
+        "accepted": false
+      },
+      {
+        "n": 27,
+        "accepted": false
+      },
+      {
+        "n": 28,
+        "accepted": false
+      },
+      {
+        "n": 29,
+        "accepted": false
+      },
+      {
+        "n": 30,
+        "accepted": false
+      },
+      {
+        "n": 31,
+        "accepted": false
+      },
+      {
+        "n": 32,
+        "accepted": false
+      },
+      {
+        "n": 33,
+        "accepted": false
+      },
+      {
+        "n": 34,
+        "accepted": false
+      },
+      {
+        "n": 35,
+        "accepted": false
+      },
+      {
+        "n": 36,
+        "accepted": false
+      },
+      {
+        "n": 37,
+        "accepted": false
+      },
+      {
+        "n": 38,
+        "accepted": false
+      },
+      {
+        "n": 39,
+        "accepted": false
+      },
+      {
+        "n": 40,
+        "accepted": false
+      }
+    ],
+    "uniform-2": [
+      {
+        "n": 38,
+        "accepted": true
+      },
+      {
+        "n": 39,
+        "accepted": true
+      },
+      {
+        "n": 40,
+        "accepted": true
+      },
+      {
+        "n": 41,
+        "accepted": true
+      }
+    ],
+    "uniform-3": [
+      {
+        "n": 24,
+        "accepted": true
+      },
+      {
+        "n": 25,
+        "accepted": true
+      },
+      {
+        "n": 26,
+        "accepted": true
+      },
+      {
+        "n": 27,
+        "accepted": true
+      }
+    ]
+  },
+  "affine_control": "New explicit finite grids p(t)=(.6-.2t,.3-.1t,.1+.3t), H0 t=(0,.25,.5), H1 t=(.6,.8,1); historical parameterisation unavailable."
+}
