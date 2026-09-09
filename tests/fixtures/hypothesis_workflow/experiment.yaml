@@ -1,0 +1,26 @@
+schema_version: 1
+isotope_model:
+  metabolites:
+    glucose_unlabelled: {carbon_count: 6}
+    glucose_labelled: {carbon_count: 6}
+    g6p: {carbon_count: 6}
+  required_reactions: [HX_U, HX_L]
+  assignments:
+    - reaction_id: HX_U
+      transition_id: glycolysis.hexokinase
+      direction: forward
+      metabolite_map: {glucose: glucose_unlabelled, glucose_6_phosphate: g6p}
+    - reaction_id: HX_L
+      transition_id: glycolysis.hexokinase
+      direction: forward
+      metabolite_map: {glucose: glucose_labelled, glucose_6_phosphate: g6p}
+experiment:
+  tracers:
+    - metabolite_id: glucose_unlabelled
+      isotopomers: {'#000000': 1.0}
+    - metabolite_id: glucose_labelled
+      isotopomers: {'#111111': 1.0}
+  targets:
+    - target_id: pool-mid
+      metabolite_id: g6p
+      atom_positions: [1, 2, 3, 4, 5, 6]
