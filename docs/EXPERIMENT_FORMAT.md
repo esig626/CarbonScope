@@ -59,14 +59,31 @@ Observation targets that combine explicit precursor fragments may also be declar
 
 `fva_fraction_of_optimum` must lie in `(0, 1]`. It controls the retained biological objective constraint in native forward FVA and ensemble analysis. It does not turn FVA endpoints into a flux state. The hypothesis-testing workflow validates this experiment field but samples the entire H0/H1 constrained steady-state regions without retaining an objective fraction; it does not reuse this field as a hypothesis constraint.
 
-## Genuine counts are separate
+## Observation laws are separate
 
 This stationary experiment file defines isotope prediction. Genuine count observation totals used by `fluxemu.observation` are separate explicit declarations. CarbonScope never infers a count total from a normalised MID or intensity vector.
 
+The corrected-MID Dirichlet workflow also keeps noise outside this experiment
+file. Its workflow declaration supplies block-specific concentration, source,
+replicate semantics, independence and external correction provenance. The
+native experiment's `correction: 'no'` records the forward isotope-model
+policy; it is not evidence that measured data were externally corrected. A
+Dirichlet workflow therefore requires its own explicit
+`status: externally_corrected` audit record and does not add a correction
+engine to the native experiment loader.
+
 ## Hypothesis-testing specification
 
-The `fluxemu test-hypotheses` command consumes a separate schema-version-1 workflow YAML that refers to these native experiment files. The experiment file continues to define tracers, authoritative mappings, targets and mass-class order. The workflow file defines the common physical model, H0/H1 reaction-bound restrictions, finite-state sampling policy, ordered experiment/target/replicate count blocks, independence and testing procedures.
+The `fluxemu test-hypotheses` command consumes a separate schema-version-1 workflow YAML that refers to these native experiment files. The experiment file continues to define tracers, authoritative mappings, targets and mass-class order. The workflow file defines the common physical model, H0/H1 reaction-bound restrictions, finite-state sampling policy, observation-law blocks, independence and testing procedures.
 
-All experiments in one workflow must use the same canonical isotope model. Each observation block references a declared target and supplies its own genuine integer `total_count`; measured fractions and intensities are not accepted as count specifications. Multiple blocks require explicit `independent_blocks: true`.
+All experiments in one workflow must use the same canonical isotope model. A
+genuine-count block supplies its own integer `total_count`; measured fractions
+and intensities are not accepted as count specifications. A corrected-MID
+Dirichlet block instead supplies a positive concentration that is explicitly
+not a count. Multiple blocks require explicit `independent_blocks: true`.
 
-See [HYPOTHESIS_WORKFLOW.md](HYPOTHESIS_WORKFLOW.md) for the complete YAML and a runnable example using [the committed native experiment fixture](../tests/fixtures/hypothesis_workflow/experiment.yaml). Count declarations and flux constraints remain separate from isotope prediction semantics.
+See [HYPOTHESIS_WORKFLOW.md](HYPOTHESIS_WORKFLOW.md) for both runnable YAML
+branches using [the committed native experiment fixture](../tests/fixtures/hypothesis_workflow/experiment.yaml),
+and [DIRICHLET_MID_OBSERVATION.md](DIRICHLET_MID_OBSERVATION.md) for the
+continuous-law support and provenance contract. Observation declarations and
+flux constraints remain separate from isotope prediction semantics.

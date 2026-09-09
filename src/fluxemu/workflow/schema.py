@@ -20,8 +20,13 @@ from fluxemu.model import (
 )
 from fluxemu.native_io import load_native_stationary_spec
 from fluxemu.observation import (
+    MIDCorrectionProvenance,
+    StationaryDirichletBlockSpecification,
+    StationaryDirichletObservationExperiment,
+    StationaryDirichletObservationSpecification,
     StationaryCountSpecification, StationaryObservationExperiment,
     StationaryObservationSpecification, validate_stationary_observation_specification,
+    validate_stationary_dirichlet_observation_specification,
 )
 
 from ._yaml import load_unique_yaml, validate_native_experiment_document
@@ -178,7 +183,7 @@ class WorkflowInputSource:
 
 @dataclass(frozen=True, slots=True)
 class WorkflowSpecification:
-    observation: StationaryObservationSpecification
+    observation: StationaryObservationSpecification | StationaryDirichletObservationSpecification
     null: HypothesisSpecification
     alternative: HypothesisSpecification
     testing: TestingSpecification
@@ -194,12 +199,27 @@ class WorkflowSpecification:
         return self.observation.model
 
     @property
+    def observation_semantics(self) -> str:
+        if isinstance(self.observation, StationaryObservationSpecification):
+            return "genuine_counts"
+        if isinstance(self.observation, StationaryDirichletObservationSpecification):
+            return "corrected_mid_dirichlet"
+        raise InputValidationError("workflow has an unsupported observation specification type")
+
+    @property
     def fingerprint(self) -> str:
         validate_hypothesis_testing_specification(self)
+        if isinstance(self.observation, StationaryObservationSpecification):
+            # Preserve the shipped count-workflow scientific identity exactly.
+            return scientific_fingerprint((
+                "native-hypothesis-workflow-v1", self.observation,
+                ("H0", self.null), ("H1", self.alternative), self.testing,
+                self.independent_blocks, "genuine_counts", "full-constrained-region",
+            ))
         return scientific_fingerprint((
-            "native-hypothesis-workflow-v1", self.observation,
+            "native-hypothesis-workflow-dirichlet-v1", self.observation,
             ("H0", self.null), ("H1", self.alternative), self.testing,
-            self.independent_blocks, "genuine_counts", "full-constrained-region",
+            self.independent_blocks, "corrected_mid_dirichlet", "full-constrained-region",
         ))
 
 
@@ -208,10 +228,15 @@ def validate_hypothesis_testing_specification(specification: WorkflowSpecificati
 
     if not isinstance(specification, WorkflowSpecification):
         raise InputValidationError("specification must be WorkflowSpecification")
-    if not isinstance(specification.observation, StationaryObservationSpecification):
-        raise InputValidationError("observation must be StationaryObservationSpecification")
+    if not isinstance(specification.observation, (
+        StationaryObservationSpecification, StationaryDirichletObservationSpecification,
+    )):
+        raise InputValidationError("workflow has an unsupported observation specification")
     try:
-        validate_stationary_observation_specification(specification.observation)
+        if isinstance(specification.observation, StationaryObservationSpecification):
+            validate_stationary_observation_specification(specification.observation)
+        else:
+            validate_stationary_dirichlet_observation_specification(specification.observation)
     except CanonicalModelError as error:
         raise InputValidationError(f"invalid workflow model or isotope experiment: {error}") from error
     if type(specification.independent_blocks) is not bool:
@@ -298,6 +323,29 @@ def _load_hypothesis_testing_spec(path: str | Path, *, model_path: str | Path | 
     root = _mapping(raw, "workflow", fields, fields - {"model", "output"})
     if type(root["schema_version"]) is not int or root["schema_version"] != 1:
         raise InputValidationError("workflow must declare integer schema_version: 1")
+    observations_root = _mapping(
+        root["observations"], "observations",
+        {"semantics", "independent_blocks", "correction", "blocks"},
+        {"semantics", "independent_blocks"},
+    )
+    semantics = observations_root["semantics"]
+    _identifier(semantics, "observations.semantics")
+    if semantics not in {"genuine_counts", "corrected_mid_dirichlet"}:
+        raise InputValidationError(
+            "observations.semantics must be genuine_counts or corrected_mid_dirichlet"
+        )
+    if semantics == "genuine_counts" and set(observations_root) != {
+        "semantics", "independent_blocks",
+    }:
+        raise InputValidationError(
+            "genuine_counts observations do not accept Dirichlet correction or block fields"
+        )
+    if semantics == "corrected_mid_dirichlet" and not {
+        "correction", "blocks",
+    }.issubset(observations_root):
+        raise InputValidationError(
+            "corrected_mid_dirichlet observations require correction and blocks"
+        )
     if "model" in root:
         _identifier(root["model"], "model path")
     physical_path = Path(model_path).resolve() if model_path is not None else _path(root.get("model"), path.parent, "model path")
@@ -306,10 +354,17 @@ def _load_hypothesis_testing_spec(path: str | Path, *, model_path: str | Path | 
         WorkflowInputSource("workflow", "workflow", path, sha256(path.read_bytes()).hexdigest()),
         WorkflowInputSource("model", "common", physical_path, sha256(physical_path.read_bytes()).hexdigest()),
     ]
-    experiments = []
+    native_experiments = []
     common_model = None
     for item in _list(root["experiments"], "experiments"):
-        item = _mapping(item, "experiment declaration", {"experiment_id", "specification", "counts"}, {"experiment_id", "specification", "counts"})
+        experiment_fields = (
+            {"experiment_id", "specification", "counts"}
+            if semantics == "genuine_counts"
+            else {"experiment_id", "specification"}
+        )
+        item = _mapping(
+            item, "experiment declaration", experiment_fields, experiment_fields,
+        )
         _identifier(item["experiment_id"], "experiment_id")
         experiment_path = _path(item["specification"], path.parent, "experiment specification path")
         document = load_unique_yaml(experiment_path, "native experiment")
@@ -319,16 +374,17 @@ def _load_hypothesis_testing_spec(path: str | Path, *, model_path: str | Path | 
             common_model = model
         elif common_model != model:
             raise InputValidationError("all experiments must declare the same common isotope model and ordering")
-        counts = []
-        for count in _list(item["counts"], "experiment counts"):
-            count = _mapping(count, "count declaration", {"target_id", "replicate_id", "total_count"}, {"target_id", "replicate_id", "total_count"})
-            counts.append(StationaryCountSpecification(**count))
-        experiments.append(StationaryObservationExperiment(item["experiment_id"], experiment, tuple(counts)))
+        if semantics == "genuine_counts":
+            counts = []
+            for count in _list(item["counts"], "experiment counts"):
+                count = _mapping(count, "count declaration", {"target_id", "replicate_id", "total_count"}, {"target_id", "replicate_id", "total_count"})
+                counts.append(StationaryCountSpecification(**count))
+            declarations = tuple(counts)
+        else:
+            declarations = ()
+        native_experiments.append((item["experiment_id"], experiment, declarations))
         sources.append(WorkflowInputSource("experiment", item["experiment_id"], experiment_path, sha256(experiment_path.read_bytes()).hexdigest(), fraction))
     hypotheses = _mapping(root["hypotheses"], "hypotheses", {"H0", "H1"}, {"H0", "H1"})
-    observations = _mapping(root["observations"], "observations", {"semantics", "independent_blocks"}, {"semantics", "independent_blocks"})
-    if observations["semantics"] != "genuine_counts":
-        raise InputValidationError("workflow V1 requires explicit genuine_counts observation semantics")
     testing = _mapping(root["testing"], "testing", {"epsilon", "procedures", "converse_orders", "score_orders", "max_outcomes"}, {"epsilon", "procedures"})
     testing_values = dict(testing)
     for key in ("procedures", "converse_orders", "score_orders"):
@@ -338,10 +394,97 @@ def _load_hypothesis_testing_spec(path: str | Path, *, model_path: str | Path | 
     if "output" in root:
         output_raw = _mapping(root["output"], "output", {"directory"}, {"directory"})
         output = _path(output_raw["directory"], path.parent, "output directory")
+    if semantics == "genuine_counts":
+        observation = StationaryObservationSpecification(
+            common_model,
+            tuple(
+                StationaryObservationExperiment(experiment_id, experiment, declarations)
+                for experiment_id, experiment, declarations in native_experiments
+            ),
+        )
+    else:
+        correction_raw = _mapping(
+            observations_root["correction"], "observations.correction",
+            {"status", "method", "provenance"},
+            {"status", "method", "provenance"},
+        )
+        correction = MIDCorrectionProvenance(**correction_raw)
+        identifiers = tuple(item[0] for item in native_experiments)
+        if len(set(identifiers)) != len(identifiers):
+            raise InputValidationError("experiment_id values must be unique")
+        grouped: dict[str, list[StationaryDirichletBlockSpecification]] = {
+            identifier: [] for identifier in identifiers
+        }
+        observed_experiment_order = []
+        for index, raw_block in enumerate(_list(observations_root["blocks"], "observations.blocks")):
+            raw_block = _mapping(
+                raw_block, f"observations.blocks[{index}]",
+                {
+                    "experiment_id", "target_id", "replicate_id", "replicate_count",
+                    "replicate_semantics", "independent_replicates", "noise_model",
+                    "correction",
+                },
+                {
+                    "experiment_id", "target_id", "replicate_id", "replicate_count",
+                    "replicate_semantics", "independent_replicates", "noise_model",
+                },
+            )
+            experiment_id = raw_block["experiment_id"]
+            _identifier(experiment_id, "Dirichlet block experiment_id")
+            if experiment_id not in grouped:
+                raise InputValidationError(
+                    f"Dirichlet block references unknown experiment_id {experiment_id!r}"
+                )
+            noise = _mapping(
+                raw_block["noise_model"], f"observations.blocks[{index}].noise_model",
+                {"distribution", "precision", "precision_source", "precision_provenance"},
+                {"distribution", "precision", "precision_source", "precision_provenance"},
+            )
+            if noise["distribution"] != "dirichlet":
+                raise InputValidationError("Dirichlet block noise_model.distribution must be 'dirichlet'")
+            grouped[experiment_id].append(StationaryDirichletBlockSpecification(
+                target_id=raw_block["target_id"],
+                precision=noise["precision"],
+                precision_source=noise["precision_source"],
+                precision_provenance=noise["precision_provenance"],
+                replicate_count=raw_block["replicate_count"],
+                replicate_semantics=raw_block["replicate_semantics"],
+                independent_replicates=raw_block["independent_replicates"],
+                replicate_id=raw_block["replicate_id"],
+                correction=(
+                    MIDCorrectionProvenance(**_mapping(
+                        raw_block["correction"],
+                        f"observations.blocks[{index}].correction",
+                        {"status", "method", "provenance"},
+                        {"status", "method", "provenance"},
+                    ))
+                    if "correction" in raw_block else None
+                ),
+            ))
+            observed_experiment_order.append(identifiers.index(experiment_id))
+        if observed_experiment_order != sorted(observed_experiment_order):
+            raise InputValidationError(
+                "Dirichlet blocks must follow the declared experiment order"
+            )
+        missing = tuple(identifier for identifier, values in grouped.items() if not values)
+        if missing:
+            raise InputValidationError(
+                f"Dirichlet observations require at least one block for every experiment: {missing!r}"
+            )
+        observation = StationaryDirichletObservationSpecification(
+            common_model,
+            tuple(
+                StationaryDirichletObservationExperiment(
+                    experiment_id, experiment, tuple(grouped[experiment_id]),
+                )
+                for experiment_id, experiment, _ in native_experiments
+            ),
+            correction,
+        )
     return WorkflowSpecification(
-        StationaryObservationSpecification(common_model, tuple(experiments)),
+        observation,
         _hypothesis(hypotheses["H0"], "H0"), _hypothesis(hypotheses["H1"], "H1"),
-        TestingSpecification(**testing_values), observations["independent_blocks"], output, tuple(sources),
+        TestingSpecification(**testing_values), observations_root["independent_blocks"], output, tuple(sources),
     )
 
 

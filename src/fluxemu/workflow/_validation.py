@@ -18,6 +18,7 @@ from fluxemu.flux_analysis.sampling import (
     FluxSampleValidationReport, FluxSamplingProvenance, NativeFluxSamplingResult,
 )
 from fluxemu.model import experiment_fingerprint, model_fingerprint
+from fluxemu.observation import StationaryDirichletObservationSpecification
 from fluxemu.observation.schema import _validate_state_record
 
 from .schema import scientific_fingerprint, validate_hypothesis_testing_specification
@@ -135,10 +136,19 @@ def _testing_records(result) -> None:
              "procedure and supplied-order coverage/order")
     lookup = {(item.procedure, item.order): item for item in records}
     types = {
-        "composite_converse": testing.CompositeRenyiConverseBound,
+        "composite_converse": (
+            testing.CompositeRenyiConverseBound,
+            testing.DirichletCompositeRenyiConverseBound,
+        ),
         "exact_minimax": testing.FiniteCompositeMinimaxResult,
-        "candidate_score": testing.CompositeRenyiScoreCandidate,
-        "analytical_score_bound": testing.CompositeScoreBound,
+        "candidate_score": (
+            testing.CompositeRenyiScoreCandidate,
+            testing.DirichletCompositeRenyiScoreCandidate,
+        ),
+        "analytical_score_bound": (
+            testing.CompositeScoreBound,
+            testing.DirichletCompositeScoreBound,
+        ),
         "deterministic_score_error": testing.CompositeScoreTestEvaluation,
         "calibrated_score_error": testing.CalibratedCompositeScoreTest,
     }
@@ -209,7 +219,14 @@ def validate_workflow_result(result) -> None:
     _family(specification, result.alternative_family, "H1", specification.alternative)
     _region_evidence(result)
     stationary = result.stationary
-    _require(isinstance(stationary, testing.StationaryCompositeTestingResult), "stationary source result type")
+    continuous = isinstance(
+        specification.observation, StationaryDirichletObservationSpecification,
+    )
+    stationary_type = (
+        testing.StationaryDirichletCompositeTestingResult
+        if continuous else testing.StationaryCompositeTestingResult
+    )
+    _require(isinstance(stationary, stationary_type), "stationary source result type")
     stationary.__post_init__()
     _require(stationary.hypotheses.null_states == result.null_family.states
              and stationary.hypotheses.alternative_states == result.alternative_family.states,
@@ -218,8 +235,14 @@ def validate_workflow_result(result) -> None:
     model_digest = model_fingerprint(specification.model)
     experiment_digests = tuple((block.experiment_id, experiment_fingerprint(specification.model, block.experiment))
                                for block in observation.experiments)
-    declarations = tuple(((block.experiment_id, item.target_id, item.replicate_id), item.total_count)
-                         for block in observation.experiments for item in block.specifications)
+    if continuous:
+        declarations = tuple(
+            ((block.experiment_id, item.target_id, item.replicate_id), item)
+            for block in observation.experiments for item in block.specifications
+        )
+    else:
+        declarations = tuple(((block.experiment_id, item.target_id, item.replicate_id), item.total_count)
+                             for block in observation.experiments for item in block.specifications)
     for source, family in ((stationary.null_observation_laws, result.problem.null),
                            (stationary.alternative_observation_laws, result.problem.alternative)):
         _require(source.model_fingerprint == model_digest
@@ -227,8 +250,28 @@ def validate_workflow_result(result) -> None:
                  and source.specification_fingerprint == observation.fingerprint,
                  "stationary observation specification binding")
         for member in family.members:
-            _require(tuple(zip(member.block_identities, member.block_totals, strict=True)) == declarations,
-                     "stationary block/count declaration binding")
+            if continuous:
+                _require(len(member.blocks) == len(declarations), "stationary Dirichlet block count")
+                for law, (identity, item) in zip(member.blocks, declarations, strict=True):
+                    _require(
+                        law.observation_identity == identity
+                        and law.precision == item.precision
+                        and law.precision_source == item.precision_source
+                        and law.precision_provenance == item.precision_provenance
+                        and law.replicate_count == item.replicate_count
+                        and law.replicate_semantics == item.replicate_semantics
+                        and law.independent_replicates == item.independent_replicates
+                        and law.correction == (item.correction or observation.correction),
+                        "stationary Dirichlet block/provenance declaration binding",
+                    )
+                _require(
+                    tuple((law.observation_identity, law.active_support) for law in member.blocks)
+                    == source.common_active_supports,
+                    "stationary Dirichlet common active-face binding",
+                )
+            else:
+                _require(tuple(zip(member.block_identities, member.block_totals, strict=True)) == declarations,
+                         "stationary block/count declaration binding")
     _testing_records(result)
     _require(isinstance(result.relationship_checks, tuple)
              and all(isinstance(check, RelationshipCheck) for check in result.relationship_checks),

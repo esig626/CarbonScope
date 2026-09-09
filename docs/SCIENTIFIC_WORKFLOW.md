@@ -2,7 +2,7 @@
 
 CarbonScope is intended to use isotope tracing as a forward hypothesis testing framework, not primarily as a tool for recovering one supposedly true flux vector.
 
-This document describes the intended scientific workflow and distinguishes it from the implemented finite testing scope. The current release provides forward modelling, feasible state sampling, genuine count observation laws, simple binary testing and composite testing for represented finite H0/H1 classes. The public `run_hypothesis_testing_workflow(...)` API and `fluxemu test-hypotheses` command now construct those classes from one common SBML/FBC model and explicit hypothesis and experiment files. Testing over a complete continuous feasible flux family remains unsolved in this implementation: rigorous optimisation or bounds over that entire family are not provided.
+This document describes the intended scientific workflow and distinguishes it from the implemented finite testing scope. The current release provides forward modelling, feasible state sampling, genuine-count observation laws, corrected-MID Dirichlet observation laws, simple binary count testing and composite testing for represented finite H0/H1 classes. The public `run_hypothesis_testing_workflow(...)` API and `fluxemu test-hypotheses` command construct those classes from one common SBML/FBC model and explicit hypothesis and experiment files. Testing over a complete continuous feasible flux family remains unsolved in this implementation: rigorous optimisation or bounds over that entire family are not provided.
 
 See [HYPOTHESIS_WORKFLOW.md](HYPOTHESIS_WORKFLOW.md) for a complete reproducible files-to-report example. The implemented workflow evaluates a declared experiment's finite-class testing performance. It does not accept observed data to produce a generic composite p-value or invert a test into compatibility regions.
 
@@ -66,9 +66,22 @@ The scientific object of interest is the whole observable family, not the single
 
 If competing biological hypotheses are available, propagate each through the same forward workflow to obtain competing families of observable laws.
 
-The finite composite layer compares explicitly supplied families of complete genuine-count laws. A law may be an ordered product of count blocks when their independence is declared explicitly. It provides order-specific Rényi converse bounds, achieved score tests with directly evaluated worst-case errors, and a complete finite observation-space minimax LP for small problems that pass its numerical checks.
+The finite composite layer compares explicitly supplied families of complete
+observation laws. Genuine-count products provide order-specific Rényi
+converses, achieved score tests with directly evaluated worst-case errors, and
+a complete finite observation-space minimax LP for small problems that pass
+its numerical checks. The parallel corrected-MID Dirichlet path provides
+analytic Rényi converses and verified projected score-moment achievable bounds.
+Its observation space is continuous, so the count-space exact minimax LP and
+exact score-CDF procedures explicitly refuse rather than discretising the
+simplex. Every multi-block and multi-replicate product requires an explicit
+independence declaration.
 
-If reliable discrimination is impossible at the proposed sample size, redesign the experiment before collecting data. Possible changes include the tracer, measured targets, biological constraints or sample size.
+If reliable discrimination is impossible under the proposed measurement
+design, redesign the experiment before collecting data. Possible changes
+include the tracer, measured targets, biological constraints, genuine count
+total where scientifically meaningful, replicate design, or measurement
+precision. Dirichlet concentration is not an effective count.
 
 A converse lower bound can establish that a given count total is insufficient for the represented classes. Sufficiency requires an achieved testing procedure or a corresponding upper guarantee. The relevant ordering is `converse <= beta_star <= achieved Type II error` under the same Type I budget. A calibrated score test need not attain the unrestricted minimax optimum. The LP is a mathematically exact characterisation of the finite problem; its floating-point solution remains subject to numerical validation and explicit refusal. These finite-class results do not certify distinguishability over the complete continuous flux family.
 
@@ -78,7 +91,7 @@ The workflow report keeps six quantities separate: order-specific composite conv
 
 Collect experimental isotope tracing measurements under the same declared tracer and measurement design.
 
-The observation model used for inference must match the semantics of the measurement. Genuine counts may support an explicit count law. Continuous corrected MIDs require a separately justified observation model.
+The observation model used for inference must match the semantics of the measurement. Genuine counts may support an explicit count law. Properly QC'd continuous MIDs may use the V1 Dirichlet law only after external correction and with a fixed or independently calibrated concentration, explicit replicate meaning, and model-adequacy scrutiny. Same-data concentration estimates remain diagnostic/model-conditional. See [DIRICHLET_MID_OBSERVATION.md](DIRICHLET_MID_OBSERVATION.md).
 
 ## 7. Test the experimental data against the hypothesis family
 
@@ -86,7 +99,7 @@ Do not select the single simulated MID closest to the experimental data and call
 
 The intended broader workflow would test compatibility with the entire observable family implied by the biological hypothesis. The implemented composite engine supports a declared binary decision rule between two explicit finite classes, with uniform Type I and Type II errors over their supplied members. It does not provide a generic composite p-value, inversion into compatibility or confidence regions, or continuous-family testing.
 
-For a supported finite comparison, specify the classes, measurement law and testing level before examining the data. Ordinary corrected MIDs, peak areas and percentages cannot supply multinomial count totals.
+For a supported finite comparison, specify the classes, measurement law and testing level before examining the data. Ordinary corrected MIDs, peak areas and percentages cannot supply multinomial count totals. A Dirichlet concentration must not be inferred as a disguised count from those quantities.
 
 ## 8. Interpret the result
 

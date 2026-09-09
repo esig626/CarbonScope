@@ -1,6 +1,6 @@
 # Finite composite binary testing
 
-FluxEMU implements an explicit finite composite-testing layer for **complete observable laws**. A class member is an ordered product of genuine-count multinomial MID blocks with explicitly declared independence. A finite H0/H1 family can be supplied directly or generated from complete feasible flux states through native stationary EMU.
+FluxEMU implements explicit finite composite-testing layers for **complete observable laws**. A genuine-count class member is an ordered product of multinomial MID blocks with explicitly declared independence. A parallel continuous implementation accepts externally corrected Dirichlet MID blocks. A finite H0/H1 family can be supplied directly or generated from complete feasible flux states through native stationary EMU.
 
 The represented family is exactly the statistical class passed to the solver. FluxEMU does not silently convexify it, treat member frequency as a prior, or claim that a finite sample exhausts a larger biological mechanism class.
 
@@ -35,6 +35,14 @@ D_lambda(Q || P)
 ```
 
 This lets the composite layer operate directly on a joint panel of MID measurements without pretending the blocks are independent decisions.
+
+The parallel `IndependentDirichletMIDProductLaw` applies the same explicit
+product semantics to continuous blocks and conditionally independent
+replicates. Corresponding laws must have identical ordered block identities,
+replicate structures, mass classes and active simplex faces. Its directed
+Rényi divergence adds across blocks and multiplies each block contribution by
+its declared replicate count. A biological replicate count remains an
+observation-design declaration and is never a multinomial total.
 
 ## Order-specific composite Rényi converse
 
@@ -90,6 +98,12 @@ The LP requires the optional testing dependency:
 python -m pip install '.[testing]'
 ```
 
+This entire LP section applies only to genuine-count finite observation
+spaces. A Dirichlet law is continuous. `exact_dirichlet_composite_minimax(...)`
+therefore returns the explicit reason
+`unsupported_for_continuous_observation_space`; it does not discretise the
+simplex and call the result exact.
+
 ## Finite-family Rényi candidate score
 
 For `0 < lambda < 1`, minimising Rényi divergence over a finite non-convex family selects a **vertex-pair candidate score**. It is not automatically a joint Rényi projection of convex classes and not automatically a finite-blocklength least-favourable pair.
@@ -116,6 +130,14 @@ Structural zeros are retained. Infinite score coordinates are permitted when the
 
 `verified_composite_renyi_score(...)` raises `CompositeScoreVerificationError` when the finite-family minimum is only pairwise and the uniform composite gates fail.
 
+For Dirichlet products, the parallel
+`composite_dirichlet_renyi_score_candidate(...)` evaluates every required
+moment analytically with multivariate log-beta functions. If
+`gamma+t(beta*-alpha*)` is not componentwise positive, that moment is
+mathematically infinite and verification fails where required. No continuous
+score is approximated as Gaussian. The verified wrapper is
+`verified_composite_dirichlet_renyi_score(...)`.
+
 ## Analytical score bound
 
 For a verified candidate and Type-I budget `epsilon`, `composite_score_bound_at_order(...)` returns the analytical threshold
@@ -135,6 +157,14 @@ These formulas describe the mathematical quantities. The implementation uses the
 The function also reports the separate constant-randomised-test guarantee `1-epsilon` and their minimum as a bound on the represented minimax value. It does not require enumeration of the joint count space. A failed uniform-moment certificate cannot be bypassed to obtain this analytical formula.
 
 `evaluate_composite_score_test(...)` is the optional small-space oracle that enumerates the deterministic threshold rule and reports its actual worst-case Type-I and Type-II errors.
+
+`composite_dirichlet_score_bound_at_order(...)` supplies the analogous
+projected analytical bound after finite-family uniform moment verification.
+Exact evaluation and calibration of that deterministic continuous score are
+not implemented: a weighted sum of `log(Y_i)` under a Dirichlet law has no
+implemented certified exact CDF. The corresponding functions return explicit
+continuous-observation refusals rather than using a normal approximation,
+Monte Carlo as a guarantee, or finite simplex discretisation.
 
 ## Calibration within the score family
 
@@ -156,6 +186,13 @@ The final inequality applies when the deterministic analytical threshold is feas
 
 `evaluate_stationary_composite_hypotheses(...)` accepts finite tuples of complete `CanonicalFluxState` records for H0 and H1. Every state passes the existing original-model feasibility and stationary-EMU validation before its count blocks are grouped into an `IndependentMIDProductLaw`.
 
+`evaluate_stationary_dirichlet_composite_hypotheses(...)` is the separate
+continuous bridge. It evaluates H0 and H1 jointly so that structural zeros
+common to all represented states in one block define an explicit simplex face.
+State-dependent active faces are refused. Each state is then represented by an
+`IndependentDirichletMIDProductLaw` with precision, correction, replicate and
+support provenance retained.
+
 Multiple experiment/target/replicate blocks require explicit `independent_blocks=True`. State order, experiment/target/replicate order and genuine count totals are preserved. Provenance binds each result to its complete underlying state and hypothesis role. Duplicate sample IDs within one family are rejected; equal labels across H0 and H1 remain distinct through role-bound state IDs. The decision layer sees the generated observable laws, not the hidden flux state or its sampling frequency. No MFA fitting is invoked by this bridge.
 
 This is the intended finite represented-class bridge for comparing mechanistically generated MID-law families. A sampled state family remains a discretisation of any larger continuous mechanism class unless a separate argument establishes otherwise.
@@ -175,4 +212,4 @@ The current finite engine does not implement:
 - test inversion into flux compatibility/confidence regions;
 - Bayesian nuisance integration.
 
-Those require separate statistical specifications and, for a continuous flux family, rigorous optimisation or bounds over its complete feasible set. Validation evidence for the implemented finite layer is recorded in [the validation report](../results/composite_testing_validation/VALIDATION_REPORT.md); its tested cases and explicit numerical refusals delimit that evidence.
+Those require separate statistical specifications and, for a continuous flux family, rigorous optimisation or bounds over its complete feasible set. Validation evidence for the count layer is recorded in [the count validation report](../results/composite_testing_validation/VALIDATION_REPORT.md). The continuous law, formulas, support rules and distinct validation campaign are documented in [DIRICHLET_MID_OBSERVATION.md](DIRICHLET_MID_OBSERVATION.md) and the [Dirichlet validation report](../results/dirichlet_mid_validation/VALIDATION_REPORT.md).

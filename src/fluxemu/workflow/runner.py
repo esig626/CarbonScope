@@ -8,6 +8,10 @@ from typing import Literal, TypeAlias
 
 from fluxemu import testing
 from fluxemu.exceptions import InputValidationError, ValidationError
+from fluxemu.observation import (
+    DirichletNumericalError,
+    StationaryDirichletObservationSpecification,
+)
 
 from .schema import (
     WorkflowSpecification,
@@ -24,6 +28,9 @@ TestingValue: TypeAlias = (
     | testing.CompositeScoreBound
     | testing.CompositeScoreTestEvaluation
     | testing.CalibratedCompositeScoreTest
+    | testing.DirichletCompositeRenyiConverseBound
+    | testing.DirichletCompositeRenyiScoreCandidate
+    | testing.DirichletCompositeScoreBound
 )
 
 # The validation campaign on the repaired primitives uses this comparison
@@ -36,6 +43,8 @@ PROCEDURES = (
 _REFUSALS = (
     testing.NumericalLimitError, testing.CompositeEnumerationLimitError,
     testing.CompositeOptimizationError, testing.CompositeScoreVerificationError,
+    testing.UnsupportedContinuousObservationError,
+    testing.DirichletTestingAssumptionError, DirichletNumericalError,
 )
 
 
@@ -114,7 +123,10 @@ class HypothesisTestingWorkflowResult:
     specification: WorkflowSpecification
     null_family: HypothesisStateFamily
     alternative_family: HypothesisStateFamily
-    stationary: testing.StationaryCompositeTestingResult
+    stationary: (
+        testing.StationaryCompositeTestingResult
+        | testing.StationaryDirichletCompositeTestingResult
+    )
     testing_results: tuple[ProcedureEvaluation, ...]
     relationship_checks: tuple[RelationshipCheck, ...]
     provenance: WorkflowProvenance
@@ -125,15 +137,22 @@ class HypothesisTestingWorkflowResult:
         validate_workflow_result(self)
 
     @property
-    def problem(self) -> testing.CompositeBinaryTestingProblem:
+    def problem(self) -> (
+        testing.CompositeBinaryTestingProblem
+        | testing.DirichletCompositeBinaryTestingProblem
+    ):
         return self.stationary.problem
 
     @property
-    def null_observation_family(self) -> testing.CompositeMIDLawFamily:
+    def null_observation_family(self) -> (
+        testing.CompositeMIDLawFamily | testing.DirichletCompositeMIDLawFamily
+    ):
         return self.problem.null
 
     @property
-    def alternative_observation_family(self) -> testing.CompositeMIDLawFamily:
+    def alternative_observation_family(self) -> (
+        testing.CompositeMIDLawFamily | testing.DirichletCompositeMIDLawFamily
+    ):
         return self.problem.alternative
 
     @property
@@ -147,6 +166,10 @@ class HypothesisTestingWorkflowResult:
 
 
 def _category(error: Exception) -> str:
+    if isinstance(error, testing.UnsupportedContinuousObservationError):
+        return "unsupported_for_continuous_observation_space"
+    if isinstance(error, testing.DirichletTestingAssumptionError):
+        return "model_assumption_or_calibration"
     if isinstance(error, testing.CompositeEnumerationLimitError):
         return "enumeration_limit"
     if isinstance(error, testing.CompositeScoreVerificationError):
@@ -160,6 +183,21 @@ def _evaluate_testing(specification, problem) -> tuple[ProcedureEvaluation, ...]
     settings = specification.testing
     requested = set(settings.procedures)
     records: dict[tuple[str, float | None], ProcedureEvaluation] = {}
+    continuous = isinstance(problem, testing.DirichletCompositeBinaryTestingProblem)
+    if continuous:
+        converse_operation = testing.composite_dirichlet_renyi_converse_at_order
+        minimax_operation = testing.exact_dirichlet_composite_minimax
+        candidate_operation = testing.composite_dirichlet_renyi_score_candidate
+        bound_operation = testing.composite_dirichlet_score_bound_at_order
+        deterministic_operation = testing.evaluate_dirichlet_composite_score_test
+        calibrated_operation = testing.calibrate_dirichlet_composite_score_test
+    else:
+        converse_operation = testing.composite_renyi_converse_at_order
+        minimax_operation = testing.exact_finite_composite_minimax
+        candidate_operation = testing.composite_renyi_score_candidate
+        bound_operation = testing.composite_score_bound_at_order
+        deterministic_operation = testing.evaluate_composite_score_test
+        calibrated_operation = testing.calibrate_composite_score_test
 
     def evaluate(procedure, order, operation, dependency=None):
         if dependency is not None and dependency.status == "refused":
@@ -182,25 +220,25 @@ def _evaluate_testing(specification, problem) -> tuple[ProcedureEvaluation, ...]
 
     if "composite_converse" in requested:
         for order in settings.converse_orders:
-            evaluate("composite_converse", order, lambda: testing.composite_renyi_converse_at_order(
+            evaluate("composite_converse", order, lambda: converse_operation(
                 problem, epsilon=settings.epsilon, order=order,
             ))
     if "exact_minimax" in requested:
-        evaluate("exact_minimax", None, lambda: testing.exact_finite_composite_minimax(
+        evaluate("exact_minimax", None, lambda: minimax_operation(
             problem, epsilon=settings.epsilon, max_outcomes=settings.max_outcomes,
         ))
     for order in settings.score_orders:
-        candidate = evaluate("candidate_score", order, lambda: testing.composite_renyi_score_candidate(problem, order=order))
+        candidate = evaluate("candidate_score", order, lambda: candidate_operation(problem, order=order))
         if requested & {"analytical_score_bound", "deterministic_score_error"}:
-            bound = evaluate("analytical_score_bound", order, lambda: testing.composite_score_bound_at_order(
+            bound = evaluate("analytical_score_bound", order, lambda: bound_operation(
                 candidate.value, epsilon=settings.epsilon,
             ), candidate)
             if "deterministic_score_error" in requested:
-                evaluate("deterministic_score_error", order, lambda: testing.evaluate_composite_score_test(
+                evaluate("deterministic_score_error", order, lambda: deterministic_operation(
                     bound.value, max_outcomes=settings.max_outcomes,
                 ), bound)
         if "calibrated_score_error" in requested:
-            evaluate("calibrated_score_error", order, lambda: testing.calibrate_composite_score_test(
+            evaluate("calibrated_score_error", order, lambda: calibrated_operation(
                 candidate.value, epsilon=settings.epsilon, max_outcomes=settings.max_outcomes,
             ), candidate)
 
@@ -224,6 +262,11 @@ def _check_relationships(results) -> tuple[RelationshipCheck, ...]:
     achieved = tuple(item for item in accepted if item.procedure in {
         "deterministic_score_error", "calibrated_score_error",
     })
+    continuous_projected = tuple(
+        item for item in accepted
+        if item.procedure == "analytical_score_bound"
+        and isinstance(item.value, testing.DirichletCompositeScoreBound)
+    )
     checks = []
 
     def check(left, left_value, right, right_value):
@@ -241,6 +284,13 @@ def _check_relationships(results) -> tuple[RelationshipCheck, ...]:
             check(lower, lower.value.type_ii_lower_bound, exact, exact.value.minimax_type_ii_error)
         for upper in achieved:
             check(lower, lower.value.type_ii_lower_bound, upper, upper.value.worst_type_ii_error)
+        for upper in continuous_projected:
+            check(
+                lower,
+                lower.value.type_ii_lower_bound,
+                upper,
+                upper.value.minimax_type_ii_upper_bound,
+            )
     if exact is not None:
         for upper in achieved:
             check(exact, exact.value.minimax_type_ii_error, upper, upper.value.worst_type_ii_error)
@@ -253,7 +303,7 @@ def run_hypothesis_testing_workflow(
     model_path: str | Path | None = None,
     output_directory: str | Path | None = None,
 ) -> HypothesisTestingWorkflowResult:
-    """Run files/declarations -> complete states -> EMU -> count laws -> tests.
+    """Run files/declarations -> states -> EMU -> declared observation laws -> tests.
 
     Invalid science or failed construction raises a FluxEMU error. Only the
     statistical primitives' documented refusal classes become report outcomes.
@@ -269,10 +319,20 @@ def run_hypothesis_testing_workflow(
         raise InputValidationError("model_path can override a file specification only")
     validate_hypothesis_testing_specification(specification)
     null, alternative = generate_hypothesis_state_families(specification)
-    stationary = testing.evaluate_stationary_composite_hypotheses(
-        specification.observation, null_states=null.states, alternative_states=alternative.states,
-        independent_blocks=specification.independent_blocks,
-    )
+    if isinstance(specification.observation, StationaryDirichletObservationSpecification):
+        stationary = testing.evaluate_stationary_dirichlet_composite_hypotheses(
+            specification.observation,
+            null_states=null.states,
+            alternative_states=alternative.states,
+            independent_blocks=specification.independent_blocks,
+        )
+    else:
+        stationary = testing.evaluate_stationary_composite_hypotheses(
+            specification.observation,
+            null_states=null.states,
+            alternative_states=alternative.states,
+            independent_blocks=specification.independent_blocks,
+        )
     results = _evaluate_testing(specification, stationary.problem)
     checks = _check_relationships(results)
     from .report import build_workflow_provenance, persist_workflow_report

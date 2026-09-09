@@ -69,8 +69,24 @@ The objective is a plain sum of `D_alpha(observed || predicted)` across declared
 - `MultinomialMIDLaw` for genuine fixed total isotopologue counts;
 - stationary specification, evaluation and reproducible sampling records;
 - exact multinomial KL and Rényi identities and independent product aggregation.
+- `DirichletMIDLaw` and `MIDCorrectionProvenance` for externally corrected
+  continuous MIDs with explicit concentration, active face, replicate and
+  correction provenance;
+- `kl_dirichlet(...)`, `renyi_dirichlet(...)`,
+  `DirichletLogLikelihoodScore`, log density, analytic covariance and
+  reproducible continuous sampling;
+- `implied_dirichlet_precision_from_uncertainty(...)`,
+  `diagnose_dirichlet_covariance(...)`, and
+  `estimate_dirichlet_precision_from_replicates(...)` for structured
+  uncertainty, covariance-fit and scalar-concentration diagnostics;
+- `StationaryDirichletObservationSpecification` and
+  `evaluate_stationary_dirichlet_observation_families(...)` for joint H0/H1
+  common-face construction from stationary EMU predictions.
 
-Count totals are explicit. No pseudo count conversion or effective sample size inference is provided.
+Count totals are explicit. Dirichlet concentration is not a count. No pseudo
+count conversion or effective sample size inference is provided. Same-data
+plug-in concentration is diagnostic/model-conditional. See
+[DIRICHLET_MID_OBSERVATION.md](DIRICHLET_MID_OBSERVATION.md).
 
 ## Simple binary testing
 
@@ -101,6 +117,18 @@ Roles are fixed: H0=P0=null and H1=P1=alternative. The exact p value is the P0 u
 - `calibrate_composite_score_test(...)`: enumerated Type I calibration within a fixed, well-defined candidate upper-score threshold family, returning achieved worst-case errors even when the analytical moment certificate fails;
 - `CompositeFluxHypotheses`, `StationaryCompositeTestingResult`, and `evaluate_stationary_composite_hypotheses(...)`: finite complete flux state families mapped through native stationary EMU into one complete product observation law per state. Multiple blocks require explicit `independent_blocks=True`.
 
+The parallel continuous API provides
+`IndependentDirichletMIDProductLaw`, `DirichletCompositeMIDLawFamily`,
+`DirichletCompositeBinaryTestingProblem`,
+`composite_dirichlet_renyi_converse_at_order(...)`,
+`composite_dirichlet_renyi_score_candidate(...)`,
+`verified_composite_dirichlet_renyi_score(...)`,
+`composite_dirichlet_score_bound_at_order(...)`, and
+`evaluate_stationary_dirichlet_composite_hypotheses(...)`. The exact Dirichlet
+minimax, deterministic-error and calibration entry points exist only to return
+explicit continuous-observation refusals; no count LP, Gaussian score CDF or
+simplex discretisation is reused.
+
 The LP is a mathematically exact characterisation of the represented finite minimax value; its solution is validated numerically in floating-point arithmetic. A calibrated score returns an achieved error, which may strictly exceed the unrestricted minimax optimum. A valid converse is a lower bound: `converse <= beta_star <= achieved score error`. These quantities and the analytical score upper bounds remain distinct. A finite-family vertex-pair Rényi minimum does not by itself prove the uniform projected-moment inequalities or finite-sample least favourability.
 
 These APIs cover the supplied finite lists only. Rigorous optimisation or bounds over a complete continuous feasible flux family, generic composite p-values and compatibility-region inversion are not implemented. See [COMPOSITE_TESTING.md](COMPOSITE_TESTING.md) for numerical policies and count semantics.
@@ -110,9 +138,9 @@ These APIs cover the supplied finite lists only. Rigorous optimisation or bounds
 `fluxemu.workflow`
 
 - `WorkflowSpecification`, `HypothesisSpecification`, `ReactionBoundConstraint`, `StateGenerationSpecification` and `TestingSpecification`: immutable validated declarations for the scientific design;
-- `load_hypothesis_testing_spec(path, *, model_path=None)` loads the schema-version-1 YAML and validates the common physical/isotope model, ordered experiments, genuine-count declarations, H0/H1 constraints and numerical settings;
+- `load_hypothesis_testing_spec(path, *, model_path=None)` loads the schema-version-1 YAML and validates the common physical/isotope model, ordered experiments, genuine-count or corrected-MID Dirichlet declarations, H0/H1 constraints and numerical settings;
 - `generate_hypothesis_state_families(...)` returns ordered H0/H1 `HypothesisStateFamily` records after native feasibility, region-distinction, sampling and complete-state checks;
-- `run_hypothesis_testing_workflow(specification, *, model_path=None, output_directory=None)` accepts the validated specification or its YAML path, constructs and validates both constrained state families, evaluates native stationary EMU and count laws, evaluates requested finite procedures and optionally persists the report;
+- `run_hypothesis_testing_workflow(specification, *, model_path=None, output_directory=None)` accepts the validated specification or its YAML path, constructs and validates both constrained state families, evaluates native stationary EMU and the selected observation laws, evaluates supported requested finite procedures and optionally persists the report;
 - `HypothesisTestingWorkflowResult` is an immutable record exposing `.specification`, `.null_family`, `.alternative_family`, `.stationary`, `.problem`, `.null_observation_family`, `.alternative_observation_family`, `.testing_results`, `.relationship_checks`, `.refusals`, `.provenance`, `.output_paths` and `.summary`;
 - `ProcedureEvaluation` keeps the procedure, supplied order, whether it was explicitly requested, its evaluated/refused/not-requested status, a typed testing result or `TestingRefusal`;
 - `WorkflowProvenance` binds the model, experiment, hypothesis, represented state-family, observation-family and testing-problem identities and records software provenance separately.

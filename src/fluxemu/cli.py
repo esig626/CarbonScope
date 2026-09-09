@@ -22,7 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--output", required=True, type=Path, help="output directory")
     hypotheses = subcommands.add_parser(
         "test-hypotheses",
-        help="generate finite flux hypotheses and evaluate genuine-count tests",
+        help="generate finite flux hypotheses and evaluate declared count or Dirichlet tests",
     )
     hypotheses.add_argument(
         "--specification", required=True, type=Path,

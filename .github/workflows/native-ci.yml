@@ -42,7 +42,7 @@ jobs:
           import sys
           import fluxemu
           import fluxemu.testing
-          blocked = {"cobra", "mfapy", "optlang", "nlopt", "scipy"}
+          blocked = {"cobra", "mfapy", "optlang", "nlopt", "scipy", "mpmath"}
           imported = {name.split('.', 1)[0] for name in sys.modules}
           assert not (blocked & imported), blocked & imported
           PY
@@ -88,6 +88,7 @@ jobs:
           python examples/simple_binary_flux_discrimination.py
           python examples/composite_binary_mid_discrimination.py
           python examples/hypothesis_testing_workflow.py
+          python examples/dirichlet_mid_observation.py
       - name: Replay declarative workflow from clean checkout
         run: |
           task_outputs=$(mktemp -d)
@@ -95,5 +96,13 @@ jobs:
           fluxemu test-hypotheses --specification tests/fixtures/hypothesis_workflow/workflow.yaml --output "$task_outputs/second"
           cmp "$task_outputs/first/report.json" "$task_outputs/second/report.json"
           cmp "$task_outputs/first/summary.txt" "$task_outputs/second/summary.txt"
+          fluxemu test-hypotheses --specification tests/fixtures/hypothesis_workflow/workflow_dirichlet.yaml --output "$task_outputs/dirichlet-first"
+          fluxemu test-hypotheses --specification tests/fixtures/hypothesis_workflow/workflow_dirichlet.yaml --output "$task_outputs/dirichlet-second"
+          cmp "$task_outputs/dirichlet-first/report.json" "$task_outputs/dirichlet-second/report.json"
+          cmp "$task_outputs/dirichlet-first/summary.txt" "$task_outputs/dirichlet-second/summary.txt"
+      - name: Run Dirichlet MID validation campaign
+        run: |
+          task_outputs=$(mktemp -d)
+          python tools/dirichlet_mid_validation/run_campaign.py --output "$task_outputs/summary.json"
       - name: Verify clean checkout
         run: test -z "$(git status --porcelain)"

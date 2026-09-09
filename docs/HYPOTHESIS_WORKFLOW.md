@@ -1,6 +1,6 @@
 # Declarative stationary hypothesis-testing workflow
 
-The public workflow turns one common SBML/FBC model, explicit H0/H1 flux restrictions and native isotope experiment files into complete feasible state families, stationary genuine-count observation laws and finite composite-testing results. It evaluates the testing performance of a declared experimental design; it does not require observed data or perform generic composite p-value calculation or test inversion.
+The public workflow turns one common SBML/FBC model, explicit H0/H1 flux restrictions and native isotope experiment files into complete feasible state families, stationary observation laws and finite composite-testing results. The observation branch is either genuine counts or externally corrected continuous MIDs under an explicit Dirichlet model. It evaluates the testing performance of a declared experimental design; it does not require observed data or perform generic composite p-value calculation or test inversion.
 
 The workflow calls the existing validated native modelling, sampling, EMU, observation and finite-testing layers. It does not change their numerical contracts. H0 is always P0/null and H1 is always P1/alternative. Type I is the worst represented null probability of deciding H1; Type II is the worst represented alternative probability of deciding H0.
 
@@ -98,6 +98,52 @@ The raw analytical exponential bound exceeds one and is uninformative here; it i
 
 The fixture is compact software acceptance infrastructure. It does not constitute the full biological demonstration planned under issue #24.
 
+### Corrected-MID Dirichlet replay
+
+The same physical and isotope model can be replayed with a continuous
+observation design:
+
+```bash
+fluxemu test-hypotheses \
+  --specification tests/fixtures/hypothesis_workflow/workflow_dirichlet.yaml \
+  --output results/hypothesis_workflow_dirichlet
+```
+
+The [Dirichlet fixture](../tests/fixtures/hypothesis_workflow/workflow_dirichlet.yaml)
+omits experiment-level `counts` and instead declares:
+
+```yaml
+observations:
+  semantics: corrected_mid_dirichlet
+  correction:
+    status: externally_corrected
+    method: public-synthetic-declaration
+    provenance: tests/fixtures/hypothesis_workflow/workflow_dirichlet.yaml
+  blocks:
+    - experiment_id: mixed-glucose
+      target_id: pool-mid
+      replicate_id: technical-series-1
+      replicate_count: 3
+      replicate_semantics: technical_measurement_variability
+      independent_replicates: true
+      noise_model:
+        distribution: dirichlet
+        precision: 50.0
+        precision_source: fixed_external
+        precision_provenance: public synthetic validation fixture
+  independent_blocks: false
+```
+
+The seven-class stationary prediction has common structural zeros M+1 through
+M+5, so the active continuous face contains M+0 and M+6. The report preserves
+the full MID, removed support, concentration, correction and replicate
+provenance for every represented state. The order-1/2 candidate and analytic
+uniform moments verify, supplying a projected upper bound. Requested exact
+minimax, exact deterministic score errors and exact score calibration are
+reported as `unsupported_for_continuous_observation_space`; the workflow still
+exits 0 with `completed_with_refusals`. No simplex discretisation, Gaussian
+score approximation or pseudo-count conversion is substituted.
+
 ## V1 specification contract
 
 The workflow YAML extends the existing native experiment conventions through explicit file references. An experiment file still defines isotope mapping and prediction; it does not acquire hidden hypothesis or count semantics. See [EXPERIMENT_FORMAT.md](EXPERIMENT_FORMAT.md).
@@ -106,11 +152,44 @@ Unknown fields and duplicate YAML keys are rejected. Native experiment files loa
 
 ### Common model and experiments
 
-`schema_version` is the integer `1`. `model` supplies the SBML/FBC path unless the caller supplies a model override. `experiments` is an ordered nonempty list with unique `experiment_id` values. Every entry names a native `specification` file and an ordered nonempty `counts` list. All experiments must share the same canonical isotope model and authoritative mappings, while tracer and target declarations may differ.
+`schema_version` is the integer `1`. `model` supplies the SBML/FBC path unless the caller supplies a model override. `experiments` is an ordered nonempty list with unique `experiment_id` values. Every entry names a native `specification` file. All experiments must share the same canonical isotope model and authoritative mappings, while tracer and target declarations may differ.
 
-Each count entry references a target from that experiment and declares `replicate_id` and `total_count`. The native mass-class space is retained in full. Experiment order, target/replicate block order and mass-class order are preserved; duplicate block identities are invalid. Count totals are explicit positive integers in `1..2^63-1`, with booleans and floating-point counts rejected. No count total or effective sample size is inferred from MID fractions, percentages, peak areas, arbitrary intensities or corrected data.
+For `observations.semantics: genuine_counts`, each experiment additionally has
+an ordered nonempty `counts` list. Each entry references a target and declares
+`replicate_id` and `total_count`. The native mass-class space is retained in
+full. Experiment order, target/replicate block order and mass-class order are
+preserved; duplicate block identities are invalid. Count totals are explicit
+positive integers in `1..2^63-1`, with booleans and floating-point totals
+rejected. No count total or effective sample size is inferred from MID
+fractions, percentages, peak areas, arbitrary intensities or corrected data.
 
-`observations.semantics` must be `genuine_counts`. `independent_blocks` is a literal boolean, and multiple blocks require explicit `true`. One count block may use `false`, as in the example. This declaration concerns observation blocks, not independence of sampled flux states. A shared flux state, separate targets or distinct replicate IDs cannot establish independence by themselves.
+For `observations.semantics: corrected_mid_dirichlet`, experiment declarations
+must not contain `counts`. The observation root requires the correction and
+block structures shown above. Every experiment must have at least one block,
+and blocks follow experiment order. `precision` is a positive finite real;
+strings and booleans are rejected. `precision_source` is one of
+`fixed_external`, `external_calibration`, `independent_calibration`, or
+`same_data_plugin`, and `precision_provenance` is required. A same-data plug-in
+law is valid as a diagnostic record but testing procedures refuse its
+known-precision finite-sample claim.
+
+`replicate_count` is a positive integer and `replicate_semantics` is one of
+`technical_measurement_variability`, `biological_replicate_variability`, or
+`total_replicate_variability`. More than one replicate requires literal
+`independent_replicates: true`. The replicate number and Dirichlet precision
+are not count totals. Global correction provenance must say
+`status: externally_corrected` and include method and source; an optional block
+correction record overrides it for that fragment. Unknown or uncorrected input
+is invalid.
+
+For either branch, `independent_blocks` is a literal boolean and multiple
+blocks require explicit `true`. One block may use `false`. This declaration
+concerns observation blocks, not independence of sampled flux states. A shared
+flux state, separate targets or distinct replicate IDs cannot establish
+independence by themselves. Dirichlet common structural zeros are removed from
+the active face without epsilon; state-dependent support is invalid in V1.
+See [DIRICHLET_MID_OBSERVATION.md](DIRICHLET_MID_OBSERVATION.md) for the complete
+continuous-law contract.
 
 ### H0/H1 reaction constraints
 
@@ -142,6 +221,15 @@ The generated list defines the **represented finite class** passed to the compos
 | `analytical_score_bound` | Verified projected-score analytical Type-II guarantee, separate constant-randomised guarantee and minimax upper bound. | Requires verified uniform moments; no joint enumeration. |
 | `deterministic_score_error` | Actual worst-case errors of the verified analytical threshold rule. | Requires its analytical bound and complete joint count-space enumeration. |
 | `calibrated_score_error` | Achieved worst-case errors after Type-I calibration within a fixed candidate score family. | Requires a well-defined candidate and complete enumeration; analytical moments may fail. |
+
+For Dirichlet observations, `composite_converse`, `candidate_score`, and
+`analytical_score_bound` use continuous-law analytic divergences and moments.
+`exact_minimax`, `deterministic_score_error`, and `calibrated_score_error`
+produce explicit optional refusals because their present implementations
+enumerate a finite count space or require a certified exact score CDF. The
+Dirichlet runner checks `composite converse <= represented beta* <= projected
+upper bound` only through the available lower and upper inequalities; it does
+not report the unavailable middle value.
 
 A finite-family Rényi minimiser is not automatically a joint convex-class projection or a finite-blocklength least-favourable pair. Calibration is optimal only within its fixed upper-score threshold family and can be strictly worse than unrestricted minimax.
 
@@ -187,11 +275,11 @@ This directory is relative to the workflow YAML. No output path participates in 
 
 `report.json` is deterministic JSON with schema version 1. Its top-level fields include `status`, `identity`, `scientific_specification`, `input_sources`, `hypotheses`, `observations`, `testing`, `results`, `relationship_checks`, `refusals` and `scope`. `status` distinguishes `completed` from `completed_with_refusals`.
 
-`scientific_specification` contains the complete canonical physical/isotope model, ordered experiments with tracer, target and count declarations, H0/H1 specifications, independence and observation semantics, region policy and testing settings. The report therefore retains the scientific inputs themselves alongside their fingerprints. `input_sources` retains source byte digests and forward-only experiment metadata without ephemeral source paths.
+`scientific_specification` contains the complete canonical physical/isotope model, ordered experiments with tracer and target declarations, the selected genuine-count or corrected-MID observation design, H0/H1 specifications, independence and observation semantics, region policy and testing settings. The report therefore retains the scientific inputs themselves alongside their fingerprints. `input_sources` retains source byte digests and forward-only experiment metadata without ephemeral source paths.
 
 Identity includes the canonical model, experiments, workflow specification, H0/H1 hypotheses, finite state families, observation specification/families and composite problem fingerprints. Software/runtime versions, dependency versions, source identity and available commit information are recorded separately from the scientific fingerprints. The runtime source digest covers runtime Python files and packaged authoritative YAML/JSON data. `software_git_dirty_scope` records that Git dirty status concerns `src/fluxemu` and `pyproject.toml`; generated reports outside those locations do not affect it. Ephemeral output paths, timestamps and process IDs do not define scientific identity.
 
-The ordered `hypotheses` list retains H0 before H1, exact declared constraints, state-generation policy and seed, requested/actual family sizes and ordered state IDs/fingerprints. Observation provenance retains experiment/target/replicate identities, genuine totals, explicit independence and exact ordered laws. Testing provenance records roles, budget, supplied orders, requested procedures, enumeration caps and numerical policy.
+The ordered `hypotheses` list retains H0 before H1, exact declared constraints, state-generation policy and seed, requested/actual family sizes and ordered state IDs/fingerprints. Observation provenance retains experiment/target/replicate identities, explicit independence and exact ordered laws. Count reports retain genuine totals. Dirichlet reports instead retain full and active support, predicted means, parameter vectors, concentration/source, replicate semantics, correction provenance and continuous-law fingerprints; concentration is explicitly marked not-a-count. Testing provenance records roles, budget, supplied orders, requested procedures, enumeration caps and numerical policy.
 
 Every `results` entry identifies `procedure`, `order`, `requested`, `status`, typed result contents or refusal. `status` is `evaluated`, `refused` or `not_requested`. A needed prerequisite may be evaluated even if not explicitly requested; it appears transparently with `requested: false`. For example, requesting deterministic achieved errors requires a candidate and analytical bound. Unrequested, unused procedures are marked `not_requested`.
 
@@ -216,12 +304,12 @@ It requires an output destination from `--output` or the YAML output setting. Th
 | Invalid scientific input or failed construction | Raises a FluxEMU error. | Exit 2 with diagnostic. |
 | Failed report persistence | Raises an error. | Exit 2 with diagnostic. |
 
-Invalid construction includes malformed/unknown reaction constraints, infeasible or identical H0/H1 regions, invalid sampling settings, incompatible isotope experiments, undefined stationary EMU evaluation, missing genuine-count declarations, unsupported observation semantics, missing multi-block independence, invalid budgets and malformed or unsupported orders. These inputs are never partially reinterpreted.
+Invalid construction includes malformed/unknown reaction constraints, infeasible or identical H0/H1 regions, invalid sampling settings, incompatible isotope experiments, undefined stationary EMU evaluation, missing genuine-count declarations, invalid Dirichlet precision/correction/replicate semantics, state-dependent continuous support, unsupported observation semantics, missing independence, invalid budgets and malformed or unsupported orders. These inputs are never partially reinterpreted.
 
-Optional statistical refusals include enumeration limits, exact-LP coefficient resolution or certification failures, missing exact-LP dependencies, unrepresentable numerical quantities and failed score verification. A refused analytical certificate remains refused even if direct calibration succeeds. A refusal is a reported limitation, not an estimate of the missing quantity.
+Optional statistical refusals include enumeration limits, exact-LP coefficient resolution or certification failures, missing exact-LP dependencies, unrepresentable numerical quantities, failed score verification, same-data plug-in concentration, and procedures unavailable for a continuous observation space. A refused analytical certificate remains refused even if a separate supported calculation succeeds. A refusal is a reported limitation, not an estimate of the missing quantity.
 
 ## What the result establishes
 
-Accepted outputs evaluate the declared count experiment against its represented finite classes under the stated numerical conditions. A converse establishes an impossibility constraint, not achievability. An achieved procedure supplies finite-class error performance and need not be unrestricted minimax. Numerical equality with minimax is limited to the accepted problem and reported tolerances.
+Accepted outputs evaluate the declared observation design against its represented finite classes under the stated numerical and modelling conditions. A converse establishes an impossibility constraint, not achievability. An achieved procedure or projected guarantee supplies an upper bound and need not be unrestricted minimax. Numerical equality with minimax is limited to accepted finite-count problems and reported tolerances; Dirichlet V1 does not compute the exact continuous minimax value.
 
-The workflow does not establish uniform guarantees over the complete continuous feasible flux families, identify a true flux or mechanism, or declare biological compatibility from observed data. It does not implement realistic non-count LC-MS/GC-MS laws, new natural-abundance correction machinery, generic composite p-values, compatibility/test inversion, Bayesian nuisance integration, transient inverse MFA or composite testing, experiment-design optimisation, a GUI or the full biological showcase. Issues #24–#28 remain separate work. See [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).
+The workflow does not establish uniform guarantees over the complete continuous feasible flux families, identify a true flux or mechanism, or declare biological compatibility from observed data. Dirichlet V1 is one testable continuous-noise assumption, not a universal LC-MS/GC-MS law. It does not implement new natural-abundance correction machinery, censoring/detection limits, biological random effects, unknown-precision finite-sample theory, generic composite p-values, compatibility/test inversion, Bayesian nuisance integration, transient inverse MFA or composite testing, experiment-design optimisation, a GUI or the full biological showcase. Issues #24–#28 remain separate work, and #25 remains open beyond this slice. See [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).

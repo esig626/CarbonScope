@@ -1,0 +1,222 @@
+{
+  "claims": {
+    "continuous_flux_family_solved": false,
+    "dirichlet_is_universally_adequate": false,
+    "exact_continuous_minimax_computed": false,
+    "monte_carlo_is_proof": false
+  },
+  "distribution_identities": {
+    "analytic_covariance_rows_and_columns_sum_to_zero": true,
+    "configurations": 5,
+    "draws_per_configuration": 60000,
+    "increasing_precision_decreased_every_marginal_variance": true,
+    "maximum_covariance_relative_frobenius_error": 0.008024300922727727,
+    "maximum_mean_standard_errors": 1.6260405210829951,
+    "maximum_sample_simplex_residual": 4.440892098500626e-16,
+    "total_draws": 300000
+  },
+  "model_diagnostics": {
+    "deliberately_non_dirichlet_logistic_normal": {
+      "bootstrap_p_value": 0.006622516556291391,
+      "covariance_relative_frobenius_error": 0.6252659009749134,
+      "estimated_precision": 21.97120059451636,
+      "suitable_for_rigorous_testing": false,
+      "warnings": [
+        "component-wise precisions differ; inspect the reported dispersion rather than treating marginal-SE agreement as proof of a Dirichlet model",
+        "analytical and biological contributions cannot be separated from these replicates",
+        "same-data plug-in precision is diagnostic/model-conditional and does not inherit known-precision finite-sample guarantees"
+      ]
+    },
+    "non_dirichlet_covariance_error_exceeded_true_dirichlet": true,
+    "replicates_per_dataset": 1200,
+    "true_dirichlet": {
+      "bootstrap_p_value": 0.5364238410596026,
+      "covariance_relative_frobenius_error": 0.026837966035493252,
+      "estimated_precision": 80.31974250406722,
+      "generating_precision": 80.0,
+      "suitable_for_rigorous_testing_when_independent": true
+    }
+  },
+  "mpmath": "1.4.1",
+  "numpy": "2.4.6",
+  "python": "3.11.16",
+  "renyi_identities_and_stress": {
+    "accepted": 2479,
+    "asymmetric_direction_controls": 22,
+    "dimensions": [
+      2,
+      12
+    ],
+    "explicit_numerical_refusals": 521,
+    "half_order_numerical_refusals": 41,
+    "high_precision_mpmath_comparisons": 51,
+    "infinite_integrability_results": 773,
+    "integrability_boundary_returned_infinity": true,
+    "maximum_relative_error_vs_mpmath": 3.078716726603991e-11,
+    "maximum_relative_error_vs_scipy": 2.051511298174527e-10,
+    "near_one_accepted_limit_controls": 2,
+    "near_one_accepted_orders": [
+      0.999,
+      1.001
+    ],
+    "near_one_explicit_refusals": 2,
+    "orders": [
+      0.01,
+      0.2,
+      0.5,
+      0.9,
+      0.99999,
+      1.00001,
+      1.2,
+      2.0,
+      10.0,
+      50.0
+    ],
+    "precision_range": [
+      0.05,
+      10000000.0
+    ],
+    "replicate_additivity_verified": true,
+    "reverse_numerical_refusals": 9,
+    "scipy_comparisons": 1706,
+    "stress_cases": 3000
+  },
+  "scale": 1.0,
+  "scipy": "1.17.1",
+  "score_moments": {
+    "analytic_stress_cases": 1500,
+    "draws_per_monte_carlo_case": 150000,
+    "finite_scipy_comparisons": 735,
+    "maximum_monte_carlo_standard_errors": 1.2549737123820712,
+    "maximum_relative_error_vs_scipy": 2.2818998752187732e-11,
+    "monte_carlo_cases": 3,
+    "nonintegrable_moments": 765
+  },
+  "seed": 20260909,
+  "source_sha256": {
+    "src/fluxemu/observation/dirichlet.py": "059452116172a7facd0f98bfa0c9bc17e2cbb5ee5eebdb6ef61a646cd33d5777",
+    "src/fluxemu/observation/dirichlet_stationary.py": "01ada7a5bf236b83a0e6f6d087fe8115a0c04159371dc71cd54a80fb4b2c632d",
+    "src/fluxemu/testing/dirichlet_composite.py": "0a2753f72fa652e72f3e86b20919ed7bd948b918fd86f94168f31cbe6be3f6ca",
+    "src/fluxemu/testing/dirichlet_stationary.py": "7f3201ab19b7aec2066eb794de9148e66d598739aa72c88ea9c4d93084672626"
+  },
+  "status": "passed",
+  "type_i_simulation": {
+    "all_represented_null_members_simulated": 5,
+    "campaigns": [
+      {
+        "alternative_members": [
+          {
+            "draws": 80000,
+            "empirical_type_ii": 0.0008375,
+            "member_id": "Q-0"
+          },
+          {
+            "draws": 80000,
+            "empirical_type_ii": 0.0106375,
+            "member_id": "Q-1"
+          }
+        ],
+        "analytical_deterministic_score_type_ii_upper_bound": 0.06847098651281307,
+        "analytical_projected_type_ii_upper_bound": 0.06847098651281307,
+        "epsilon": 0.05,
+        "name": "ordered-one-block",
+        "null_members": [
+          {
+            "draws": 80000,
+            "empirical_type_i": 0.000625,
+            "member_id": "P-0",
+            "rejections": 50,
+            "wilson_95_interval": [
+              0.0004741438094117197,
+              0.0008238138626608675
+            ]
+          },
+          {
+            "draws": 80000,
+            "empirical_type_i": 0.007425,
+            "member_id": "P-1",
+            "rejections": 594,
+            "wilson_95_interval": [
+              0.006853300683560389,
+              0.008044003947871211
+            ]
+          }
+        ],
+        "order": 0.5,
+        "threshold": 0.31438709555799194
+      },
+      {
+        "alternative_members": [
+          {
+            "draws": 80000,
+            "empirical_type_ii": 0.0193625,
+            "member_id": "Q-0"
+          }
+        ],
+        "analytical_deterministic_score_type_ii_upper_bound": 0.12005302935904816,
+        "analytical_projected_type_ii_upper_bound": 0.12005302935904816,
+        "epsilon": 0.05,
+        "name": "singleton-one-block",
+        "null_members": [
+          {
+            "draws": 80000,
+            "empirical_type_i": 0.007175,
+            "member_id": "P-0",
+            "rejections": 574,
+            "wilson_95_interval": [
+              0.006613331103112274,
+              0.00778399753716642
+            ]
+          }
+        ],
+        "order": 0.5,
+        "threshold": 0.8759105510652482
+      },
+      {
+        "alternative_members": [
+          {
+            "draws": 80000,
+            "empirical_type_ii": 0.0306125,
+            "member_id": "Q-0"
+          },
+          {
+            "draws": 80000,
+            "empirical_type_ii": 0.134575,
+            "member_id": "Q-1"
+          }
+        ],
+        "analytical_deterministic_score_type_ii_upper_bound": 0.6922731692353614,
+        "analytical_projected_type_ii_upper_bound": 0.6922731692353614,
+        "epsilon": 0.05,
+        "name": "ordered-two-block",
+        "null_members": [
+          {
+            "draws": 80000,
+            "empirical_type_i": 0.000625,
+            "member_id": "P-0",
+            "rejections": 50,
+            "wilson_95_interval": [
+              0.0004741438094117197,
+              0.0008238138626608675
+            ]
+          },
+          {
+            "draws": 80000,
+            "empirical_type_i": 0.00565,
+            "member_id": "P-1",
+            "rejections": 452,
+            "wilson_95_interval": [
+              0.005153804283640103,
+              0.00619367081060587
+            ]
+          }
+        ],
+        "order": 0.5,
+        "threshold": 2.627957625525257
+      }
+    ],
+    "certified_projected_test_cases": 3,
+    "draws_per_member": 80000,
+    "interpretation": "Monte Carlo sanity check only; analytic moments provide the guarantee"
+  }
+}

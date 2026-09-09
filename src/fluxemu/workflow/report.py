@@ -15,6 +15,7 @@ from tempfile import NamedTemporaryFile
 from fluxemu import __version__
 from fluxemu.exceptions import ConfigurationError, ValidationError
 from fluxemu.model import deterministic_serialise, model_fingerprint
+from fluxemu.observation import StationaryDirichletObservationSpecification
 from fluxemu.testing.composite import (
     COMPOSITE_LP_CERTIFICATION_TOLERANCE, COMPOSITE_LP_SMALL_MATRIX_VALUE,
     COMPOSITE_NUMERICAL_TOLERANCE, MIN_EXACT_COMPOSITE_EPSILON,
@@ -35,6 +36,20 @@ SCOPE = (
     "A candidate score is not a finite-sample least-favourable pair or an asserted joint convex-class projection.",
     "Achieved score errors need not equal unrestricted represented finite minimax.",
     "Exact minimax is a numerically checked small-problem LP and may explicitly refuse.",
+    "This is testing-performance analysis, not a realised-data composite p-value, compatibility set, or identification of biological truth.",
+)
+
+DIRICHLET_SCOPE = (
+    "Results apply only to the ordered represented finite H0/P0 and H1/P1 law families.",
+    "The observation space is continuous; no simplex discretisation, pseudo-count, or effective sample size is used.",
+    "Dirichlet precision is a declared concentration parameter, never a multinomial count.",
+    "The scalar-precision covariance model is a testable assumption, not a universal MID-noise law.",
+    "Sample frequency is not a prior; finite hit-and-run chains have no asserted mixing or independence guarantee.",
+    "Continuous feasible flux-family testing and continuous Renyi-order optimization remain unresolved here.",
+    "A converse constrains achievable error; it does not prove achievability.",
+    "A verified projected-score bound is an upper guarantee, not an exact minimax value or exact score error.",
+    "Exact finite minimax and exact/calibrated score errors are unsupported for the continuous observation space.",
+    "A candidate score is not a finite-sample least-favourable pair or an asserted joint convex-class projection.",
     "This is testing-performance analysis, not a realised-data composite p-value, compatibility set, or identification of biological truth.",
 )
 
@@ -139,7 +154,8 @@ def _result_value(item):
         return None
     result = {
         field.name: _json_value(getattr(value, field.name))
-        for field in fields(value) if field.name not in {"problem", "candidate", "bound"}
+        for field in fields(value)
+        if field.name not in {"problem", "candidate", "bound", "score"}
     }
     result["record_type"] = type(value).__name__
     if item.procedure in {"composite_converse", "candidate_score"}:
@@ -157,6 +173,17 @@ def _result_value(item):
         result["quantity"] = "finite_family_renyi_vertex_pair_candidate"
         result["finite_n_least_favourable_claimed"] = False
         result["joint_convex_projection_claimed"] = False
+        if hasattr(value, "score"):
+            result["analytic_score_blocks"] = [
+                {
+                    "observation_identity": list(score.null.observation_identity),
+                    "constant": score.constant,
+                    "active_support": list(score.null.active_support),
+                    "weights": list(score.weights),
+                    "replicate_count": score.null.replicate_count,
+                }
+                for score in value.score.block_scores
+            ]
     elif item.procedure == "analytical_score_bound":
         result["quantity"] = "verified_projected_score_analytical_bound"
         result["candidate_order"] = value.candidate.order
@@ -180,29 +207,91 @@ def workflow_report(result: HypothesisTestingWorkflowResult) -> dict:
     validate_workflow_result(result)
     specification = result.specification
     design = result.problem.null.members[0]
-    observations = {
-        "semantics": "genuine_counts",
-        "independent_blocks": specification.independent_blocks,
-        "block_order": [
-            {"experiment_id": identity[0], "target_id": identity[1], "replicate_id": identity[2],
-             "total_count": block.n, "mass_classes": list(block.mass_classes)}
-            for identity, block in zip(design.block_identities, design.blocks, strict=True)
-        ],
-        "families": [],
-    }
+    continuous = isinstance(
+        specification.observation, StationaryDirichletObservationSpecification,
+    )
+    if continuous:
+        observations = {
+            "semantics": "corrected_mid_dirichlet",
+            "continuous_observation_space": True,
+            "precision_is_count": False,
+            "independent_blocks": specification.independent_blocks,
+            "correction": _json_value(specification.observation.correction),
+            "block_order": [
+                {
+                    "experiment_id": block.observation_identity[0],
+                    "target_id": block.observation_identity[1],
+                    "replicate_id": block.observation_identity[2],
+                    "mass_classes": list(block.mass_classes),
+                    "active_support": list(block.active_support),
+                    "active_mass_classes": list(block.active_mass_classes),
+                    "structural_zero_mass_classes": list(block.structural_zero_mass_classes),
+                    "precision": block.precision,
+                    "precision_source": block.precision_source,
+                    "precision_provenance": block.precision_provenance,
+                    "replicate_count": block.replicate_count,
+                    "replicate_semantics": block.replicate_semantics,
+                    "independent_replicates": block.independent_replicates,
+                    "correction": _json_value(block.correction),
+                }
+                for block in design.blocks
+            ],
+            "families": [],
+        }
+    else:
+        # Keep the count report structure unchanged.
+        observations = {
+            "semantics": "genuine_counts",
+            "independent_blocks": specification.independent_blocks,
+            "block_order": [
+                {"experiment_id": identity[0], "target_id": identity[1], "replicate_id": identity[2],
+                 "total_count": block.n, "mass_classes": list(block.mass_classes)}
+                for identity, block in zip(design.block_identities, design.blocks, strict=True)
+            ],
+            "families": [],
+        }
     for role, source, family in (
         ("H0", result.stationary.null_observation_laws, result.problem.null),
         ("H1", result.stationary.alternative_observation_laws, result.problem.alternative),
     ):
-        observations["families"].append({
-            "role": role, "family_fingerprint": family.fingerprint,
-            "members": [
+        if continuous:
+            members = [
+                {
+                    "member_id": identifier,
+                    "law_fingerprint": member.fingerprint,
+                    "blocks": [
+                        {
+                            "law_fingerprint": block.fingerprint,
+                            "predicted_mean_mid": list(block.predicted_mid),
+                            "mass_classes": list(block.mass_classes),
+                            "active_support": list(block.active_support),
+                            "structural_zero_mass_classes": list(block.structural_zero_mass_classes),
+                            "precision": block.precision,
+                            "dirichlet_parameters": list(block.parameters),
+                            "precision_source": block.precision_source,
+                            "precision_provenance": block.precision_provenance,
+                            "replicate_count": block.replicate_count,
+                            "replicate_semantics": block.replicate_semantics,
+                            "independent_replicates": block.independent_replicates,
+                            "correction": _json_value(block.correction),
+                        }
+                        for block in member.blocks
+                    ],
+                }
+                for identifier, member in zip(family.member_ids, family.members, strict=True)
+            ]
+        else:
+            members = [
                 {"member_id": identifier, "law_fingerprint": member.fingerprint,
                  "blocks": [{"law_fingerprint": block.fingerprint, "total_count": block.n,
                              "probabilities": list(block.probabilities), "mass_classes": list(block.mass_classes)}
                             for block in member.blocks]}
                 for identifier, member in zip(family.member_ids, family.members, strict=True)
-            ],
+            ]
+        observations["families"].append({
+            "role": role,
+            "family_fingerprint": family.fingerprint,
+            "members": members,
             "ordered_component_fingerprints": [component.fingerprint for component in source.components],
             "common_model_state_validation": source.validation.to_dict(),
         })
@@ -217,7 +306,7 @@ def workflow_report(result: HypothesisTestingWorkflowResult) -> dict:
             "H0": specification.null,
             "H1": specification.alternative,
             "independent_blocks": specification.independent_blocks,
-            "observation_semantics": "genuine_counts",
+            "observation_semantics": specification.observation_semantics,
             "region_policy": "full-constrained-region",
             "testing": specification.testing,
         },
@@ -236,13 +325,41 @@ def workflow_report(result: HypothesisTestingWorkflowResult) -> dict:
             "type_i": "max over H0 of P0(decide H1)",
             "type_ii": "max over H1 of P1(decide H0)",
             "specification": specification.testing,
+            **({
+                "observation_procedure_support": {
+                    "supported": [
+                        "order-specific composite Renyi converse",
+                        "finite-family Renyi candidate selection",
+                        "analytic uniform score-moment verification",
+                        "verified projected-score analytical upper bound",
+                    ],
+                    "unsupported": [
+                        {
+                            "procedure": "exact_minimax",
+                            "reason": "unsupported_for_continuous_observation_space",
+                        },
+                        {
+                            "procedure": "deterministic_score_error",
+                            "reason": "no certified exact score CDF is implemented",
+                        },
+                        {
+                            "procedure": "calibrated_score_error",
+                            "reason": "finite outcome calibration does not apply to a continuous simplex",
+                        },
+                    ],
+                },
+            } if continuous else {}),
             "numerical_policy": {
                 "exact_minimum_epsilon": MIN_EXACT_COMPOSITE_EPSILON,
                 "lp_small_matrix_value": COMPOSITE_LP_SMALL_MATRIX_VALUE,
                 "lp_certification_tolerance": COMPOSITE_LP_CERTIFICATION_TOLERANCE,
                 "composite_numerical_tolerance": COMPOSITE_NUMERICAL_TOLERANCE,
                 "relationship_comparison_tolerance": RELATIONSHIP_TOLERANCE,
-                "policy": "unchanged repaired finite primitives; full enumeration or explicit refusal; no clipping, support dropping, or fallback",
+                "policy": (
+                    "analytic Dirichlet divergence/moments; continuous exact-minimax and score-CDF procedures explicitly refuse; no clipping, pseudocount, discretisation, or fallback"
+                    if continuous else
+                    "unchanged repaired finite primitives; full enumeration or explicit refusal; no clipping, support dropping, or fallback"
+                ),
             },
         },
         "results": [
@@ -252,7 +369,7 @@ def workflow_report(result: HypothesisTestingWorkflowResult) -> dict:
         ],
         "relationship_checks": result.relationship_checks,
         "refusals": result.refusals,
-        "scope": SCOPE,
+        "scope": DIRICHLET_SCOPE if continuous else SCOPE,
         "extended_real_encoding": "Infinity and -Infinity are strings; NaN is invalid",
     })
 
@@ -266,9 +383,29 @@ def workflow_summary(result: HypothesisTestingWorkflowResult) -> str:
         ) or "common physical bounds"
         lines.append(f"{role}: {family.hypothesis.description}; {constraints}; {len(family.states)} represented states.")
     design = result.problem.null.members[0]
-    lines.append(f"Observation design: {len(design.blocks)} genuine-count blocks; independent_blocks={result.specification.independent_blocks}.")
-    for identity, block in zip(design.block_identities, design.blocks, strict=True):
-        lines.append(f"  {' / '.join(identity)}: total_count={block.n}, mass classes={block.mass_classes}.")
+    continuous = isinstance(
+        result.specification.observation, StationaryDirichletObservationSpecification,
+    )
+    if continuous:
+        lines.append(
+            f"Observation design: {len(design.blocks)} corrected-MID Dirichlet blocks "
+            f"on a continuous simplex; independent_blocks={result.specification.independent_blocks}."
+        )
+        for block in design.blocks:
+            lines.append(
+                f"  {' / '.join(block.observation_identity)}: precision={block.precision:g} "
+                f"({block.precision_source}; not a count), replicates={block.replicate_count}, "
+                f"replicate_semantics={block.replicate_semantics}, active mass classes="
+                f"{block.active_mass_classes}, structural zeros={block.structural_zero_mass_classes}."
+            )
+        correction = result.specification.observation.correction
+        lines.append(
+            f"External correction: method={correction.method}; provenance={correction.provenance}."
+        )
+    else:
+        lines.append(f"Observation design: {len(design.blocks)} genuine-count blocks; independent_blocks={result.specification.independent_blocks}.")
+        for identity, block in zip(design.block_identities, design.blocks, strict=True):
+            lines.append(f"  {' / '.join(identity)}: total_count={block.n}, mass classes={block.mass_classes}.")
     lines.append(f"Worst-case Type-I budget: {result.specification.testing.epsilon:g}.")
     for item in result.testing_results:
         if item.status == "not_requested":
@@ -296,7 +433,7 @@ def workflow_summary(result: HypothesisTestingWorkflowResult) -> str:
     if not result.refusals:
         lines.append("No requested statistical procedure was refused.")
     lines.append("The evaluated quantities establish the stated performance bounds/errors for these represented finite laws only.")
-    lines.extend(SCOPE)
+    lines.extend(DIRICHLET_SCOPE if continuous else SCOPE)
     return "\n".join(lines) + "\n"
 
 

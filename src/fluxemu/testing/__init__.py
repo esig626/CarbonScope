@@ -1,9 +1,10 @@
-"""Simple and finite-composite testing over declared genuine-count laws.
+"""Simple and finite-composite testing over declared observation laws.
 
 Simple testing fixes one H0/P0 law and one H1/P1 law. Composite testing uses
 explicit finite H0/H1 families of complete independent MID product laws and
-keeps minimax worst-case Type I/II roles separate from MFA fitting. Finite
-classes are never silently convexified.
+keeps minimax worst-case Type I/II roles separate from MFA fitting. A parallel
+continuous path handles corrected-MID Dirichlet laws without applying finite
+count-space procedures. Finite classes are never silently convexified.
 """
 
 from .simple import (
@@ -57,6 +58,29 @@ from .composite_stationary import (
     StationaryCompositeTestingResult,
     evaluate_stationary_composite_hypotheses,
 )
+from .dirichlet_composite import (
+    DIRICHLET_MOMENT_VERIFICATION_TOLERANCE,
+    DirichletCompositeBinaryTestingProblem,
+    DirichletCompositeMIDLawFamily,
+    DirichletCompositeRenyiConverseBound,
+    DirichletCompositeRenyiScoreCandidate,
+    DirichletCompositeScoreBound,
+    DirichletProductLogLikelihoodScore,
+    DirichletTestingAssumptionError,
+    IndependentDirichletMIDProductLaw,
+    UnsupportedContinuousObservationError,
+    calibrate_dirichlet_composite_score_test,
+    composite_dirichlet_renyi_converse_at_order,
+    composite_dirichlet_renyi_score_candidate,
+    composite_dirichlet_score_bound_at_order,
+    evaluate_dirichlet_composite_score_test,
+    exact_dirichlet_composite_minimax,
+    verified_composite_dirichlet_renyi_score,
+)
+from .dirichlet_stationary import (
+    StationaryDirichletCompositeTestingResult,
+    evaluate_stationary_dirichlet_composite_hypotheses,
+)
 
 __all__ = [
     "BrunoOrderBound", "BrunoTheoremAssumptionError", "NumericalLimitError",
@@ -79,4 +103,17 @@ __all__ = [
     "composite_renyi_score_candidate", "composite_score_bound_at_order",
     "evaluate_composite_score_test", "evaluate_stationary_composite_hypotheses",
     "exact_finite_composite_minimax", "verified_composite_renyi_score",
+    "DIRICHLET_MOMENT_VERIFICATION_TOLERANCE",
+    "DirichletCompositeBinaryTestingProblem", "DirichletCompositeMIDLawFamily",
+    "DirichletCompositeRenyiConverseBound", "DirichletCompositeRenyiScoreCandidate",
+    "DirichletCompositeScoreBound", "DirichletProductLogLikelihoodScore",
+    "DirichletTestingAssumptionError", "IndependentDirichletMIDProductLaw",
+    "UnsupportedContinuousObservationError", "calibrate_dirichlet_composite_score_test",
+    "composite_dirichlet_renyi_converse_at_order",
+    "composite_dirichlet_renyi_score_candidate",
+    "composite_dirichlet_score_bound_at_order",
+    "evaluate_dirichlet_composite_score_test", "exact_dirichlet_composite_minimax",
+    "verified_composite_dirichlet_renyi_score",
+    "StationaryDirichletCompositeTestingResult",
+    "evaluate_stationary_dirichlet_composite_hypotheses",
 ]

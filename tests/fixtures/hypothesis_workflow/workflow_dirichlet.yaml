@@ -1,0 +1,67 @@
+schema_version: 1
+model: model.xml
+
+experiments:
+  - experiment_id: mixed-glucose
+    specification: experiment.yaml
+
+hypotheses:
+  H0:
+    description: Predominantly unlabelled glucose input
+    reaction_bounds:
+      - reaction_id: HX_U
+        lower_bound: 7.0
+        upper_bound: 8.0
+    state_generation:
+      method: hit_and_run
+      count: 2
+      seed: 23
+      burn_in: 8
+      thinning: 2
+      max_direction_attempts: 100
+  H1:
+    description: Predominantly fully labelled glucose input
+    reaction_bounds:
+      - reaction_id: HX_U
+        lower_bound: 2.0
+        upper_bound: 3.0
+    state_generation:
+      method: hit_and_run
+      count: 2
+      seed: 24
+      burn_in: 8
+      thinning: 2
+      max_direction_attempts: 100
+
+observations:
+  semantics: corrected_mid_dirichlet
+  correction:
+    status: externally_corrected
+    method: public-synthetic-declaration
+    provenance: tests/fixtures/hypothesis_workflow/workflow_dirichlet.yaml
+  blocks:
+    - experiment_id: mixed-glucose
+      target_id: pool-mid
+      replicate_id: technical-series-1
+      replicate_count: 3
+      replicate_semantics: technical_measurement_variability
+      independent_replicates: true
+      noise_model:
+        distribution: dirichlet
+        precision: 50.0
+        precision_source: fixed_external
+        precision_provenance: public synthetic validation fixture
+  independent_blocks: false
+
+testing:
+  epsilon: 0.05
+  procedures:
+    - composite_converse
+    - exact_minimax
+    - candidate_score
+    - analytical_score_bound
+    - deterministic_score_error
+    - calibrated_score_error
+  converse_orders: [1.2]
+  score_orders: [0.5]
+  max_outcomes: 1000

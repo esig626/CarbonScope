@@ -18,13 +18,13 @@ SBML/FBC model
   -> stationary or transient EMU prediction
   -> MID ensembles
   -> stationary MFA when required
-  -> explicit observation laws for genuine counts
+  -> explicit observation laws for genuine counts or corrected continuous MIDs
   -> simple or finite composite hypothesis testing
 ```
 
 Finite composite testing is implemented for explicit finite H0 and H1 families of complete observable laws. CarbonScope does not silently promote a represented finite family to a continuous mechanism class, convexify it, or claim that a finite family Rényi minimising pair is automatically finite sample least favourable.
 
-The public workflow constructs those finite families from one common SBML/FBC model, explicit H0/H1 reaction constraints, native isotope experiment files and genuine-count declarations. Users do not need to construct flux-state tuples or probability laws by hand.
+The public workflow constructs those finite families from one common SBML/FBC model, explicit H0/H1 reaction constraints, native isotope experiment files and either genuine-count declarations or corrected-MID Dirichlet declarations. Users do not need to construct flux-state tuples or probability laws by hand.
 
 ## Runtime interface
 
@@ -73,7 +73,7 @@ fluxemu test-hypotheses \
   --output results/hypothesis_workflow
 ```
 
-The specification refers to one physical model and ordered native experiment files, declares separate H0/H1 reaction-bound restrictions, and supplies each family's hit-and-run state count and seed. The workflow validates the constrained regions, samples complete jointly feasible states, evaluates stationary EMU and constructs complete genuine-count observation laws. It writes deterministic `report.json` and `summary.txt` files with scientific identities, ordered states and observation blocks, testing results and explicit refusals.
+The specification refers to one physical model and ordered native experiment files, declares separate H0/H1 reaction-bound restrictions, and supplies each family's hit-and-run state count and seed. The workflow validates the constrained regions, samples complete jointly feasible states, evaluates stationary EMU and constructs either genuine-count laws or continuous Dirichlet laws for externally corrected MIDs. It writes deterministic `report.json` and `summary.txt` files with scientific identities, ordered states and observation blocks, testing results and explicit refusals.
 
 The equivalent public Python entry point is:
 
@@ -88,7 +88,7 @@ result = run_hypothesis_testing_workflow(
 
 Converse bounds, unrestricted represented finite minimax values, candidate scores, verified analytical score bounds and achieved test errors retain separate labels. A valid workflow with a refused optional statistical procedure exits successfully and records the reason; invalid input or failed model/state/observation construction exits with code 2. Exact minimax remains a small-problem numerical oracle and can refuse even within its enumeration cap.
 
-These results concern the generated **represented finite classes**. They do not certify the complete continuous feasible flux families or identify a true mechanism. Counts and multi-block independence must be declared explicitly; normalised MIDs and intensities cannot be reinterpreted as counts. See [docs/HYPOTHESIS_WORKFLOW.md](docs/HYPOTHESIS_WORKFLOW.md) for the complete files-to-report example, YAML contract, API and failure semantics.
+These results concern the generated **represented finite classes**. They do not certify the complete continuous feasible flux families or identify a true mechanism. Counts, concentrations, replicate semantics and independence must be declared explicitly; normalised MIDs and intensities cannot be reinterpreted as counts. See [docs/HYPOTHESIS_WORKFLOW.md](docs/HYPOTHESIS_WORKFLOW.md) for the complete files-to-report examples, YAML contract, API and failure semantics.
 
 ## Stationary MFA
 
@@ -118,6 +118,30 @@ with declared count totals, exact structural zero support, reproducible sampling
 
 See [docs/STATIONARY_OBSERVATION_LAW.md](docs/STATIONARY_OBSERVATION_LAW.md).
 
+## Corrected continuous MID observation laws
+
+For a properly QC'd, externally corrected composition, `fluxemu.observation`
+also provides the explicit continuous model
+
+```text
+Y | p, kappa ~ Dirichlet(kappa * p).
+```
+
+`kappa` is a concentration parameter, never a count. Its fixed or independent
+calibration source, correction provenance, replicate meaning and independence
+are retained. Common structural zeros define an explicit simplex face; a
+state-dependent face or an observed active-coordinate zero is refused without
+pseudocounts. Public diagnostics expose component-wise implied concentrations,
+replicate covariance fit and deterministic bootstrap model checks. Same-data
+plug-in concentration is diagnostic/model-conditional and cannot enter the
+known-precision testing guarantee.
+
+Finite represented Dirichlet families support analytic directed Rényi
+converses and verified projected score-moment upper bounds. The count-space
+exact minimax LP and exact score CDF/calibration explicitly refuse continuous
+observations. See [docs/DIRICHLET_MID_OBSERVATION.md](docs/DIRICHLET_MID_OBSERVATION.md)
+and its [validation report](results/dirichlet_mid_validation/VALIDATION_REPORT.md).
+
 ## Simple binary inference
 
 For two fixed feasible flux states, CarbonScope supports:
@@ -145,7 +169,7 @@ See [docs/SIMPLE_BINARY_RENYI_BOUNDS.md](docs/SIMPLE_BINARY_RENYI_BOUNDS.md) and
 
 ## Finite composite binary testing
 
-CarbonScope supports explicit finite H0 and H1 families of **complete observable laws**. Each member may be an explicitly independent ordered product of genuine count MID blocks, including joint panels generated from complete feasible flux states through native stationary EMU.
+CarbonScope supports explicit finite H0 and H1 families of **complete observable laws**. A member may be an explicitly independent ordered product of genuine-count MID blocks or, through a separate continuous implementation, corrected-MID Dirichlet blocks. Joint panels are generated from complete feasible flux states through native stationary EMU.
 
 For a randomised test `phi`,
 
@@ -181,7 +205,7 @@ See [docs/COMPOSITE_TESTING.md](docs/COMPOSITE_TESTING.md).
 
 ## Validation
 
-The test suite includes analytical controls, exact finite count enumeration, independent deterministic test oracles, exact finite composite minimax controls, joint product law controls, structural zero score gates, adversarial nonordered composite families, a direct full isotopomer implementation of the Antoniewicz TCA benchmark, and the packaged E. coli acceptance model. The curated carbon transition library retains explicit source provenance and atom mappings.
+The test suite includes analytical controls, exact finite count enumeration, independent deterministic test oracles, exact finite composite minimax controls, joint product law controls, structural zero score gates, adversarial nonordered composite families, a direct full isotopomer implementation of the Antoniewicz TCA benchmark, and the packaged E. coli acceptance model. The dedicated Dirichlet campaign adds independent SciPy and high-precision checks, continuous score-moment controls, Type-I simulations, and compatible/incompatible compositional model diagnostics. The curated carbon transition library retains explicit source provenance and atom mappings.
 
 The production FastFVA architecture is a HiGHS native adaptation of the shared memory computational design of Marouen Ben Guebila's VFFVA. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

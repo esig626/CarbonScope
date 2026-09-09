@@ -14,6 +14,22 @@ Soft measured flux likelihood terms, global optimisation, Bayesian inference and
 
 The multinomial observation layer is valid only when the measurements genuinely have fixed total isotopologue count semantics. Normalised MIDs, percentages, peak areas and arbitrary intensities do not define a count total and are not converted to pseudo counts.
 
+The Dirichlet MID layer is limited to externally corrected continuous
+compositions with a positive fixed or independently calibrated concentration
+and explicit replicate semantics. Its scalar concentration imposes covariance
+`(diag(p)-p p.T)/(kappa+1)`; real analytical and biological noise need not have
+that form. Same-data plug-in concentration is diagnostic/model-conditional and
+is refused for known-precision finite-sample guarantees. Biological and
+analytical variability are not separated automatically.
+
+Dirichlet V1 uses an explicitly common simplex face. Structural zeros shared by
+every represented state in a block are retained and removed from the active
+face, but state-dependent support is refused. Exact observed zeros on active
+coordinates need a censoring/detection-limit or other observation model; no
+pseudocount is added. Near-one or otherwise ill-conditioned Rényi calculations
+may refuse under the documented binary64 policy. See
+[DIRICHLET_MID_OBSERVATION.md](DIRICHLET_MID_OBSERVATION.md).
+
 The exact simple null likelihood ratio p value enumerates the positive probability null count space. Enumeration is protected by an explicit outcome limit. If the limit is exceeded, CarbonScope raises an error; it does not silently substitute chi square, Monte Carlo, saddlepoint or another approximation.
 
 A generic composite p value is not implemented. The existing p value remains explicitly simple null and alternative specific.
@@ -58,11 +74,11 @@ A sampled finite flux state family is exactly the class represented to these fin
 
 Each finite family is sampled from its complete constrained steady-state region without a retained objective constraint. The native experiment's forward-analysis `fva_fraction_of_optimum` does not restrict the hypothesis region. Bounds fixing a single reaction are supported; a general objective-retention or coupled biological constraint requires a separately specified extension.
 
-The workflow requires native stationary isotope experiments sharing the same authoritative canonical isotope model and genuine positive integer count totals. Multiple declared observation blocks require explicit independence, including blocks labelled as replicates. Neither a shared flux state nor separate replicate IDs establishes independence. The workflow does not provide correlated block laws, realistic non-count LC-MS/GC-MS models or biological replicate random effects.
+The workflow requires native stationary isotope experiments sharing the same authoritative canonical isotope model. Its observation branch must declare either genuine positive integer count totals or externally corrected Dirichlet blocks with concentration source, replicate meaning and correction provenance. Multiple declared observation blocks require explicit independence; multiple Dirichlet replicates additionally require explicit conditional independence. Neither a shared flux state nor separate replicate IDs establishes independence. The workflow does not provide correlated block laws, general LC-MS/GC-MS noise, censoring, or biological replicate random effects.
 
 Malformed scientific input, infeasible or indistinguishable hypothesis regions, failed state generation and incompatible/undefined native observation construction invalidate the workflow. Optional statistical procedures may instead produce explicit refused outcomes with reasons in an otherwise valid report. Enumeration and numerical certification limits remain unchanged, and a workflow that finishes successfully does not imply every requested statistic was available.
 
-The output describes finite-class testing performance and provenance. It does not perform a realised-data composite decision, provide generic composite p-values, invert tests, identify a true flux or mechanism, or establish a continuous-family guarantee. A converse supplies an impossibility constraint; an achieved score procedure need not be unrestricted minimax. The compact acceptance fixture is software infrastructure, not a biological showcase. Issues #24–#28 remain separate work; this workflow does not implement their non-count observation, compatibility/inversion, continuous-family or other scientific extensions.
+The output describes finite-class testing performance and provenance. It does not perform a realised-data composite decision, provide generic composite p-values, invert tests, identify a true flux or mechanism, or establish a continuous-family guarantee. A converse supplies an impossibility constraint; an achieved score procedure need not be unrestricted minimax. For Dirichlet observations, the exact finite count-space minimax LP and exact score-CDF/calibration procedures are unavailable, so only valid lower and projected upper bounds are reported. The compact acceptance fixtures are software infrastructure, not biological showcases. Issue #25 remains open beyond the Dirichlet V1 slice, including external empirical validation and broader observation models; issues #24 and #26–#28 remain separate work.
 
 See [HYPOTHESIS_WORKFLOW.md](HYPOTHESIS_WORKFLOW.md) for the schema, result labels and refusal contract.
 
@@ -70,7 +86,7 @@ See [HYPOTHESIS_WORKFLOW.md](HYPOTHESIS_WORKFLOW.md) for the schema, result labe
 
 Atom transitions must be supplied explicitly through the authoritative mappings and model representation. CarbonScope does not infer mappings from stoichiometry, names, molecular formulae or an external database.
 
-The native stationary path does not implement natural abundance correction; experiments requiring that capability must be preprocessed by a scientifically justified external procedure before entering the current native model.
+The native stationary path does not implement natural abundance correction. Dirichlet V1 requires explicit externally corrected status plus method and source provenance; unknown, raw or uncorrected MIDs are refused for that workflow. CarbonScope does not validate or reproduce the external correction engine itself.
 
 The transient implementation is fixed flux forward simulation with explicit pool quantities, requested time points and an initial unlabelled internal state. Transient inverse MFA is not implemented.
 
